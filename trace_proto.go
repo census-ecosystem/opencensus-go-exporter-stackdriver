@@ -19,7 +19,6 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"go.opencensus.io/internal"
 	"go.opencensus.io/plugin/ochttp"
 
 	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
@@ -103,7 +102,7 @@ func protoFromSpanData(s *trace.SpanData, projectID string) *tracepb.Span {
 	}
 	sp.Attributes.AttributeMap[agentLabel] = &tracepb.AttributeValue{
 		Value: &tracepb.AttributeValue_StringValue{
-			StringValue: trunc(internal.UserAgent, maxAttributeStringValue),
+			StringValue: trunc(userAgent, maxAttributeStringValue),
 		},
 	}
 

@@ -23,7 +23,7 @@ import (
 	"testing"
 	"time"
 
-	"go.opencensus.io/internal/testpb"
+	"contrib.go.opencensus.io/exporter/stackdriver/internal/testpb"
 	"go.opencensus.io/plugin/ochttp"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"

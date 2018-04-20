@@ -23,7 +23,7 @@ import (
 	"log"
 	"time"
 
-	"go.opencensus.io/exporter/stackdriver"
+	"contrib.go.opencensus.io/exporter/stackdriver"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 )

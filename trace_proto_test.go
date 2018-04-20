@@ -24,8 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"go.opencensus.io/internal"
-
 	"github.com/golang/protobuf/proto"
 	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"
@@ -150,13 +148,14 @@ func TestExportTrace(t *testing.T) {
 		span.Name, span.SpanId, span.ParentSpanId = "", "", ""
 	}
 
+	ua := trunc(userAgent, len(userAgent))
 	expectedSpans := spans{
 		&tracepb.Span{
 			DisplayName:             trunc("span0", 128),
 			SameProcessAsParentSpan: &wrapperspb.BoolValue{Value: false},
 			Attributes: &tracepb.Span_Attributes{
 				AttributeMap: map[string]*tracepb.AttributeValue{
-					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: trunc(internal.UserAgent, len(internal.UserAgent))}},
+					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: ua}},
 				},
 			},
 		},
@@ -165,7 +164,7 @@ func TestExportTrace(t *testing.T) {
 			SameProcessAsParentSpan: &wrapperspb.BoolValue{Value: true},
 			Attributes: &tracepb.Span_Attributes{
 				AttributeMap: map[string]*tracepb.AttributeValue{
-					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: trunc(internal.UserAgent, len(internal.UserAgent))}},
+					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: ua}},
 				},
 			},
 		},
@@ -175,7 +174,7 @@ func TestExportTrace(t *testing.T) {
 				AttributeMap: map[string]*tracepb.AttributeValue{
 					"key2":     {Value: &tracepb.AttributeValue_StringValue{StringValue: trunc("value2", 256)}},
 					"key1":     {Value: &tracepb.AttributeValue_IntValue{IntValue: 100}},
-					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: trunc(internal.UserAgent, len(internal.UserAgent))}},
+					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: ua}},
 				},
 			},
 			TimeEvents: &tracepb.Span_TimeEvents{
@@ -212,7 +211,7 @@ func TestExportTrace(t *testing.T) {
 			DisplayName: trunc("span3", 128),
 			Attributes: &tracepb.Span_Attributes{
 				AttributeMap: map[string]*tracepb.AttributeValue{
-					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: trunc(internal.UserAgent, len(internal.UserAgent))}},
+					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: ua}},
 				},
 			},
 			TimeEvents: &tracepb.Span_TimeEvents{
@@ -245,7 +244,7 @@ func TestExportTrace(t *testing.T) {
 			DisplayName: trunc("span4", 128),
 			Attributes: &tracepb.Span_Attributes{
 				AttributeMap: map[string]*tracepb.AttributeValue{
-					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: trunc(internal.UserAgent, len(internal.UserAgent))}},
+					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: ua}},
 				},
 			},
 			TimeEvents: &tracepb.Span_TimeEvents{

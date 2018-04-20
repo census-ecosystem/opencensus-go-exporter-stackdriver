@@ -19,7 +19,7 @@
 //
 // The package uses Application Default Credentials to authenticate.  See
 // https://developers.google.com/identity/protocols/application-default-credentials
-package stackdriver // import "go.opencensus.io/exporter/stackdriver"
+package stackdriver // import "contrib.go.opencensus.io/exporter/stackdriver"
 
 import (
 	"context"

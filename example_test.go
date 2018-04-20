@@ -18,8 +18,8 @@ import (
 	"log"
 	"net/http"
 
-	"go.opencensus.io/exporter/stackdriver"
-	"go.opencensus.io/exporter/stackdriver/propagation"
+	"contrib.go.opencensus.io/exporter/stackdriver"
+	"contrib.go.opencensus.io/exporter/stackdriver/propagation"
 	"go.opencensus.io/plugin/ochttp"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"

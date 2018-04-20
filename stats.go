@@ -25,7 +25,6 @@ import (
 	"sync"
 	"time"
 
-	"go.opencensus.io/internal"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
@@ -43,10 +42,14 @@ import (
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 )
 
-const maxTimeSeriesPerUpload = 200
-const opencensusTaskKey = "opencensus_task"
-const opencensusTaskDescription = "Opencensus task identifier"
-const defaultDisplayNamePrefix = "OpenCensus"
+const (
+	maxTimeSeriesPerUpload    = 200
+	opencensusTaskKey         = "opencensus_task"
+	opencensusTaskDescription = "Opencensus task identifier"
+	defaultDisplayNamePrefix  = "OpenCensus"
+
+	userAgent = "opencensus-go [0.8.0]"
+)
 
 // statsExporter exports stats to the Stackdriver Monitoring.
 type statsExporter struct {
@@ -89,7 +92,7 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 
 	seenProjects[o.ProjectID] = true
 
-	opts := append(o.MonitoringClientOptions, option.WithUserAgent(internal.UserAgent))
+	opts := append(o.MonitoringClientOptions, option.WithUserAgent(userAgent))
 	client, err := monitoring.NewMetricClient(context.Background(), opts...)
 	if err != nil {
 		return nil, err
@@ -157,7 +160,7 @@ func (e *statsExporter) Flush() {
 func (e *statsExporter) uploadStats(vds []*view.Data) error {
 	ctx, span := trace.StartSpan(
 		context.Background(),
-		"go.opencensus.io/exporter/stackdriver.uploadStats",
+		"contrib.go.opencensus.io/exporter/stackdriver.uploadStats",
 		trace.WithSampler(trace.NeverSample()),
 	)
 	defer span.End()
@@ -367,7 +370,7 @@ func namespacedViewName(v string) string {
 func newLabels(tags []tag.Tag, taskValue string) map[string]string {
 	labels := make(map[string]string)
 	for _, tag := range tags {
-		labels[internal.Sanitize(tag.Key.Name())] = tag.Value
+		labels[sanitize(tag.Key.Name())] = tag.Value
 	}
 	labels[opencensusTaskKey] = taskValue
 	return labels
@@ -377,7 +380,7 @@ func newLabelDescriptors(keys []tag.Key) []*labelpb.LabelDescriptor {
 	labelDescriptors := make([]*labelpb.LabelDescriptor, len(keys)+1)
 	for i, key := range keys {
 		labelDescriptors[i] = &labelpb.LabelDescriptor{
-			Key:       internal.Sanitize(key.Name()),
+			Key:       sanitize(key.Name()),
 			ValueType: labelpb.LabelDescriptor_STRING, // We only use string tags
 		}
 	}
@@ -417,7 +420,7 @@ func equalMeasureAggTagKeys(md *metricpb.MetricDescriptor, m stats.Measure, agg 
 
 	labels := make(map[string]struct{}, len(keys)+1)
 	for _, k := range keys {
-		labels[internal.Sanitize(k.Name())] = struct{}{}
+		labels[sanitize(k.Name())] = struct{}{}
 	}
 	labels[opencensusTaskKey] = struct{}{}
 

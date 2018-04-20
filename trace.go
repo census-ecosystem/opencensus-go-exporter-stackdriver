@@ -119,7 +119,7 @@ func (e *traceExporter) uploadSpans(spans []*trace.SpanData) {
 	// Create a never-sampled span to prevent traces associated with exporter.
 	ctx, span := trace.StartSpan( // TODO: add timeouts
 		context.Background(),
-		"go.opencensus.io/exporter/stackdriver.uploadSpans",
+		"contrib.go.opencensus.io/exporter/stackdriver.uploadSpans",
 		trace.WithSampler(trace.NeverSample()),
 	)
 	defer span.End()
