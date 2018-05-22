@@ -81,6 +81,9 @@ type Options struct {
 	// MetricPrefix overrides the OpenCensus prefix of a stackdriver metric.
 	// Optional.
 	MetricPrefix string
+
+	// DefaultTraceAttributes will be appended to every span that is exported.
+	DefaultTraceAttributes map[string]interface{}
 }
 
 // Exporter is a stats.Exporter and trace.Exporter
@@ -125,7 +128,22 @@ func (e *Exporter) ExportView(vd *view.Data) {
 
 // ExportSpan exports a SpanData to Stackdriver Trace.
 func (e *Exporter) ExportSpan(sd *trace.SpanData) {
+	if len(e.traceExporter.o.DefaultTraceAttributes) > 0 {
+		sd = e.sdWithDefaultTraceAttributes(sd)
+	}
 	e.traceExporter.ExportSpan(sd)
+}
+
+func (e *Exporter) sdWithDefaultTraceAttributes(sd *trace.SpanData) *trace.SpanData {
+	newSD := *sd
+	newSD.Attributes = make(map[string]interface{})
+	for k, v := range e.traceExporter.o.DefaultTraceAttributes {
+		newSD.Attributes[k] = v
+	}
+	for k, v := range sd.Attributes {
+		newSD.Attributes[k] = v
+	}
+	return &newSD
 }
 
 // Flush waits for exported data to be uploaded.
