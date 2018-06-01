@@ -32,6 +32,8 @@ import (
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 	"google.golang.org/grpc"
+	"google.golang.org/genproto/googleapis/api/distribution"
+	"fmt"
 )
 
 var authOptions = []option.ClientOption{option.WithGRPCConn(&grpc.ClientConn{})}
@@ -315,7 +317,47 @@ func TestExporter_makeReq(t *testing.T) {
 			name:   "dist agg + time window",
 			projID: "proj-id",
 			vd:     newTestDistViewData(distView, start, end),
-			want:   nil, //TODO: add expectation for distribution
+			want:   []*monitoringpb.CreateTimeSeriesRequest{{
+				Name: monitoring.MetricProjectPath("proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/distview",
+							Labels: map[string]string{
+								opencensusTaskKey: taskValue,
+							},
+						},
+						Resource: &monitoredrespb.MonitoredResource{
+							Type: "global",
+						},
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DistributionValue{
+									DistributionValue: &distribution.Distribution{
+										Count: 5,
+										Mean: 3.0,
+										SumOfSquaredDeviation: 1.5,
+										BucketOptions: &distribution.Distribution_BucketOptions{
+											Options:&distribution.Distribution_BucketOptions_ExplicitBuckets{
+												ExplicitBuckets:&distribution.Distribution_BucketOptions_Explicit{
+													Bounds: []float64{2.0, 4.0, 7.0}}}},
+										BucketCounts:[]int64{2, 2, 1}},
+								}},
+							},
+						},
+					},
+				},
+			}},
 		},
 	}
 	for _, tt := range tests {
@@ -335,6 +377,8 @@ func TestExporter_makeReq(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(resps, tt.want) {
+				temp := reflect.DeepEqual(resps, tt.want)
+				fmt.Print(temp)
 				t.Errorf("%v: Exporter.makeReq() = %v, want %v", tt.name, resps, tt.want)
 			}
 		})
