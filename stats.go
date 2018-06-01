@@ -65,16 +65,8 @@ type statsExporter struct {
 	defaultLabels map[string]labelValue
 }
 
-// Enforces the singleton on NewExporter per projectID per process
-// lest there will be races with Stackdriver.
 var (
-	seenProjectsMu sync.Mutex
-	seenProjects   = make(map[string]bool)
-)
-
-var (
-	errBlankProjectID    = errors.New("expecting a non-blank ProjectID")
-	errSingletonExporter = errors.New("only one exporter can be created per unique ProjectID per process")
+	errBlankProjectID = errors.New("expecting a non-blank ProjectID")
 )
 
 // newStatsExporter returns an exporter that uploads stats data to Stackdriver Monitoring.
@@ -83,18 +75,6 @@ var (
 func newStatsExporter(o Options, enforceProjectUniqueness bool) (*statsExporter, error) {
 	if strings.TrimSpace(o.ProjectID) == "" {
 		return nil, errBlankProjectID
-	}
-
-	if enforceProjectUniqueness {
-		seenProjectsMu.Lock()
-		_, seen := seenProjects[o.ProjectID]
-		if !seen {
-			seenProjects[o.ProjectID] = true
-		}
-		seenProjectsMu.Unlock()
-		if seen {
-			return nil, errSingletonExporter
-		}
 	}
 
 	opts := append(o.MonitoringClientOptions, option.WithUserAgent(userAgent))

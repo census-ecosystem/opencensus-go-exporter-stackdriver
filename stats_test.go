@@ -48,28 +48,6 @@ func TestRejectBlankProjectID(t *testing.T) {
 	}
 }
 
-// Ensure only one exporter per projectID per process, any
-// subsequent invocations of NewExporter should fail.
-func TestNewExporterSingletonPerProcess(t *testing.T) {
-	ids := []string{"open-census.io", "x", "fakeProjectID"}
-	for _, projectID := range ids {
-		opts := Options{ProjectID: projectID, MonitoringClientOptions: authOptions}
-		exp, err := newStatsExporter(opts, true)
-		if err != nil {
-			t.Errorf("NewExporter() projectID = %q err = %q", projectID, err)
-			continue
-		}
-		if exp == nil {
-			t.Errorf("NewExporter returned a nil Exporter")
-			continue
-		}
-		exp, err = newStatsExporter(opts, true)
-		if err == nil || exp != nil {
-			t.Errorf("NewExporter more than once should fail; exp (%v) err %v", exp, err)
-		}
-	}
-}
-
 func TestExporter_makeReq(t *testing.T) {
 	m := stats.Float64("test-measure", "measure desc", "unit")
 
