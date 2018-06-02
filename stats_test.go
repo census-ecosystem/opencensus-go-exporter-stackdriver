@@ -26,14 +26,13 @@ import (
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
 	"google.golang.org/api/option"
+	"google.golang.org/genproto/googleapis/api/distribution"
 	"google.golang.org/genproto/googleapis/api/label"
 	"google.golang.org/genproto/googleapis/api/metric"
 	metricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 	"google.golang.org/grpc"
-	"google.golang.org/genproto/googleapis/api/distribution"
-	"fmt"
 )
 
 var authOptions = []option.ClientOption{option.WithGRPCConn(&grpc.ClientConn{})}
@@ -317,7 +316,7 @@ func TestExporter_makeReq(t *testing.T) {
 			name:   "dist agg + time window",
 			projID: "proj-id",
 			vd:     newTestDistViewData(distView, start, end),
-			want:   []*monitoringpb.CreateTimeSeriesRequest{{
+			want: []*monitoringpb.CreateTimeSeriesRequest{{
 				Name: monitoring.MetricProjectPath("proj-id"),
 				TimeSeries: []*monitoringpb.TimeSeries{
 					{
@@ -345,13 +344,13 @@ func TestExporter_makeReq(t *testing.T) {
 								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DistributionValue{
 									DistributionValue: &distribution.Distribution{
 										Count: 5,
-										Mean: 3.0,
+										Mean:  3.0,
 										SumOfSquaredDeviation: 1.5,
 										BucketOptions: &distribution.Distribution_BucketOptions{
-											Options:&distribution.Distribution_BucketOptions_ExplicitBuckets{
-												ExplicitBuckets:&distribution.Distribution_BucketOptions_Explicit{
+											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
+												ExplicitBuckets: &distribution.Distribution_BucketOptions_Explicit{
 													Bounds: []float64{2.0, 4.0, 7.0}}}},
-										BucketCounts:[]int64{2, 2, 1}},
+										BucketCounts: []int64{2, 2, 1}},
 								}},
 							},
 						},
@@ -377,8 +376,6 @@ func TestExporter_makeReq(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(resps, tt.want) {
-				temp := reflect.DeepEqual(resps, tt.want)
-				fmt.Print(temp)
 				t.Errorf("%v: Exporter.makeReq() = %v, want %v", tt.name, resps, tt.want)
 			}
 		})
