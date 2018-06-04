@@ -366,9 +366,6 @@ func TestExporter_makeReq(t *testing.T) {
 				taskValue: taskValue,
 			}
 			resps := e.makeReq([]*view.Data{tt.vd}, maxTimeSeriesPerUpload)
-			if tt.want == nil {
-				t.Skip("Missing expectation")
-			}
 			if got, want := len(resps), len(tt.want); got != want {
 				t.Fatalf("%v: Exporter.makeReq() returned %d responses; want %d", tt.name, got, want)
 			}
