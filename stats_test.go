@@ -26,6 +26,7 @@ import (
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
 	"google.golang.org/api/option"
+	"google.golang.org/genproto/googleapis/api/distribution"
 	"google.golang.org/genproto/googleapis/api/label"
 	"google.golang.org/genproto/googleapis/api/metric"
 	metricpb "google.golang.org/genproto/googleapis/api/metric"
@@ -315,7 +316,47 @@ func TestExporter_makeReq(t *testing.T) {
 			name:   "dist agg + time window",
 			projID: "proj-id",
 			vd:     newTestDistViewData(distView, start, end),
-			want:   nil, //TODO: add expectation for distribution
+			want: []*monitoringpb.CreateTimeSeriesRequest{{
+				Name: monitoring.MetricProjectPath("proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/distview",
+							Labels: map[string]string{
+								opencensusTaskKey: taskValue,
+							},
+						},
+						Resource: &monitoredrespb.MonitoredResource{
+							Type: "global",
+						},
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DistributionValue{
+									DistributionValue: &distribution.Distribution{
+										Count: 5,
+										Mean:  3.0,
+										SumOfSquaredDeviation: 1.5,
+										BucketOptions: &distribution.Distribution_BucketOptions{
+											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
+												ExplicitBuckets: &distribution.Distribution_BucketOptions_Explicit{
+													Bounds: []float64{2.0, 4.0, 7.0}}}},
+										BucketCounts: []int64{2, 2, 1}},
+								}},
+							},
+						},
+					},
+				},
+			}},
 		},
 	}
 	for _, tt := range tests {
@@ -325,9 +366,6 @@ func TestExporter_makeReq(t *testing.T) {
 				taskValue: taskValue,
 			}
 			resps := e.makeReq([]*view.Data{tt.vd}, maxTimeSeriesPerUpload)
-			if tt.want == nil {
-				t.Skip("Missing expectation")
-			}
 			if got, want := len(resps), len(tt.want); got != want {
 				t.Fatalf("%v: Exporter.makeReq() returned %d responses; want %d", tt.name, got, want)
 			}
