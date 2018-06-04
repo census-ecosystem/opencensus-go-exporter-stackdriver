@@ -32,6 +32,7 @@ import (
 
 	"cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"go.opencensus.io/exporterutil"
 	"google.golang.org/api/option"
 	"google.golang.org/api/support/bundler"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
@@ -47,9 +48,10 @@ const (
 	opencensusTaskKey         = "opencensus_task"
 	opencensusTaskDescription = "Opencensus task identifier"
 	defaultDisplayNamePrefix  = "OpenCensus"
-
-	userAgent = "opencensus-go [0.8.0]"
+	version                   = "0.3.0"
 )
+
+var userAgent = fmt.Sprintf("opencensus-go %s; stackdriver-exporter %s", exporterutil.Version, version)
 
 // statsExporter exports stats to the Stackdriver Monitoring.
 type statsExporter struct {

@@ -21,6 +21,7 @@
     "ptypes/any",
     "ptypes/duration",
     "ptypes/empty",
+    "ptypes/struct",
     "ptypes/timestamp",
     "ptypes/wrappers"
   ]
@@ -37,6 +38,7 @@
   name = "go.opencensus.io"
   packages = [
     "exporter/stackdriver/propagation",
+    "exporterutil",
     "internal",
     "internal/tagencoding",
     "plugin/ocgrpc",
@@ -50,8 +52,8 @@
     "trace/internal",
     "trace/propagation"
   ]
-  revision = "10cec2c05ea2cfb8b0d856711daedc49d8a45c56"
-  version = "v0.9.0"
+  revision = "5897c5ce32247fc8af19c7710abd96e3304fb43c"
+  version = "v0.12.0"
 
 [[projects]]
   branch = "master"
@@ -66,7 +68,7 @@
     "internal/timeseries",
     "trace"
   ]
-  revision = "2491c5de3490fced2f6cff376127c667efeed857"
+  revision = "1e491301e022f8f977054da4c2d852decd59571f"
 
 [[projects]]
   branch = "master"
@@ -78,7 +80,7 @@
     "jws",
     "jwt"
   ]
-  revision = "cdc340f7c179dbbfa4afd43b7614e8fcadde4269"
+  revision = "1e0a3fa8ba9a5c9eb35c271780101fdaf1b205d7"
 
 [[projects]]
   branch = "master"
@@ -120,7 +122,7 @@
     "transport/grpc",
     "transport/http"
   ]
-  revision = "aedc137bffcaca05f836e35c6d182fcb7a68b1c0"
+  revision = "8e296ef260056b6323d10727db40512dac6d92d5"
 
 [[projects]]
   name = "google.golang.org/appengine"
@@ -156,7 +158,7 @@
     "googleapis/rpc/status",
     "protobuf/field_mask"
   ]
-  revision = "11a468237815f3a3ddf9f7c6e8b6b3b382a24d15"
+  revision = "81158efcc9f219c511e4d3c0d61a0e6e49c01a24"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -193,6 +195,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3038cb48bb2bce5c8567df94e51eee5f2d59499b0add7cc6278eaf2ed53d4c7b"
+  inputs-digest = "b4b0ab84c5165e534e247fcf62a0ab6b134a217b2439b852999047920e415881"
   solver-name = "gps-cdcl"
   solver-version = 1
