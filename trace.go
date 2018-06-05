@@ -23,6 +23,7 @@ import (
 
 	tracingclient "cloud.google.com/go/trace/apiv2"
 	"go.opencensus.io/trace"
+	"google.golang.org/api/option"
 	"google.golang.org/api/support/bundler"
 	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
 )
@@ -43,7 +44,10 @@ type traceExporter struct {
 var _ trace.Exporter = (*traceExporter)(nil)
 
 func newTraceExporter(o Options) (*traceExporter, error) {
-	client, err := tracingclient.NewClient(context.Background(), o.TraceClientOptions...)
+	var opts []option.ClientOption
+	opts = append(opts, o.ClientOptions...)
+	opts = append(opts, o.TraceClientOptions...)
+	client, err := tracingclient.NewClient(context.Background(), opts...)
 	if err != nil {
 		return nil, fmt.Errorf("stackdriver: couldn't initialize trace client: %v", err)
 	}

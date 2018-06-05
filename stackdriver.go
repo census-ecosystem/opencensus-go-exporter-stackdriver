@@ -60,6 +60,11 @@ type Options struct {
 	// Optional.
 	TraceClientOptions []option.ClientOption
 
+	// ClientOptions are applied to the underlying Stackdriver API
+	// clients. TraceClientOptions and MonitoringClientOptions override these
+	// options.
+	ClientOptions []option.ClientOption
+
 	// BundleDelayThreshold determines the max amount of time
 	// the exporter can wait before uploading view data to
 	// the backend.
