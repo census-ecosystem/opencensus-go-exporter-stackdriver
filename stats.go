@@ -196,13 +196,26 @@ func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.Cre
 
 	for _, vd := range vds {
 		for _, row := range vd.Rows {
-			ts := &monitoringpb.TimeSeries{
-				Metric: &metricpb.Metric{
-					Type:   namespacedViewName(vd.View.Name),
-					Labels: newLabels(row.Tags, e.taskValue),
-				},
-				Resource: resource,
-				Points:   []*monitoringpb.Point{newPoint(vd.View, row, vd.Start, vd.End)},
+			var ts *monitoringpb.TimeSeries
+			switch vd.View.Aggregation.Type{
+			case view.AggTypeLastValue:
+				ts = &monitoringpb.TimeSeries{
+					Metric: &metricpb.Metric{
+						Type:   namespacedViewName(vd.View.Name),
+						Labels: newLabels(row.Tags, e.taskValue),
+					},
+					Resource: resource,
+					Points:   []*monitoringpb.Point{newGaugePoint(vd.View, row, vd.Start, vd.End)},
+				}
+			default:
+				ts = &monitoringpb.TimeSeries{
+					Metric: &metricpb.Metric{
+						Type:   namespacedViewName(vd.View.Name),
+						Labels: newLabels(row.Tags, e.taskValue),
+					},
+					Resource: resource,
+					Points:   []*monitoringpb.Point{newCumulativePoint(vd.View, row, vd.Start, vd.End)},
+				}
 			}
 			timeSeries = append(timeSeries, ts)
 			if len(timeSeries) == limit {
@@ -242,6 +255,8 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 	metricType := namespacedViewName(viewName)
 	var valueType metricpb.MetricDescriptor_ValueType
 	unit := m.Unit()
+	// Default metric Kind
+	metricKind := metricpb.MetricDescriptor_CUMULATIVE
 
 	switch agg.Type {
 	case view.AggTypeCount:
@@ -259,6 +274,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 	case view.AggTypeDistribution:
 		valueType = metricpb.MetricDescriptor_DISTRIBUTION
 	case view.AggTypeLastValue:
+		metricKind = metricpb.MetricDescriptor_GAUGE
 		switch m.(type) {
 		case *stats.Int64Measure:
 			valueType = metricpb.MetricDescriptor_INT64
@@ -269,7 +285,6 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 		return fmt.Errorf("unsupported aggregation type: %s", agg.Type.String())
 	}
 
-	metricKind := metricpb.MetricDescriptor_CUMULATIVE
 	displayNamePrefix := defaultDisplayNamePrefix
 	if e.o.MetricPrefix != "" {
 		displayNamePrefix = e.o.MetricPrefix
@@ -296,7 +311,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 	return nil
 }
 
-func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
+func newCumulativePoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
 	return &monitoringpb.Point{
 		Interval: &monitoringpb.TimeInterval{
 			StartTime: &timestamp.Timestamp{
@@ -307,6 +322,20 @@ func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.P
 				Seconds: end.Unix(),
 				Nanos:   int32(end.Nanosecond()),
 			},
+		},
+		Value: newTypedValue(v, row),
+	}
+}
+
+func newGaugePoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
+	gaugeTime := &timestamp.Timestamp{
+		Seconds: end.Unix(),
+		Nanos:   int32(start.Nanosecond()),
+	}
+	return &monitoringpb.Point{
+		Interval: &monitoringpb.TimeInterval{
+			StartTime: gaugeTime,
+			EndTime: gaugeTime,
 		},
 		Value: newTypedValue(v, row),
 	}
