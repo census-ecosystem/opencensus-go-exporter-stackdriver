@@ -197,7 +197,7 @@ func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.Cre
 	for _, vd := range vds {
 		for _, row := range vd.Rows {
 			var ts *monitoringpb.TimeSeries
-			switch vd.View.Aggregation.Type{
+			switch vd.View.Aggregation.Type {
 			case view.AggTypeLastValue:
 				ts = &monitoringpb.TimeSeries{
 					Metric: &metricpb.Metric{
@@ -335,7 +335,7 @@ func newGaugePoint(v *view.View, row *view.Row, start, end time.Time) *monitorin
 	return &monitoringpb.Point{
 		Interval: &monitoringpb.TimeInterval{
 			StartTime: gaugeTime,
-			EndTime: gaugeTime,
+			EndTime:   gaugeTime,
 		},
 		Value: newTypedValue(v, row),
 	}
