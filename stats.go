@@ -298,12 +298,12 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 	return nil
 }
 
-func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point{
+func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
 	switch v.Aggregation.Type {
 	case view.AggTypeLastValue:
-		return newGaugePoint(v, row, end);
+		return newGaugePoint(v, row, end)
 	default:
-		return newCumulativePoint(v, row, start, end);
+		return newCumulativePoint(v, row, start, end)
 	}
 }
 
