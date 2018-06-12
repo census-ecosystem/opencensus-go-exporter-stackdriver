@@ -330,7 +330,7 @@ func newCumulativePoint(v *view.View, row *view.Row, start, end time.Time) *moni
 func newGaugePoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
 	gaugeTime := &timestamp.Timestamp{
 		Seconds: end.Unix(),
-		Nanos:   int32(start.Nanosecond()),
+		Nanos:   int32(end.Nanosecond()),
 	}
 	return &monitoringpb.Point{
 		Interval: &monitoringpb.TimeInterval{
