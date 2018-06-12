@@ -196,26 +196,13 @@ func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.Cre
 
 	for _, vd := range vds {
 		for _, row := range vd.Rows {
-			var ts *monitoringpb.TimeSeries
-			switch vd.View.Aggregation.Type {
-			case view.AggTypeLastValue:
-				ts = &monitoringpb.TimeSeries{
-					Metric: &metricpb.Metric{
-						Type:   namespacedViewName(vd.View.Name),
-						Labels: newLabels(row.Tags, e.taskValue),
-					},
-					Resource: resource,
-					Points:   []*monitoringpb.Point{newGaugePoint(vd.View, row, vd.Start, vd.End)},
-				}
-			default:
-				ts = &monitoringpb.TimeSeries{
-					Metric: &metricpb.Metric{
-						Type:   namespacedViewName(vd.View.Name),
-						Labels: newLabels(row.Tags, e.taskValue),
-					},
-					Resource: resource,
-					Points:   []*monitoringpb.Point{newCumulativePoint(vd.View, row, vd.Start, vd.End)},
-				}
+			ts := &monitoringpb.TimeSeries{
+				Metric: &metricpb.Metric{
+					Type:   namespacedViewName(vd.View.Name),
+					Labels: newLabels(row.Tags, e.taskValue),
+				},
+				Resource: resource,
+				Points:   []*monitoringpb.Point{newPoint(vd.View, row, vd.Start, vd.End)},
 			}
 			timeSeries = append(timeSeries, ts)
 			if len(timeSeries) == limit {
@@ -311,6 +298,15 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 	return nil
 }
 
+func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point{
+	switch v.Aggregation.Type {
+	case view.AggTypeLastValue:
+		return newGaugePoint(v, row, end);
+	default:
+		return newCumulativePoint(v, row, start, end);
+	}
+}
+
 func newCumulativePoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
 	return &monitoringpb.Point{
 		Interval: &monitoringpb.TimeInterval{
@@ -327,7 +323,7 @@ func newCumulativePoint(v *view.View, row *view.Row, start, end time.Time) *moni
 	}
 }
 
-func newGaugePoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
+func newGaugePoint(v *view.View, row *view.Row, end time.Time) *monitoringpb.Point {
 	gaugeTime := &timestamp.Timestamp{
 		Seconds: end.Unix(),
 		Nanos:   int32(end.Nanosecond()),
