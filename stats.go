@@ -330,8 +330,7 @@ func newGaugePoint(v *view.View, row *view.Row, end time.Time) *monitoringpb.Poi
 	}
 	return &monitoringpb.Point{
 		Interval: &monitoringpb.TimeInterval{
-			StartTime: gaugeTime,
-			EndTime:   gaugeTime,
+			EndTime: gaugeTime,
 		},
 		Value: newTypedValue(v, row),
 	}
