@@ -274,10 +274,6 @@ func TestExporter_makeReq(t *testing.T) {
 						Points: []*monitoringpb.Point{
 							{
 								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
 									EndTime: &timestamp.Timestamp{
 										Seconds: end.Unix(),
 										Nanos:   int32(end.Nanosecond()),
@@ -303,10 +299,6 @@ func TestExporter_makeReq(t *testing.T) {
 						Points: []*monitoringpb.Point{
 							{
 								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
 									EndTime: &timestamp.Timestamp{
 										Seconds: end.Unix(),
 										Nanos:   int32(end.Nanosecond()),
