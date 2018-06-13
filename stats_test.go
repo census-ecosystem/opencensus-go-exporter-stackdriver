@@ -85,6 +85,15 @@ func TestExporter_makeReq(t *testing.T) {
 		Measure:     m,
 		Aggregation: view.Count(),
 	}
+
+	lastValueView := &view.View{
+		Name:        "lasttestview",
+		Description: "desc",
+		TagKeys:     []tag.Key{key},
+		Measure:     m,
+		Aggregation: view.LastValue(),
+	}
+
 	distView := &view.View{
 		Name:        "distview",
 		Description: "desc",
@@ -247,13 +256,13 @@ func TestExporter_makeReq(t *testing.T) {
 		{
 			name:   "last value agg",
 			projID: "proj-id",
-			vd:     newTestViewData(v, start, end, &last1, &last2),
+			vd:     newTestViewData(lastValueView, start, end, &last1, &last2),
 			want: []*monitoringpb.CreateTimeSeriesRequest{{
 				Name: monitoring.MetricProjectPath("proj-id"),
 				TimeSeries: []*monitoringpb.TimeSeries{
 					{
 						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
+							Type: "custom.googleapis.com/opencensus/lasttestview",
 							Labels: map[string]string{
 								"test_key":        "test-value-1",
 								opencensusTaskKey: taskValue,
@@ -266,7 +275,7 @@ func TestExporter_makeReq(t *testing.T) {
 							{
 								Interval: &monitoringpb.TimeInterval{
 									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
+										Seconds: end.Unix(),
 										Nanos:   int32(start.Nanosecond()),
 									},
 									EndTime: &timestamp.Timestamp{
@@ -282,7 +291,7 @@ func TestExporter_makeReq(t *testing.T) {
 					},
 					{
 						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
+							Type: "custom.googleapis.com/opencensus/lasttestview",
 							Labels: map[string]string{
 								"test_key":        "test-value-2",
 								opencensusTaskKey: taskValue,
@@ -295,7 +304,7 @@ func TestExporter_makeReq(t *testing.T) {
 							{
 								Interval: &monitoringpb.TimeInterval{
 									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
+										Seconds: end.Unix(),
 										Nanos:   int32(start.Nanosecond()),
 									},
 									EndTime: &timestamp.Timestamp{

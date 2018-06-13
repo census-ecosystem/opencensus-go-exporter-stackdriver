@@ -242,6 +242,8 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 	metricType := namespacedViewName(viewName)
 	var valueType metricpb.MetricDescriptor_ValueType
 	unit := m.Unit()
+	// Default metric Kind
+	metricKind := metricpb.MetricDescriptor_CUMULATIVE
 
 	switch agg.Type {
 	case view.AggTypeCount:
@@ -259,6 +261,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 	case view.AggTypeDistribution:
 		valueType = metricpb.MetricDescriptor_DISTRIBUTION
 	case view.AggTypeLastValue:
+		metricKind = metricpb.MetricDescriptor_GAUGE
 		switch m.(type) {
 		case *stats.Int64Measure:
 			valueType = metricpb.MetricDescriptor_INT64
@@ -269,7 +272,6 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 		return fmt.Errorf("unsupported aggregation type: %s", agg.Type.String())
 	}
 
-	metricKind := metricpb.MetricDescriptor_CUMULATIVE
 	displayNamePrefix := defaultDisplayNamePrefix
 	if e.o.MetricPrefix != "" {
 		displayNamePrefix = e.o.MetricPrefix
@@ -297,6 +299,15 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 }
 
 func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
+	switch v.Aggregation.Type {
+	case view.AggTypeLastValue:
+		return newGaugePoint(v, row, end)
+	default:
+		return newCumulativePoint(v, row, start, end)
+	}
+}
+
+func newCumulativePoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
 	return &monitoringpb.Point{
 		Interval: &monitoringpb.TimeInterval{
 			StartTime: &timestamp.Timestamp{
@@ -307,6 +318,20 @@ func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.P
 				Seconds: end.Unix(),
 				Nanos:   int32(end.Nanosecond()),
 			},
+		},
+		Value: newTypedValue(v, row),
+	}
+}
+
+func newGaugePoint(v *view.View, row *view.Row, end time.Time) *monitoringpb.Point {
+	gaugeTime := &timestamp.Timestamp{
+		Seconds: end.Unix(),
+		Nanos:   int32(end.Nanosecond()),
+	}
+	return &monitoringpb.Point{
+		Interval: &monitoringpb.TimeInterval{
+			StartTime: gaugeTime,
+			EndTime:   gaugeTime,
 		},
 		Value: newTypedValue(v, row),
 	}
