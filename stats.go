@@ -25,7 +25,7 @@ import (
 	"sync"
 	"time"
 
-	opencensus "go.opencensus.io"
+	"go.opencensus.io"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
@@ -61,8 +61,8 @@ type statsExporter struct {
 	createdViewsMu sync.Mutex
 	createdViews   map[string]*metricpb.MetricDescriptor // Views already created remotely
 
-	c         *monitoring.MetricClient
-	taskValue string
+	c             *monitoring.MetricClient
+	defaultLabels map[string]labelValue
 }
 
 // Enforces the singleton on NewExporter per projectID per process
@@ -80,19 +80,22 @@ var (
 // newStatsExporter returns an exporter that uploads stats data to Stackdriver Monitoring.
 // Only one Stackdriver exporter should be created per ProjectID per process, any subsequent
 // invocations of NewExporter with the same ProjectID will return an error.
-func newStatsExporter(o Options) (*statsExporter, error) {
+func newStatsExporter(o Options, enforceProjectUniqueness bool) (*statsExporter, error) {
 	if strings.TrimSpace(o.ProjectID) == "" {
 		return nil, errBlankProjectID
 	}
 
-	seenProjectsMu.Lock()
-	defer seenProjectsMu.Unlock()
-	_, seen := seenProjects[o.ProjectID]
-	if seen {
-		return nil, errSingletonExporter
+	if enforceProjectUniqueness {
+		seenProjectsMu.Lock()
+		_, seen := seenProjects[o.ProjectID]
+		if !seen {
+			seenProjects[o.ProjectID] = true
+		}
+		seenProjectsMu.Unlock()
+		if seen {
+			return nil, errSingletonExporter
+		}
 	}
-
-	seenProjects[o.ProjectID] = true
 
 	opts := append(o.MonitoringClientOptions, option.WithUserAgent(userAgent))
 	client, err := monitoring.NewMetricClient(context.Background(), opts...)
@@ -103,7 +106,13 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		c:            client,
 		o:            o,
 		createdViews: make(map[string]*metricpb.MetricDescriptor),
-		taskValue:    getTaskValue(),
+	}
+	if o.DefaultMonitoringLabels != nil {
+		e.defaultLabels = o.DefaultMonitoringLabels.m
+	} else {
+		e.defaultLabels = map[string]labelValue{
+			opencensusTaskKey: {val: getTaskValue(), desc: opencensusTaskDescription},
+		}
 	}
 	e.bundler = bundler.NewBundler((*view.Data)(nil), func(bundle interface{}) {
 		vds := bundle.([]*view.Data)
@@ -168,7 +177,7 @@ func (e *statsExporter) uploadStats(vds []*view.Data) error {
 	defer span.End()
 
 	for _, vd := range vds {
-		if err := e.createMeasure(ctx, vd); err != nil {
+		if err := e.createMeasure(ctx, vd.View); err != nil {
 			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 			return err
 		}
@@ -199,7 +208,7 @@ func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.Cre
 			ts := &monitoringpb.TimeSeries{
 				Metric: &metricpb.Metric{
 					Type:   namespacedViewName(vd.View.Name),
-					Labels: newLabels(row.Tags, e.taskValue),
+					Labels: newLabels(e.defaultLabels, row.Tags),
 				},
 				Resource: resource,
 				Points:   []*monitoringpb.Point{newPoint(vd.View, row, vd.Start, vd.End)},
@@ -226,17 +235,17 @@ func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.Cre
 // createMeasure creates a MetricDescriptor for the given view data in Stackdriver Monitoring.
 // An error will be returned if there is already a metric descriptor created with the same name
 // but it has a different aggregation or keys.
-func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error {
+func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 	e.createdViewsMu.Lock()
 	defer e.createdViewsMu.Unlock()
 
-	m := vd.View.Measure
-	agg := vd.View.Aggregation
-	tagKeys := vd.View.TagKeys
-	viewName := vd.View.Name
+	m := v.Measure
+	agg := v.Aggregation
+	tagKeys := v.TagKeys
+	viewName := v.Name
 
 	if md, ok := e.createdViews[viewName]; ok {
-		return equalMeasureAggTagKeys(md, m, agg, tagKeys)
+		return e.equalMeasureAggTagKeys(md, m, agg, tagKeys)
 	}
 
 	metricType := namespacedViewName(viewName)
@@ -282,12 +291,12 @@ func (e *statsExporter) createMeasure(ctx context.Context, vd *view.Data) error 
 		MetricDescriptor: &metricpb.MetricDescriptor{
 			Name:        fmt.Sprintf("projects/%s/metricDescriptors/%s", e.o.ProjectID, metricType),
 			DisplayName: path.Join(displayNamePrefix, viewName),
-			Description: vd.View.Description,
+			Description: v.Description,
 			Unit:        unit,
 			Type:        metricType,
 			MetricKind:  metricKind,
 			ValueType:   valueType,
-			Labels:      newLabelDescriptors(vd.View.TagKeys),
+			Labels:      newLabelDescriptors(e.defaultLabels, v.TagKeys),
 		},
 	})
 	if err != nil {
@@ -393,33 +402,36 @@ func namespacedViewName(v string) string {
 	return path.Join("custom.googleapis.com", "opencensus", v)
 }
 
-func newLabels(tags []tag.Tag, taskValue string) map[string]string {
+func newLabels(defaults map[string]labelValue, tags []tag.Tag) map[string]string {
 	labels := make(map[string]string)
+	for k, lbl := range defaults {
+		labels[sanitize(k)] = lbl.val
+	}
 	for _, tag := range tags {
 		labels[sanitize(tag.Key.Name())] = tag.Value
 	}
-	labels[opencensusTaskKey] = taskValue
 	return labels
 }
 
-func newLabelDescriptors(keys []tag.Key) []*labelpb.LabelDescriptor {
-	labelDescriptors := make([]*labelpb.LabelDescriptor, len(keys)+1)
-	for i, key := range keys {
-		labelDescriptors[i] = &labelpb.LabelDescriptor{
+func newLabelDescriptors(defaults map[string]labelValue, keys []tag.Key) []*labelpb.LabelDescriptor {
+	labelDescriptors := make([]*labelpb.LabelDescriptor, 0, len(keys)+len(defaults))
+	for key, lbl := range defaults {
+		labelDescriptors = append(labelDescriptors, &labelpb.LabelDescriptor{
+			Key:         sanitize(key),
+			Description: lbl.desc,
+			ValueType:   labelpb.LabelDescriptor_STRING,
+		})
+	}
+	for _, key := range keys {
+		labelDescriptors = append(labelDescriptors, &labelpb.LabelDescriptor{
 			Key:       sanitize(key.Name()),
 			ValueType: labelpb.LabelDescriptor_STRING, // We only use string tags
-		}
-	}
-	// Add a specific open census task id label.
-	labelDescriptors[len(keys)] = &labelpb.LabelDescriptor{
-		Key:         opencensusTaskKey,
-		ValueType:   labelpb.LabelDescriptor_STRING,
-		Description: opencensusTaskDescription,
+		})
 	}
 	return labelDescriptors
 }
 
-func equalMeasureAggTagKeys(md *metricpb.MetricDescriptor, m stats.Measure, agg *view.Aggregation, keys []tag.Key) error {
+func (e *statsExporter) equalMeasureAggTagKeys(md *metricpb.MetricDescriptor, m stats.Measure, agg *view.Aggregation, keys []tag.Key) error {
 	var aggTypeMatch bool
 	switch md.ValueType {
 	case metricpb.MetricDescriptor_INT64:
@@ -440,20 +452,27 @@ func equalMeasureAggTagKeys(md *metricpb.MetricDescriptor, m stats.Measure, agg 
 		return fmt.Errorf("stackdriver metric descriptor was not created with aggregation type %T", agg.Type)
 	}
 
-	if len(md.Labels) != len(keys)+1 {
-		return errors.New("stackdriver metric descriptor was not created with the view labels")
-	}
-
-	labels := make(map[string]struct{}, len(keys)+1)
+	labels := make(map[string]struct{}, len(keys)+len(e.defaultLabels))
 	for _, k := range keys {
 		labels[sanitize(k.Name())] = struct{}{}
 	}
-	labels[opencensusTaskKey] = struct{}{}
+	for k := range e.defaultLabels {
+		labels[sanitize(k)] = struct{}{}
+	}
 
 	for _, k := range md.Labels {
 		if _, ok := labels[k.Key]; !ok {
-			return fmt.Errorf("stackdriver metric descriptor was not created with label %q", k)
+			return fmt.Errorf("stackdriver metric descriptor %q was not created with label %q", md.Type, k)
 		}
+		delete(labels, k.Key)
+	}
+
+	if len(labels) > 0 {
+		extra := make([]string, 0, len(labels))
+		for k := range labels {
+			extra = append(extra, k)
+		}
+		return fmt.Errorf("stackdriver metric descriptor %q contains unexpected labels: %s", md.Type, strings.Join(extra, ", "))
 	}
 
 	return nil
