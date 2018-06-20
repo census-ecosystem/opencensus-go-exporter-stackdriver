@@ -160,5 +160,5 @@ func (o Options) handleError(err error) {
 		o.OnError(err)
 		return
 	}
-	log.Printf("Error exporting to Stackdriver: %v", err)
+	log.Printf("Failed to export to Stackdriver: %v", err)
 }
