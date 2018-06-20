@@ -52,7 +52,7 @@ func TestRejectBlankProjectID(t *testing.T) {
 
 func TestDelayThresholdDefault(t *testing.T) {
 	opts := Options{ProjectID: "dth-default", MonitoringClientOptions: authOptions, BundleDelayThreshold: 0}
-	exp, err := newStatsExporter(opts)
+	exp, err := newStatsExporter(opts, false)
 	if err != nil {
 		t.Errorf("NewExporter() err = %q", err)
 	}
@@ -63,7 +63,7 @@ func TestDelayThresholdDefault(t *testing.T) {
 
 func TestBundleCountThresholdDefault(t *testing.T) {
 	opts := Options{ProjectID: "bct-default", MonitoringClientOptions: authOptions, BundleDelayThreshold: 0}
-	exp, err := newStatsExporter(opts)
+	exp, err := newStatsExporter(opts, false)
 	if err != nil {
 		t.Errorf("NewExporter() err = %q", err)
 	}
