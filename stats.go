@@ -94,7 +94,10 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 
 	seenProjects[o.ProjectID] = true
 
-	opts := append(o.MonitoringClientOptions, option.WithUserAgent(userAgent))
+	var opts []option.ClientOption
+	opts = append(opts, o.ClientOptions...)
+	opts = append(opts, o.MonitoringClientOptions...)
+	opts = append(opts, option.WithUserAgent(userAgent))
 	client, err := monitoring.NewMetricClient(context.Background(), opts...)
 	if err != nil {
 		return nil, err
