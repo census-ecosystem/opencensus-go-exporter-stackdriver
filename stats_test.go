@@ -43,7 +43,7 @@ func TestRejectBlankProjectID(t *testing.T) {
 	ids := []string{"", "     ", " "}
 	for _, projectID := range ids {
 		opts := Options{ProjectID: projectID, MonitoringClientOptions: authOptions}
-		exp, err := newStatsExporter(opts)
+		exp, err := newStatsExporter(opts, false)
 		if err == nil || exp != nil {
 			t.Errorf("%q ProjectID must be rejected: NewExporter() = %v err = %q", projectID, exp, err)
 		}
@@ -78,7 +78,7 @@ func TestNewExporterSingletonPerProcess(t *testing.T) {
 	ids := []string{"open-census.io", "x", "fakeProjectID"}
 	for _, projectID := range ids {
 		opts := Options{ProjectID: projectID, MonitoringClientOptions: authOptions}
-		exp, err := newStatsExporter(opts)
+		exp, err := newStatsExporter(opts, true)
 		if err != nil {
 			t.Errorf("NewExporter() projectID = %q err = %q", projectID, err)
 			continue
@@ -87,7 +87,7 @@ func TestNewExporterSingletonPerProcess(t *testing.T) {
 			t.Errorf("NewExporter returned a nil Exporter")
 			continue
 		}
-		exp, err = newStatsExporter(opts)
+		exp, err = newStatsExporter(opts, true)
 		if err == nil || exp != nil {
 			t.Errorf("NewExporter more than once should fail; exp (%v) err %v", exp, err)
 		}
@@ -386,9 +386,9 @@ func TestExporter_makeReq(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := &statsExporter{
-				o:         Options{ProjectID: tt.projID},
-				taskValue: taskValue,
+			e, err := newStatsExporter(Options{ProjectID: tt.projID, MonitoringClientOptions: authOptions}, false)
+			if err != nil {
+				t.Fatal(err)
 			}
 			resps := e.makeReq([]*view.Data{tt.vd}, maxTimeSeriesPerUpload)
 			if got, want := len(resps), len(tt.want); got != want {
@@ -613,9 +613,13 @@ func TestEqualAggWindowTagKeys(t *testing.T) {
 			wantErr: false,
 		},
 	}
+	e, err := newStatsExporter(Options{ProjectID: "opencensus-test", MonitoringClientOptions: authOptions}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := equalMeasureAggTagKeys(tt.md, tt.m, tt.agg, tt.keys)
+			err := e.equalMeasureAggTagKeys(tt.md, tt.m, tt.agg, tt.keys)
 			if err != nil && !tt.wantErr {
 				t.Errorf("equalAggTagKeys() = %q; want no error", err)
 			}
@@ -648,58 +652,87 @@ func TestExporter_createMeasure(t *testing.T) {
 	data := &view.CountData{Value: 0}
 	vd := newTestViewData(v, time.Now(), time.Now(), data, data)
 
-	e := &statsExporter{
-		createdViews: make(map[string]*metricpb.MetricDescriptor),
-		o:            Options{ProjectID: "test_project"},
+	var customLabels Labels
+	customLabels.Set("pid", "1234", "Local process identifier")
+	customLabels.Set("hostname", "test.example.com", "Local hostname")
+	customLabels.Set("a/b/c/host-name", "test.example.com", "Local hostname")
+
+	tests := []struct {
+		name string
+		opts Options
+	}{
+		{
+			name: "default",
+		},
+		{
+			name: "no default labels",
+			opts: Options{DefaultMonitoringLabels: &Labels{}},
+		},
+		{
+			name: "custom default labels",
+			opts: Options{DefaultMonitoringLabels: &customLabels},
+		},
 	}
 
-	var createCalls int
-	createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
-		createCalls++
-		if got, want := mdr.MetricDescriptor.Name, "projects/test_project/metricDescriptors/custom.googleapis.com/opencensus/test_view_sum"; got != want {
-			t.Errorf("MetricDescriptor.Name = %q; want %q", got, want)
-		}
-		if got, want := mdr.MetricDescriptor.Type, "custom.googleapis.com/opencensus/test_view_sum"; got != want {
-			t.Errorf("MetricDescriptor.Type = %q; want %q", got, want)
-		}
-		if got, want := mdr.MetricDescriptor.ValueType, metricpb.MetricDescriptor_DOUBLE; got != want {
-			t.Errorf("MetricDescriptor.ValueType = %q; want %q", got, want)
-		}
-		if got, want := mdr.MetricDescriptor.MetricKind, metricpb.MetricDescriptor_CUMULATIVE; got != want {
-			t.Errorf("MetricDescriptor.MetricKind = %q; want %q", got, want)
-		}
-		if got, want := mdr.MetricDescriptor.Description, "view_description"; got != want {
-			t.Errorf("MetricDescriptor.Description = %q; want %q", got, want)
-		}
-		if got, want := mdr.MetricDescriptor.DisplayName, "OpenCensus/test_view_sum"; got != want {
-			t.Errorf("MetricDescriptor.DisplayName = %q; want %q", got, want)
-		}
-		if got, want := mdr.MetricDescriptor.Unit, stats.UnitMilliseconds; got != want {
-			t.Errorf("MetricDescriptor.Unit = %q; want %q", got, want)
-		}
-		return &metric.MetricDescriptor{
-			DisplayName: "OpenCensus/test_view_sum",
-			Description: "view_description",
-			Unit:        stats.UnitMilliseconds,
-			Type:        "custom.googleapis.com/opencensus/test_view_sum",
-			MetricKind:  metricpb.MetricDescriptor_CUMULATIVE,
-			ValueType:   metricpb.MetricDescriptor_DOUBLE,
-			Labels:      newLabelDescriptors(vd.View.TagKeys),
-		}, nil
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := tt.opts
+			opts.MonitoringClientOptions = authOptions
+			opts.ProjectID = "test_project"
+			e, err := newStatsExporter(opts, false)
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	ctx := context.Background()
-	if err := e.createMeasure(ctx, vd); err != nil {
-		t.Errorf("Exporter.createMeasure() error = %v", err)
-	}
-	if err := e.createMeasure(ctx, vd); err != nil {
-		t.Errorf("Exporter.createMeasure() error = %v", err)
-	}
-	if count := createCalls; count != 1 {
-		t.Errorf("createMetricDescriptor needs to be called for once; called %v times", count)
-	}
-	if count := len(e.createdViews); count != 1 {
-		t.Errorf("len(e.createdViews) = %v; want 1", count)
+			var createCalls int
+			createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
+				createCalls++
+				if got, want := mdr.MetricDescriptor.Name, "projects/test_project/metricDescriptors/custom.googleapis.com/opencensus/test_view_sum"; got != want {
+					t.Errorf("MetricDescriptor.Name = %q; want %q", got, want)
+				}
+				if got, want := mdr.MetricDescriptor.Type, "custom.googleapis.com/opencensus/test_view_sum"; got != want {
+					t.Errorf("MetricDescriptor.Type = %q; want %q", got, want)
+				}
+				if got, want := mdr.MetricDescriptor.ValueType, metricpb.MetricDescriptor_DOUBLE; got != want {
+					t.Errorf("MetricDescriptor.ValueType = %q; want %q", got, want)
+				}
+				if got, want := mdr.MetricDescriptor.MetricKind, metricpb.MetricDescriptor_CUMULATIVE; got != want {
+					t.Errorf("MetricDescriptor.MetricKind = %q; want %q", got, want)
+				}
+				if got, want := mdr.MetricDescriptor.Description, "view_description"; got != want {
+					t.Errorf("MetricDescriptor.Description = %q; want %q", got, want)
+				}
+				if got, want := mdr.MetricDescriptor.DisplayName, "OpenCensus/test_view_sum"; got != want {
+					t.Errorf("MetricDescriptor.DisplayName = %q; want %q", got, want)
+				}
+				if got, want := mdr.MetricDescriptor.Unit, stats.UnitMilliseconds; got != want {
+					t.Errorf("MetricDescriptor.Unit = %q; want %q", got, want)
+				}
+				return &metric.MetricDescriptor{
+					DisplayName: "OpenCensus/test_view_sum",
+					Description: "view_description",
+					Unit:        stats.UnitMilliseconds,
+					Type:        "custom.googleapis.com/opencensus/test_view_sum",
+					MetricKind:  metricpb.MetricDescriptor_CUMULATIVE,
+					ValueType:   metricpb.MetricDescriptor_DOUBLE,
+					Labels:      newLabelDescriptors(e.defaultLabels, vd.View.TagKeys),
+				}, nil
+			}
+
+			ctx := context.Background()
+			if err := e.createMeasure(ctx, vd.View); err != nil {
+				t.Errorf("Exporter.createMeasure() error = %v", err)
+			}
+			if err := e.createMeasure(ctx, vd.View); err != nil {
+				t.Errorf("Exporter.createMeasure() error = %v", err)
+			}
+			if count := createCalls; count != 1 {
+				t.Errorf("createMetricDescriptor needs to be called for once; called %v times", count)
+			}
+			if count := len(e.createdViews); count != 1 {
+				t.Errorf("len(e.createdViews) = %v; want 1", count)
+			}
+		})
 	}
 }
 
@@ -758,11 +791,11 @@ func TestExporter_createMeasure_CountAggregation(t *testing.T) {
 			Type:        "custom.googleapis.com/opencensus/test_view_count",
 			MetricKind:  metricpb.MetricDescriptor_CUMULATIVE,
 			ValueType:   metricpb.MetricDescriptor_INT64,
-			Labels:      newLabelDescriptors(vd.View.TagKeys),
+			Labels:      newLabelDescriptors(nil, vd.View.TagKeys),
 		}, nil
 	}
 	ctx := context.Background()
-	if err := e.createMeasure(ctx, vd); err != nil {
+	if err := e.createMeasure(ctx, vd.View); err != nil {
 		t.Errorf("Exporter.createMeasure() error = %v", err)
 	}
 }
@@ -799,15 +832,150 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
-		projID string
-		vd     *view.Data
-		want   []*monitoringpb.CreateTimeSeriesRequest
+		name string
+		opts Options
+		vd   *view.Data
+		want []*monitoringpb.CreateTimeSeriesRequest
 	}{
 		{
-			name:   "count agg timeline",
-			projID: "proj-id",
-			vd:     newTestViewData(v, start, end, count1, count2),
+			name: "count agg timeline",
+			opts: Options{Resource: resource},
+			vd:   newTestViewData(v, start, end, count1, count2),
+			want: []*monitoringpb.CreateTimeSeriesRequest{{
+				Name: monitoring.MetricProjectPath("proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/testview",
+							Labels: map[string]string{
+								"test_key":        "test-value-1",
+								opencensusTaskKey: taskValue,
+							},
+						},
+						Resource: resource,
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+									Int64Value: 10,
+								}},
+							},
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/testview",
+							Labels: map[string]string{
+								"test_key":        "test-value-2",
+								opencensusTaskKey: taskValue,
+							},
+						},
+						Resource: resource,
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+									Int64Value: 16,
+								}},
+							},
+						},
+					},
+				},
+			}},
+		},
+		{
+			name: "custom default monitoring labels",
+			opts: func() Options {
+				var labels Labels
+				labels.Set("pid", "1234", "Process identifier")
+				return Options{
+					Resource:                resource,
+					DefaultMonitoringLabels: &labels,
+				}
+			}(),
+			vd: newTestViewData(v, start, end, count1, count2),
+			want: []*monitoringpb.CreateTimeSeriesRequest{{
+				Name: monitoring.MetricProjectPath("proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/testview",
+							Labels: map[string]string{
+								"test_key": "test-value-1",
+								"pid":      "1234",
+							},
+						},
+						Resource: resource,
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+									Int64Value: 10,
+								}},
+							},
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/testview",
+							Labels: map[string]string{
+								"test_key": "test-value-2",
+								"pid":      "1234",
+							},
+						},
+						Resource: resource,
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+									Int64Value: 16,
+								}},
+							},
+						},
+					},
+				},
+			}},
+		},
+		{
+			name: "count agg timeline",
+			opts: Options{Resource: resource},
+			vd:   newTestViewData(v, start, end, count1, count2),
 			want: []*monitoringpb.CreateTimeSeriesRequest{{
 				Name: monitoring.MetricProjectPath("proj-id"),
 				TimeSeries: []*monitoringpb.TimeSeries{
@@ -871,9 +1039,12 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e := &statsExporter{
-				o:         Options{ProjectID: tt.projID, Resource: resource},
-				taskValue: taskValue,
+			opts := tt.opts
+			opts.MonitoringClientOptions = authOptions
+			opts.ProjectID = "proj-id"
+			e, err := newStatsExporter(opts, false)
+			if err != nil {
+				t.Fatal(err)
 			}
 			resps := e.makeReq([]*view.Data{tt.vd}, maxTimeSeriesPerUpload)
 			if got, want := len(resps), len(tt.want); got != want {
@@ -883,7 +1054,7 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 				return
 			}
 			if !reflect.DeepEqual(resps, tt.want) {
-				t.Errorf("%v: Exporter.makeReq() = %v, want %v", tt.name, resps, tt.want)
+				t.Errorf("%v: Exporter.makeReq() = \n      %v\nwant: %v", tt.name, resps, tt.want)
 			}
 		})
 	}
