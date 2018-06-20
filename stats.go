@@ -109,8 +109,13 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		vds := bundle.([]*view.Data)
 		e.handleUpload(vds...)
 	})
-	e.bundler.DelayThreshold = e.o.BundleDelayThreshold
-	e.bundler.BundleCountThreshold = e.o.BundleCountThreshold
+
+	if e.o.BundleDelayThreshold != 0 {
+		e.bundler.DelayThreshold = e.o.BundleDelayThreshold
+	}
+	if e.o.BundleCountThreshold != 0 {
+		e.bundler.BundleCountThreshold = e.o.BundleCountThreshold
+	}
 	return e, nil
 }
 

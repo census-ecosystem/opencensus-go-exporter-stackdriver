@@ -20,6 +20,8 @@ import (
 	"testing"
 	"time"
 
+	"google.golang.org/api/support/bundler"
+
 	"cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.opencensus.io/stats"
@@ -45,6 +47,28 @@ func TestRejectBlankProjectID(t *testing.T) {
 		if err == nil || exp != nil {
 			t.Errorf("%q ProjectID must be rejected: NewExporter() = %v err = %q", projectID, exp, err)
 		}
+	}
+}
+
+func TestDelayThresholdDefault(t *testing.T) {
+	opts := Options{ProjectID: "dth-default", MonitoringClientOptions: authOptions, BundleDelayThreshold: 0}
+	exp, err := newStatsExporter(opts)
+	if err != nil {
+		t.Errorf("NewExporter() err = %q", err)
+	}
+	if exp.bundler.DelayThreshold != bundler.DefaultDelayThreshold {
+		t.Error("NewExporter() DelayThreshold != default")
+	}
+}
+
+func TestBundleCountThresholdDefault(t *testing.T) {
+	opts := Options{ProjectID: "bct-default", MonitoringClientOptions: authOptions, BundleDelayThreshold: 0}
+	exp, err := newStatsExporter(opts)
+	if err != nil {
+		t.Errorf("NewExporter() err = %q", err)
+	}
+	if exp.bundler.BundleCountThreshold != bundler.DefaultBundleCountThreshold {
+		t.Error("NewExporter() DelayThreshold != default")
 	}
 }
 
