@@ -166,6 +166,9 @@ func NewExporter(o Options) (*Exporter, error) {
 		}
 		o.ProjectID = creds.ProjectID
 	}
+	if o.Resource == nil {
+		o.Resource = GetAutoDetectedDefaultResource()
+	}
 	se, err := newStatsExporter(o, true)
 	if err != nil {
 		return nil, err
