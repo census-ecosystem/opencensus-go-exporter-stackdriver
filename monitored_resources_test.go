@@ -114,7 +114,7 @@ func TestAwsEc2InstanceMonitoredResources(t *testing.T) {
 	if mr.GetType() != ResourceTypeAwsEc2Instance ||
 		mr.GetLabels()[AwsEc2LabelInstanceId] != "i-1234567890abcdef0" ||
 		mr.GetLabels()[AwsEc2LabelAwsAccount] != "123456789012" ||
-		mr.GetLabels()[AwsEc2LabelRegion] != "aws:us-west-2" {
+		mr.GetLabels()[AwsEc2LabelRegion] != "us-west-2" {
 		t.Errorf("AwsEc2InstanceMonitoredResource Failed: %v", mr)
 	}
 }

@@ -18,7 +18,6 @@ import (
 	"log"
 
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"time"
@@ -53,8 +52,6 @@ func parseAwsIdentityDocument(bytes []byte) {
 			if awsIdentityDoc.InstanceId != "" {
 				runningOnAwsEc2 = true
 			}
-			// region should be converted into format 'aws:{region}'. eg. 'aws:us-west-2'
-			awsIdentityDoc.Region = fmt.Sprintf("aws:%s", awsIdentityDoc.Region)
 		}
 	}
 }

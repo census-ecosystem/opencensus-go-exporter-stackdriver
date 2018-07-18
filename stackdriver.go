@@ -166,9 +166,20 @@ func NewExporter(o Options) (*Exporter, error) {
 		}
 		o.ProjectID = creds.ProjectID
 	}
+
 	if o.Resource == nil {
 		o.Resource = GetAutoDetectedDefaultResource()
+		if o.Resource.Type == ResourceTypeAwsEc2Instance {
+			for k, v := range o.Resource.Labels {
+				if k == AwsEc2LabelRegion {
+					// region should be converted into format 'aws:{region}'. eg. 'aws:us-west-2'
+					o.Resource.Labels[k] = fmt.Sprintf("aws:%s", v)
+					break
+				}
+			}
+		}
 	}
+
 	se, err := newStatsExporter(o, true)
 	if err != nil {
 		return nil, err
