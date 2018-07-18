@@ -168,13 +168,16 @@ func NewExporter(o Options) (*Exporter, error) {
 	}
 
 	if o.Resource == nil {
-		o.Resource = GetAutoDetectedDefaultResource()
-		if o.Resource.Type == ResourceTypeAwsEc2Instance {
-			for k, v := range o.Resource.Labels {
-				if k == AwsEc2LabelRegion {
-					// region should be converted into format 'aws:{region}'. eg. 'aws:us-west-2'
-					o.Resource.Labels[k] = fmt.Sprintf("aws:%s", v)
-					break
+		mr := GetAutoDetectedDefaultResource()
+		if mr != nil {
+			o.Resource = convertMonitoredResourceToPB(mr)
+			if o.Resource.Type == ResourceTypeAwsEc2Instance {
+				for k, v := range o.Resource.Labels {
+					if k == AwsEc2LabelRegion {
+						// region should be converted into format 'aws:{region}'. eg. 'aws:us-west-2'
+						o.Resource.Labels[k] = fmt.Sprintf("aws:%s", v)
+						break
+					}
 				}
 			}
 		}
@@ -235,4 +238,15 @@ func (o Options) handleError(err error) {
 		return
 	}
 	log.Printf("Failed to export to Stackdriver: %v", err)
+}
+
+// convertMonitoredResourceToPB converts MonitoredResource data in to
+// protocol buffer.
+func convertMonitoredResourceToPB(mr *MonitoredResource) *monitoredrespb.MonitoredResource {
+	mrpb := new(monitoredrespb.MonitoredResource)
+	mrpb.Type = mr.GetType()
+	for k, v := range mr.GetLabels() {
+		mrpb.Labels[k] = v
+	}
+	return mrpb
 }

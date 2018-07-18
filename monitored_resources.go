@@ -15,9 +15,26 @@
 package stackdriver
 
 import (
-	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	"os"
 )
+
+// MonitoredResource is used hold resource specific data.
+// Type defines the type of resource.
+// Labels is key/value pair based on the resource type.
+type MonitoredResource struct {
+	Type   string
+	Labels map[string]string
+}
+
+// GetType returns the Type of monitored resource
+func (mr *MonitoredResource) GetType() string {
+	return mr.Type
+}
+
+// GetLabels returns the Labels, a list key/value pair in form of a map.
+func (mr *MonitoredResource) GetLabels() map[string]string {
+	return mr.Labels
+}
 
 // GetAutoDetectedDefaultResource auto-detects monitored resources based on
 // the environment where the application is running.
@@ -30,7 +47,7 @@ import (
 //
 // For resource definition go to https://cloud.google.com/monitoring/api/resources
 
-func GetAutoDetectedDefaultResource() *monitoredrespb.MonitoredResource {
+func GetAutoDetectedDefaultResource() *MonitoredResource {
 
 	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
 		return createGcpGkeContainerMonitoredResource()
@@ -46,8 +63,8 @@ func GetAutoDetectedDefaultResource() *monitoredrespb.MonitoredResource {
 
 // createNewMonitoredResources creates a monitored resource of type resourceType.
 // Returns *monitoredrespb.MonitoredResource containing empty label map.
-func createNewMonitoredResources(resourceType string) *monitoredrespb.MonitoredResource {
-	mr := new(monitoredrespb.MonitoredResource)
+func createNewMonitoredResources(resourceType string) *MonitoredResource {
+	mr := new(MonitoredResource)
 	if mr == nil {
 		return nil
 	}
@@ -61,7 +78,7 @@ func createNewMonitoredResources(resourceType string) *monitoredrespb.MonitoredR
 
 // createAwsEc2InstanceMonitoredResource creates a monitored resource of type
 // ResourceTypeAwsEc2Instance.
-func createAwsEc2InstanceMonitoredResource() *monitoredrespb.MonitoredResource {
+func createAwsEc2InstanceMonitoredResource() *MonitoredResource {
 	mr := createNewMonitoredResources(ResourceTypeAwsEc2Instance)
 	if mr != nil {
 		mr.Labels[AwsEc2LabelAwsAccount] = getValueFromAwsIdentityDocument(awsAccountId)
@@ -73,7 +90,7 @@ func createAwsEc2InstanceMonitoredResource() *monitoredrespb.MonitoredResource {
 
 // createGcpGceInstanceMonitoredResource creates a monitored resource of type
 // ResourceTypeGceInstance
-func createGcpGceInstanceMonitoredResource() *monitoredrespb.MonitoredResource {
+func createGcpGceInstanceMonitoredResource() *MonitoredResource {
 	mr := createNewMonitoredResources(ResourceTypeGceInstance)
 	if mr != nil {
 		mr.Labels[GceLabelProjectId] = getValueFromGcpMetadataConfig(gcpAccountIdAttr)
@@ -85,7 +102,7 @@ func createGcpGceInstanceMonitoredResource() *monitoredrespb.MonitoredResource {
 
 // createGcpGkeContainerMonitoredResource creates a monitored resource of type
 // ResourceTypeGkeContainer
-func createGcpGkeContainerMonitoredResource() *monitoredrespb.MonitoredResource {
+func createGcpGkeContainerMonitoredResource() *MonitoredResource {
 	mr := createNewMonitoredResources(ResourceTypeGkeContainer)
 	if mr != nil {
 		mr.Labels[GkeLabelProjectId] = getValueFromGcpMetadataConfig(gcpAccountIdAttr)
