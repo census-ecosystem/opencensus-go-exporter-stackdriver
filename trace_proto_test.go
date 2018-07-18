@@ -28,6 +28,7 @@ import (
 	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"
 	"go.opencensus.io/trace"
+	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
 	codepb "google.golang.org/genproto/googleapis/rpc/code"
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
@@ -54,13 +55,8 @@ func (t *testExporter) ExportSpan(s *trace.SpanData) {
 	t.spans = append(t.spans, s)
 }
 
-func TestExportTrace(t *testing.T) {
+func generateSpan() {
 	ctx := context.Background()
-
-	var te testExporter
-	trace.RegisterExporter(&te)
-	defer trace.UnregisterExporter(&te)
-
 	ctx, span0 := trace.StartSpanWithRemoteParent(
 		ctx,
 		"span0",
@@ -107,47 +103,9 @@ func TestExportTrace(t *testing.T) {
 		span1.End()
 	}
 	span0.End()
-	if len(te.spans) != 5 {
-		t.Errorf("got %d exported spans, want 5", len(te.spans))
-	}
+}
 
-	var spbs spans
-	for _, s := range te.spans {
-		spbs = append(spbs, protoFromSpanData(s, "testproject"))
-	}
-	sort.Sort(spbs)
-
-	for i, want := range []string{
-		spanID.String(),
-		spbs[0].SpanId,
-		spbs[1].SpanId,
-		spbs[1].SpanId,
-		spbs[3].SpanId,
-	} {
-		if got := spbs[i].ParentSpanId; got != want {
-			t.Errorf("span %d: got ParentSpanID %q want %q", i, got, want)
-		}
-	}
-	checkTime := func(ts **timestamppb.Timestamp) {
-		if *ts == nil {
-			t.Error("expected timestamp")
-		}
-		*ts = nil
-	}
-	for _, span := range spbs {
-		checkTime(&span.StartTime)
-		checkTime(&span.EndTime)
-		if span.TimeEvents != nil {
-			for _, te := range span.TimeEvents.TimeEvent {
-				checkTime(&te.Time)
-			}
-		}
-		if want := fmt.Sprintf("projects/testproject/traces/%s/spans/%s", traceID, span.SpanId); span.Name != want {
-			t.Errorf("got span name %q want %q", span.Name, want)
-		}
-		span.Name, span.SpanId, span.ParentSpanId = "", "", ""
-	}
-
+func createExpectedSpans() spans {
 	ua := trunc(userAgent, len(userAgent))
 	expectedSpans := spans{
 		&tracepb.Span{
@@ -304,6 +262,59 @@ func TestExportTrace(t *testing.T) {
 			SameProcessAsParentSpan: &wrapperspb.BoolValue{Value: true},
 		},
 	}
+	return expectedSpans
+}
+
+func TestExportTrace(t *testing.T) {
+
+	var te testExporter
+	trace.RegisterExporter(&te)
+	defer trace.UnregisterExporter(&te)
+
+	generateSpan()
+
+	if len(te.spans) != 5 {
+		t.Errorf("got %d exported spans, want 5", len(te.spans))
+	}
+
+	var spbs spans
+	for _, s := range te.spans {
+		spbs = append(spbs, protoFromSpanData(s, "testproject", nil))
+	}
+	sort.Sort(spbs)
+
+	for i, want := range []string{
+		spanID.String(),
+		spbs[0].SpanId,
+		spbs[1].SpanId,
+		spbs[1].SpanId,
+		spbs[3].SpanId,
+	} {
+		if got := spbs[i].ParentSpanId; got != want {
+			t.Errorf("span %d: got ParentSpanID %q want %q", i, got, want)
+		}
+	}
+	checkTime := func(ts **timestamppb.Timestamp) {
+		if *ts == nil {
+			t.Error("expected timestamp")
+		}
+		*ts = nil
+	}
+	for _, span := range spbs {
+		checkTime(&span.StartTime)
+		checkTime(&span.EndTime)
+		if span.TimeEvents != nil {
+			for _, te := range span.TimeEvents.TimeEvent {
+				checkTime(&te.Time)
+			}
+		}
+		if want := fmt.Sprintf("projects/testproject/traces/%s/spans/%s", traceID, span.SpanId); span.Name != want {
+			t.Errorf("got span name %q want %q", span.Name, want)
+		}
+		span.Name, span.SpanId, span.ParentSpanId = "", "", ""
+	}
+
+	expectedSpans := createExpectedSpans()
 
 	if !reflect.DeepEqual(spbs, expectedSpans) {
 		var got, want []string
@@ -315,6 +326,111 @@ func TestExportTrace(t *testing.T) {
 		}
 		t.Errorf("got spans:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
+}
+
+func checkExepectedMonitoredResourceKV(k string, v string, spb *tracepb.Span, t *testing.T) {
+	found := spb.Attributes.AttributeMap[k].GetStringValue().GetValue()
+	if found != v {
+		t.Errorf("Monitored Resource Attributes: got %s want %s for attribute %s", found, v, k)
+	}
+}
+
+func createAwsEc2MonitoredResource() *monitoredrespb.MonitoredResource {
+
+	mr := &monitoredrespb.MonitoredResource{
+		Type: "aws_ec2_instance",
+		Labels: map[string]string{
+			"instance_id": "i-092676e3abbde2959",
+			"aws_account": "999999999999",
+			"region":      "aws:us-west-2",
+		},
+	}
+	return mr
+}
+
+func createGceInstanceMonitoredResource() *monitoredrespb.MonitoredResource {
+
+	mr := &monitoredrespb.MonitoredResource{
+		Type: "gce_instance",
+		Labels: map[string]string{
+			"instance_id": "8586409804775703315",
+			"project_id":  "project-test",
+			"zone":        "us-central1-c",
+		},
+	}
+	return mr
+}
+
+func createGkeContainerMonitoredResource() *monitoredrespb.MonitoredResource {
+
+	mr := &monitoredrespb.MonitoredResource{
+		Type: "gke_container",
+		Labels: map[string]string{
+			"instance_id":    "8586409804775703315",
+			"project_id":     "project-test",
+			"zone":           "us-central1-c",
+			"cluster_name":   "cluster",
+			"namespace_id":   "namespace",
+			"pod_id":         "pod",
+			"container_name": "container",
+		},
+	}
+	return mr
+}
+
+func TestExportTraceWithMonitoredResource(t *testing.T) {
+
+	var te testExporter
+	trace.RegisterExporter(&te)
+	defer trace.UnregisterExporter(&te)
+
+	generateSpan()
+
+	// Test GCE Insatance Type monitored resources
+	var gceSpbs spans
+	mr := createGceInstanceMonitoredResource()
+
+	for _, s := range te.spans {
+		gceSpbs = append(gceSpbs, protoFromSpanData(s, "testproject", mr))
+	}
+
+	for _, span := range gceSpbs {
+		checkExepectedMonitoredResourceKV("g.co/r/gce_instance/project_id", "project-test", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/gce_instance/instance_id", "8586409804775703315", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/gce_instance/zone", "us-central1-c", span, t)
+	}
+
+	// Test GKE Container Type monitored resources
+	var gkeSpbs spans
+	mr = createGkeContainerMonitoredResource()
+
+	for _, s := range te.spans {
+		gkeSpbs = append(gkeSpbs, protoFromSpanData(s, "testproject", mr))
+	}
+
+	for _, span := range gkeSpbs {
+		checkExepectedMonitoredResourceKV("g.co/r/gke_container/project_id", "project-test", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/gke_container/instance_id", "8586409804775703315", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/gke_container/zone", "us-central1-c", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/gke_container/container_name", "container", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/gke_container/cluster_name", "cluster", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/gke_container/pod_id", "pod", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/gke_container/namespace_id", "namespace", span, t)
+	}
+
+	// Test AWS EC2 Instance type monitored resources
+	var awsEc2Spbs spans
+	mr = createAwsEc2MonitoredResource()
+	for _, s := range te.spans {
+		awsEc2Spbs = append(awsEc2Spbs, protoFromSpanData(s, "testproject", mr))
+	}
+
+	for _, span := range awsEc2Spbs {
+		checkExepectedMonitoredResourceKV("g.co/r/aws_ec2_instance/aws_account", "999999999999", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/aws_ec2_instance/instance_id", "i-092676e3abbde2959", span, t)
+		checkExepectedMonitoredResourceKV("g.co/r/aws_ec2_instance/region", "aws:us-west-2", span, t)
+	}
+
 }
 
 func TestEnums(t *testing.T) {
@@ -379,7 +495,7 @@ func BenchmarkProto(b *testing.B) {
 	}
 	var x int
 	for i := 0; i < b.N; i++ {
-		s := protoFromSpanData(sd, `testproject`)
+		s := protoFromSpanData(sd, `testproject`, nil)
 		x += len(s.Name)
 	}
 	if x == 0 {

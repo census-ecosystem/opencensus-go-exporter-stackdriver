@@ -114,7 +114,7 @@ func (e *traceExporter) uploadSpans(spans []*trace.SpanData) {
 		Spans: make([]*tracepb.Span, 0, len(spans)),
 	}
 	for _, span := range spans {
-		req.Spans = append(req.Spans, protoFromSpanData(span, e.projectID))
+		req.Spans = append(req.Spans, protoFromSpanData(span, e.projectID, e.o.Resource))
 	}
 	// Create a never-sampled span to prevent traces associated with exporter.
 	ctx, span := trace.StartSpan( // TODO: add timeouts

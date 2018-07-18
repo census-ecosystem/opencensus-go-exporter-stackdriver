@@ -21,9 +21,11 @@ import (
 
 	"go.opencensus.io/plugin/ochttp"
 
+	"fmt"
 	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"
 	"go.opencensus.io/trace"
+	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 )
@@ -42,7 +44,7 @@ const (
 )
 
 // proto returns a protocol buffer representation of a SpanData.
-func protoFromSpanData(s *trace.SpanData, projectID string) *tracepb.Span {
+func protoFromSpanData(s *trace.SpanData, projectID string, mr *monitoredrespb.MonitoredResource) *tracepb.Span {
 	if s == nil {
 		return nil
 	}
@@ -75,6 +77,9 @@ func protoFromSpanData(s *trace.SpanData, projectID string) *tracepb.Span {
 
 	var annotations, droppedAnnotationsCount, messageEvents, droppedMessageEventsCount int
 	copyAttributes(&sp.Attributes, s.Attributes)
+
+	// Copy MonitoredResources as span Attributes
+	copyMonitoredResourceAttributes(&sp.Attributes, mr)
 
 	as := s.Annotations
 	for i, a := range as {
@@ -158,6 +163,24 @@ func timestampProto(t time.Time) *timestamppb.Timestamp {
 	return &timestamppb.Timestamp{
 		Seconds: t.Unix(),
 		Nanos:   int32(t.Nanosecond()),
+	}
+}
+
+// copyMonitoredResourceAttributes copies proto monitoredResource to proto map field (Span_Attributes)
+// it creates the map if it is nil.
+func copyMonitoredResourceAttributes(out **tracepb.Span_Attributes, mr *monitoredrespb.MonitoredResource) {
+	if mr == nil {
+		return
+	}
+	if *out == nil {
+		*out = &tracepb.Span_Attributes{}
+	}
+	if (*out).AttributeMap == nil {
+		(*out).AttributeMap = make(map[string]*tracepb.AttributeValue)
+	}
+	for k, v := range mr.Labels {
+		av := attributeValue(v)
+		(*out).AttributeMap[fmt.Sprintf("g.co/r/%s/%s", mr.Type, k)] = av
 	}
 }
 
