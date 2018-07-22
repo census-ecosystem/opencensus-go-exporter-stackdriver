@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package stackdriver
+package monitoredresources
 
 import (
 	"os"
@@ -20,13 +20,13 @@ import (
 )
 
 const (
-	GCP_ACCOUNT_ID_STR         string = "gcp-project"
-	GCP_INSTANCE_ID_STR        string = "instance"
-	GCP_ZONE_STR               string = "us-east1"
-	GCP_GKE_NAMESPACE_STR      string = "namespace"
-	GCP_GKE_POD_ID_STR         string = "pod-id"
-	GCP_GKE_CONTAINER_NAME_STR string = "container"
-	GCP_GKE_CLUSTER_NAME_STR   string = "cluster"
+	GCP_ACCOUNT_ID_STR         = "gcp-project"
+	GCP_INSTANCE_ID_STR        = "instance"
+	GCP_ZONE_STR               = "us-east1"
+	GCP_GKE_NAMESPACE_STR      = "namespace"
+	GCP_GKE_POD_ID_STR         = "pod-id"
+	GCP_GKE_CONTAINER_NAME_STR = "container"
+	GCP_GKE_CLUSTER_NAME_STR   = "cluster"
 )
 
 const SAMPLE_AWS_IDENTITY_DOCUMENT = `{
@@ -56,75 +56,86 @@ func TestGcpGkeContainerMonitoredResources(t *testing.T) {
 	if gcpMetadataConfigMap == nil {
 		gcpMetadataConfigMap = make(map[string]string)
 	}
-	gcpMetadataConfigMap[gcpInstanceIdAttr] = GCP_INSTANCE_ID_STR
-	gcpMetadataConfigMap[gcpAccountIdAttr] = GCP_ACCOUNT_ID_STR
-	gcpMetadataConfigMap[gcpClusterNameAttr] = GCP_GKE_CLUSTER_NAME_STR
-	gcpMetadataConfigMap[gcpContainerNameEnv] = GCP_GKE_CONTAINER_NAME_STR
-	gcpMetadataConfigMap[gcpZoneAttr] = GCP_ZONE_STR
-	gcpMetadataConfigMap[gcpNamespaceEnv] = GCP_GKE_NAMESPACE_STR
-	gcpMetadataConfigMap[gcpPodIdEnv] = GCP_GKE_POD_ID_STR
-	mr := GetAutoDetectedDefaultResource()
+	gcpMetadataConfigMap[gcpInstanceID] = GCP_INSTANCE_ID_STR
+	gcpMetadataConfigMap[gcpProjectID] = GCP_ACCOUNT_ID_STR
+	gcpMetadataConfigMap[gcpClusterName] = GCP_GKE_CLUSTER_NAME_STR
+	gcpMetadataConfigMap[gcpContainerNameEnvVar] = GCP_GKE_CONTAINER_NAME_STR
+	gcpMetadataConfigMap[gcpZone] = GCP_ZONE_STR
+	gcpMetadataConfigMap[gcpNamespaceEnvVar] = GCP_GKE_NAMESPACE_STR
+	gcpMetadataConfigMap[gcpPodIDEnvVar] = GCP_GKE_POD_ID_STR
+	detectResourceType()
+
 	if mr == nil {
 		t.Fatal("GcpGkeContainerMonitoredResource nil")
 	}
 	if mr.GetType() != ResourceTypeGkeContainer ||
-		mr.GetLabels()[GkeLabelInstanceId] != GCP_INSTANCE_ID_STR ||
-		mr.GetLabels()[GkeLabelProjectId] != GCP_ACCOUNT_ID_STR ||
-		mr.GetLabels()[GkeLabelClusterName] != GCP_GKE_CLUSTER_NAME_STR ||
-		mr.GetLabels()[GkeLabelContainerName] != GCP_GKE_CONTAINER_NAME_STR ||
-		mr.GetLabels()[GkeLabelZone] != GCP_ZONE_STR ||
-		mr.GetLabels()[GkeLabelNamespaceId] != GCP_GKE_NAMESPACE_STR ||
-		mr.GetLabels()[GkeLabelPodId] != GCP_GKE_POD_ID_STR {
+		mr.GetLabels()[GKELabelInstanceID] != GCP_INSTANCE_ID_STR ||
+		mr.GetLabels()[GKELabelProjectID] != GCP_ACCOUNT_ID_STR ||
+		mr.GetLabels()[GKELabelClusterName] != GCP_GKE_CLUSTER_NAME_STR ||
+		mr.GetLabels()[GKELabelContainerName] != GCP_GKE_CONTAINER_NAME_STR ||
+		mr.GetLabels()[GKELabelZone] != GCP_ZONE_STR ||
+		mr.GetLabels()[GKELabelNamespaceID] != GCP_GKE_NAMESPACE_STR ||
+		mr.GetLabels()[GKELabelPodID] != GCP_GKE_POD_ID_STR {
 		t.Errorf("GcpGkeContainerMonitoredResource Failed: %v", mr)
 	}
 }
 
 func TestGcpGceInstanceMonitoredResources(t *testing.T) {
-	if awsIdentityDoc == nil {
-		awsIdentityDoc = new(awsIdentityDocument)
-	}
-
 	os.Setenv("KUBERNETES_SERVICE_HOST", "")
-	gcpMetadataConfigMap[gcpInstanceIdAttr] = GCP_INSTANCE_ID_STR
-	gcpMetadataConfigMap[gcpAccountIdAttr] = GCP_ACCOUNT_ID_STR
-	gcpMetadataConfigMap[gcpZoneAttr] = GCP_ZONE_STR
-	mr := GetAutoDetectedDefaultResource()
+	if gcpMetadataConfigMap == nil {
+		gcpMetadataConfigMap = make(map[string]string)
+	}
+	gcpMetadataConfigMap[gcpInstanceID] = GCP_INSTANCE_ID_STR
+	gcpMetadataConfigMap[gcpProjectID] = GCP_ACCOUNT_ID_STR
+	gcpMetadataConfigMap[gcpZone] = GCP_ZONE_STR
+	detectResourceType()
+
 	if mr == nil {
 		t.Fatal("GcpGceInstanceMonitoredResource nil")
 	}
 	if mr.GetType() != ResourceTypeGceInstance ||
-		mr.GetLabels()[GceLabelInstanceId] != GCP_INSTANCE_ID_STR ||
-		mr.GetLabels()[GceLabelProjectId] != GCP_ACCOUNT_ID_STR ||
-		mr.GetLabels()[GceLabelZone] != GCP_ZONE_STR {
+		mr.GetLabels()[GCELabelInstanceID] != GCP_INSTANCE_ID_STR ||
+		mr.GetLabels()[GCELabelProjectID] != GCP_ACCOUNT_ID_STR ||
+		mr.GetLabels()[GCELabelZone] != GCP_ZONE_STR {
 		t.Errorf("GcpGceInstanceMonitoredResource Failed: %v", mr)
 	}
 }
 
 func TestAwsEc2InstanceMonitoredResources(t *testing.T) {
+	os.Setenv("KUBERNETES_SERVICE_HOST", "")
 	if gcpMetadataConfigMap == nil {
 		gcpMetadataConfigMap = make(map[string]string)
 	}
-	os.Setenv("KUBERNETES_SERVICE_HOST", "")
-	gcpMetadataConfigMap[gcpInstanceIdAttr] = ""
-	parseAwsIdentityDocument([]byte(SAMPLE_AWS_IDENTITY_DOCUMENT))
-	mr := GetAutoDetectedDefaultResource()
+	gcpMetadataConfigMap[gcpInstanceID] = ""
+
+	awsIdentityDoc = &awsIdentityDocument{
+		"123456789012",
+		"i-1234567890abcdef0",
+		"us-west-2",
+	}
+	runningOnAwsEc2 = true
+	detectResourceType()
+
 	if mr == nil {
 		t.Fatal("AwsEc2InstanceMonitoredResource nil")
 	}
 	if mr.GetType() != ResourceTypeAwsEc2Instance ||
-		mr.GetLabels()[AwsEc2LabelInstanceId] != "i-1234567890abcdef0" ||
-		mr.GetLabels()[AwsEc2LabelAwsAccount] != "123456789012" ||
-		mr.GetLabels()[AwsEc2LabelRegion] != "us-west-2" {
+		mr.GetLabels()[AWSEC2LabelInstanceID] != "i-1234567890abcdef0" ||
+		mr.GetLabels()[AWSEC2LabelAwsAccount] != "123456789012" ||
+		mr.GetLabels()[AWSEC2LabelRegion] != "aws:us-west-2" {
 		t.Errorf("AwsEc2InstanceMonitoredResource Failed: %v", mr)
 	}
 }
 
 func TestNullMonitoredResources(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "")
-	gcpMetadataConfigMap[gcpInstanceIdAttr] = ""
+	if gcpMetadataConfigMap == nil {
+		gcpMetadataConfigMap = make(map[string]string)
+	}
+	gcpMetadataConfigMap[gcpInstanceID] = ""
 	awsIdentityDoc = new(awsIdentityDocument)
-	parseAwsIdentityDocument([]byte(SAMPLE_NON_AWS_IDENTITY_DOCUMENT))
-	mr := GetAutoDetectedDefaultResource()
+	runningOnAwsEc2 = false
+	mr := Autodetect()
 	if mr != nil {
 		t.Errorf("Expected nil MonitoredResource but found %v", mr)
 	}

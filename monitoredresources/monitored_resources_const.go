@@ -12,63 +12,56 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package stackdriver
+package monitoredresources
 
 // Resource Type supported for auto detection.
 // For definition refer to
 // https://cloud.google.com/monitoring/custom-metrics/creating-metrics#which-resource
 const (
-	ResourceTypeGkeContainer   string = "gke_container"
-	ResourceTypeGceInstance    string = "gce_instance"
-	ResourceTypeAwsEc2Instance string = "aws_ec2_instance"
+	ResourceTypeGkeContainer   = "gke_container"
+	ResourceTypeGceInstance    = "gce_instance"
+	ResourceTypeAwsEc2Instance = "aws_ec2_instance"
 )
 
 // Resource labels for resource type aws_ec2_instance
 // For definition refer to
 // https://cloud.google.com/monitoring/api/resources#tag_aws_ec2_instance
 const (
-	AwsEc2LabelAwsAccount string = "aws_account"
-	AwsEc2LabelInstanceId string = "instance_id"
-	AwsEc2LabelRegion     string = "region"
+	AWSEC2LabelAwsAccount = "aws_account"
+	AWSEC2LabelInstanceID = "instance_id"
+	AWSEC2LabelRegion     = "region"
 )
 
 // Resource labels for resource type gce_instance
 // For definition refer to
 // https://cloud.google.com/monitoring/api/resources#tag_gce_instance
 const (
-	GceLabelProjectId  string = "project_id"
-	GceLabelInstanceId string = "instance_id"
-	GceLabelZone       string = "zone"
+	GCELabelProjectID  = "project_id"
+	GCELabelInstanceID = "instance_id"
+	GCELabelZone       = "zone"
 )
 
 // Resource labels for resource type gke_container
 // For definition refer to
 // https://cloud.google.com/monitoring/api/resources#tag_gke_container
 const (
-	GkeLabelProjectId     string = "project_id"
-	GkeLabelInstanceId    string = "instance_id"
-	GkeLabelClusterName   string = "cluster_name"
-	GkeLabelContainerName string = "container_name"
-	GkeLabelNamespaceId   string = "namespace_id"
-	GkeLabelPodId         string = "pod_id"
-	GkeLabelZone          string = "zone"
-)
-
-// Fields parsed from AWS Identity Document.
-const (
-	awsAccountId  string = "accountId"
-	awsInstanceId string = "instanceId"
-	awsRegion     string = "region"
+	GKELabelProjectID     = "project_id"
+	GKELabelInstanceID    = "instance_id"
+	GKELabelClusterName   = "cluster_name"
+	GKELabelContainerName = "container_name"
+	GKELabelNamespaceID   = "namespace_id"
+	GKELabelPodID         = "pod_id"
+	GKELabelZone          = "zone"
 )
 
 // Attributes retrieved from Metadata Server in case of
 // gke_container and gce_instance resource types.
 const (
-	gcpAccountIdAttr    string = "project/project-id"
-	gcpInstanceIdAttr   string = "instance/id"
-	gcpZoneAttr         string = "instance/zone"
-	gcpClusterNameAttr  string = "instance/attributes/cluster-name"
-	gcpContainerNameEnv string = "CONTAINER_NAME"
-	gcpNamespaceEnv     string = "NAMESPACE"
-	gcpPodIdEnv         string = "HOSTNAME"
+	gcpProjectID           = "project/project-id"
+	gcpInstanceID          = "instance/id"
+	gcpZone                = "instance/zone"
+	gcpClusterName         = "instance/attributes/cluster-name"
+	gcpContainerNameEnvVar = "CONTAINER_NAME"
+	gcpNamespaceEnvVar     = "NAMESPACE"
+	gcpPodIDEnvVar         = "HOSTNAME"
 )

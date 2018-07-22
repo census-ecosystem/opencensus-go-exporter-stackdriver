@@ -56,6 +56,7 @@ import (
 	"time"
 
 	traceapi "cloud.google.com/go/trace/apiv2"
+	monitoredres "contrib.go.opencensus.io/exporter/stackdriver/monitoredresources"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
 	"golang.org/x/oauth2/google"
@@ -144,6 +145,11 @@ type Options struct {
 	// default "opencensus_task" label. You should only do this if you know that
 	// the Resource you set uniquely identifies this Go process.
 	DefaultMonitoringLabels *Labels
+
+	// Use this to represent an auto detected monitored resource or your custom
+	// monitored resource.
+	// This field will be ignored if Resource field above is non-nil.
+	MonitoredResource monitoredres.MonitoredResInterface
 }
 
 // Exporter is a stats.Exporter and trace.Exporter
@@ -167,20 +173,8 @@ func NewExporter(o Options) (*Exporter, error) {
 		o.ProjectID = creds.ProjectID
 	}
 
-	if o.Resource == nil {
-		mr := GetAutoDetectedDefaultResource()
-		if mr != nil {
-			o.Resource = convertMonitoredResourceToPB(mr)
-			if o.Resource.Type == ResourceTypeAwsEc2Instance {
-				for k, v := range o.Resource.Labels {
-					if k == AwsEc2LabelRegion {
-						// region should be converted into format 'aws:{region}'. eg. 'aws:us-west-2'
-						o.Resource.Labels[k] = fmt.Sprintf("aws:%s", v)
-						break
-					}
-				}
-			}
-		}
+	if o.MonitoredResource != nil {
+		o.Resource = convertMonitoredResourceToPB(o.MonitoredResource)
 	}
 
 	se, err := newStatsExporter(o, true)
@@ -242,9 +236,10 @@ func (o Options) handleError(err error) {
 
 // convertMonitoredResourceToPB converts MonitoredResource data in to
 // protocol buffer.
-func convertMonitoredResourceToPB(mr *MonitoredResource) *monitoredrespb.MonitoredResource {
+func convertMonitoredResourceToPB(mr monitoredres.MonitoredResInterface) *monitoredrespb.MonitoredResource {
 	mrpb := new(monitoredrespb.MonitoredResource)
 	mrpb.Type = mr.GetType()
+	mrpb.Labels = make(map[string]string)
 	for k, v := range mr.GetLabels() {
 		mrpb.Labels[k] = v
 	}
