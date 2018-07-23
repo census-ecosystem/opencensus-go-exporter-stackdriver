@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
-	)
+)
 
 type MonitoredResInterface interface {
 	GetType() string

@@ -15,10 +15,9 @@
 package monitoredresources
 
 import (
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
+	"github.com/aws/aws-sdk-go/aws/session"
 )
-
 
 var awsIdentityDoc *awsIdentityDocument
 
@@ -44,11 +43,11 @@ func retrieveAWSIdentityDocument() {
 	c := ec2metadata.New(session.New())
 	ec2InstanceIdentifyDocument, err := c.GetInstanceIdentityDocument()
 	if err != nil {
-		runningOnAwsEc2 = false;
+		runningOnAwsEc2 = false
 		return
 	}
 	runningOnAwsEc2 = true
-	awsIdentityDoc.Region     = ec2InstanceIdentifyDocument.Region
+	awsIdentityDoc.Region = ec2InstanceIdentifyDocument.Region
 	awsIdentityDoc.InstanceId = ec2InstanceIdentifyDocument.InstanceID
 	awsIdentityDoc.AccountId = ec2InstanceIdentifyDocument.AccountID
 }
