@@ -22,6 +22,7 @@ import (
 	"go.opencensus.io/plugin/ochttp"
 
 	"fmt"
+
 	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"
 	"go.opencensus.io/trace"
@@ -79,7 +80,7 @@ func protoFromSpanData(s *trace.SpanData, projectID string, mr *monitoredrespb.M
 	copyAttributes(&sp.Attributes, s.Attributes)
 
 	// Copy MonitoredResources as span Attributes
-	copyMonitoredResourceAttributes(&sp.Attributes, mr)
+	sp.Attributes = copyMonitoredResourceAttributes(sp.Attributes, mr)
 
 	as := s.Annotations
 	for i, a := range as {
@@ -168,20 +169,21 @@ func timestampProto(t time.Time) *timestamppb.Timestamp {
 
 // copyMonitoredResourceAttributes copies proto monitoredResource to proto map field (Span_Attributes)
 // it creates the map if it is nil.
-func copyMonitoredResourceAttributes(out **tracepb.Span_Attributes, mr *monitoredrespb.MonitoredResource) {
+func copyMonitoredResourceAttributes(out *tracepb.Span_Attributes, mr *monitoredrespb.MonitoredResource) *tracepb.Span_Attributes {
 	if mr == nil {
-		return
+		return out
 	}
-	if *out == nil {
-		*out = &tracepb.Span_Attributes{}
+	if out == nil {
+		out = &tracepb.Span_Attributes{}
 	}
-	if (*out).AttributeMap == nil {
-		(*out).AttributeMap = make(map[string]*tracepb.AttributeValue)
+	if out.AttributeMap == nil {
+		out.AttributeMap = make(map[string]*tracepb.AttributeValue)
 	}
 	for k, v := range mr.Labels {
 		av := attributeValue(v)
-		(*out).AttributeMap[fmt.Sprintf("g.co/r/%s/%s", mr.Type, k)] = av
+		out.AttributeMap[fmt.Sprintf("g.co/r/%s/%s", mr.Type, k)] = av
 	}
+	return out
 }
 
 // copyAttributes copies a map of attributes to a proto map field.

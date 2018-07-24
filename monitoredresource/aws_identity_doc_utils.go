@@ -12,50 +12,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package monitoredresources
+package monitoredresource
 
 import (
 	"github.com/aws/aws-sdk-go/aws/ec2metadata"
 	"github.com/aws/aws-sdk-go/aws/session"
 )
 
-var awsIdentityDoc *awsIdentityDocument
-
 // awsIdentityDocument is used to store parsed AWS Identity Document.
 type awsIdentityDocument struct {
-	AccountId  string
-	InstanceId string
+	AccountID  string
+	InstanceID string
 	Region     string
-}
-
-var runningOnAwsEc2 = false
-
-func isRunningOnAwsEc2() bool {
-	return runningOnAwsEc2
 }
 
 // retrieveAWSIdentityDocument attempts to retrieve AWS Identity Document.
 // If the environment is AWS EC2 Instance then a valid document is retrieved.
 // Relevant attributes from the document are stored in awsIdentityDoc.
 // This is only done once.
-func retrieveAWSIdentityDocument() {
-	awsIdentityDoc = new(awsIdentityDocument)
+func retrieveAWSIdentityDocument() *awsIdentityDocument {
+	awsIdentityDoc := awsIdentityDocument{}
 	c := ec2metadata.New(session.New())
 	ec2InstanceIdentifyDocument, err := c.GetInstanceIdentityDocument()
 	if err != nil {
-		runningOnAwsEc2 = false
-		return
+		return nil
 	}
-	runningOnAwsEc2 = true
 	awsIdentityDoc.Region = ec2InstanceIdentifyDocument.Region
-	awsIdentityDoc.InstanceId = ec2InstanceIdentifyDocument.InstanceID
-	awsIdentityDoc.AccountId = ec2InstanceIdentifyDocument.AccountID
-}
+	awsIdentityDoc.InstanceID = ec2InstanceIdentifyDocument.InstanceID
+	awsIdentityDoc.AccountID = ec2InstanceIdentifyDocument.AccountID
 
-// getAWSIdentityDocument returns AWS Identity Doc.
-func getAWSIdentityDocument() *awsIdentityDocument {
-	if awsIdentityDoc == nil {
-		awsIdentityDoc = new(awsIdentityDocument)
-	}
-	return awsIdentityDoc
+	return &awsIdentityDoc
 }

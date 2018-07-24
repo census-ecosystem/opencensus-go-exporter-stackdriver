@@ -23,11 +23,12 @@ import (
 	"log"
 	"time"
 
+	"os"
+
 	"contrib.go.opencensus.io/exporter/stackdriver"
-	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresources"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
-	"os"
 )
 
 // Create measures. The program will record measures for the size of
@@ -49,7 +50,7 @@ func main() {
 	// for more details.
 	exporter, err := stackdriver.NewExporter(stackdriver.Options{
 		ProjectID:         os.Getenv("PROJECT_ID"), // Google Cloud Console project ID.
-		MonitoredResource: monitoredresources.Autodetect(),
+		MonitoredResource: monitoredresource.Autodetect(),
 	})
 	if err != nil {
 		log.Fatal(err)

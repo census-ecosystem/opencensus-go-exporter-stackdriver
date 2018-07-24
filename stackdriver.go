@@ -56,7 +56,7 @@ import (
 	"time"
 
 	traceapi "cloud.google.com/go/trace/apiv2"
-	monitoredres "contrib.go.opencensus.io/exporter/stackdriver/monitoredresources"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
 	"golang.org/x/oauth2/google"
@@ -120,6 +120,11 @@ type Options struct {
 	// Optional, but encouraged.
 	Resource *monitoredrespb.MonitoredResource
 
+	// Use this to represent an auto detected monitored resource or your custom
+	// monitored resource.
+	// This field, if non-nil, will take priority over Resource field. .
+	MonitoredResource monitoredresource.Interface
+
 	// MetricPrefix overrides the prefix of a Stackdriver metric type names.
 	// Optional. If unset defaults to "OpenCensus".
 	MetricPrefix string
@@ -145,11 +150,6 @@ type Options struct {
 	// default "opencensus_task" label. You should only do this if you know that
 	// the Resource you set uniquely identifies this Go process.
 	DefaultMonitoringLabels *Labels
-
-	// Use this to represent an auto detected monitored resource or your custom
-	// monitored resource.
-	// This field will be ignored if Resource field above is non-nil.
-	MonitoredResource monitoredres.MonitoredResInterface
 }
 
 // Exporter is a stats.Exporter and trace.Exporter
@@ -236,11 +236,12 @@ func (o Options) handleError(err error) {
 
 // convertMonitoredResourceToPB converts MonitoredResource data in to
 // protocol buffer.
-func convertMonitoredResourceToPB(mr monitoredres.MonitoredResInterface) *monitoredrespb.MonitoredResource {
+func convertMonitoredResourceToPB(mr monitoredresource.Interface) *monitoredrespb.MonitoredResource {
 	mrpb := new(monitoredrespb.MonitoredResource)
-	mrpb.Type = mr.GetType()
+	var labels map[string]string
+	mrpb.Type, labels = mr.MonitoredResource()
 	mrpb.Labels = make(map[string]string)
-	for k, v := range mr.GetLabels() {
+	for k, v := range labels {
 		mrpb.Labels[k] = v
 	}
 	return mrpb
