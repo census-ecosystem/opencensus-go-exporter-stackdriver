@@ -46,11 +46,6 @@ type GCPMetadata struct {
 	Zone string
 }
 
-// gcpMetadata holds GCP metadata for GKE Container and GCE Instance.
-// Since GKE Container is superset of GCE Instance, GKE Container type is
-// used to store gcp metadata.
-//var gcpMetadata GCPMetadata
-
 // retrieveGCPMetadata retrieves value of each Attribute from Metadata Server
 // in GKE container and GCE instance environment.
 // Some attributes are retrieved from the system environment.
