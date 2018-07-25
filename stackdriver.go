@@ -168,6 +168,15 @@ type Options struct {
 	// default "opencensus_task" label. You should only do this if you know that
 	// the Resource you set uniquely identifies this Go process.
 	DefaultMonitoringLabels *Labels
+
+	// Context allows users to provide a custom context for API calls.
+	//
+	// This context will be used several times: first, to create Stackdriver
+	// trace and metric clients, and then every time a new batch of traces or
+	// stats needs to be uploaded.
+	//
+	// If unset, context.Background() will be used.
+	Context context.Context
 }
 
 // Exporter is a stats.Exporter and trace.Exporter
@@ -180,8 +189,11 @@ type Exporter struct {
 // NewExporter creates a new Exporter that implements both stats.Exporter and
 // trace.Exporter.
 func NewExporter(o Options) (*Exporter, error) {
+	if o.Context == nil {
+		o.Context = context.Background()
+	}
 	if o.ProjectID == "" {
-		creds, err := google.FindDefaultCredentials(context.Background(), traceapi.DefaultAuthScopes()...)
+		creds, err := google.FindDefaultCredentials(o.Context, traceapi.DefaultAuthScopes()...)
 		if err != nil {
 			return nil, fmt.Errorf("stackdriver: %v", err)
 		}
