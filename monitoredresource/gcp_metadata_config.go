@@ -21,50 +21,50 @@ import (
 	"cloud.google.com/go/compute/metadata"
 )
 
-// A type representing metadata retrieved from GCP.
-type GCPMetadata struct {
+// A type representing metadata retrieved from GKE and GCE environment.
+type gcpMetadata struct {
 
-	// ProjectID is the identifier of the GCP project associated with this resource, such as "my-project".
-	ProjectID string
+	// projectID is the identifier of the GCP project associated with this resource, such as "my-project".
+	projectID string
 
-	// InstanceID is the numeric VM instance identifier assigned by Compute Engine.
-	InstanceID string
+	// instanceID is the numeric VM instance identifier assigned by Compute Engine.
+	instanceID string
 
-	// ClusterName is the name for the cluster the container is running in.
-	ClusterName string
+	// clusterName is the name for the cluster the container is running in.
+	clusterName string
 
-	// ContainerName is the name of the container.
-	ContainerName string
+	// containerName is the name of the container.
+	containerName string
 
-	// NamespaceID is the identifier for the cluster namespace the container is running in
-	NamespaceID string
+	// namespaceID is the identifier for the cluster namespace the container is running in
+	namespaceID string
 
-	// PodI is the identifier for the pod the container is running in.
-	PodID string
+	// podID is the identifier for the pod the container is running in.
+	podID string
 
-	// Zone is the Compute Engine zone in which the VM is running.
-	Zone string
+	// zone is the Compute Engine zone in which the VM is running.
+	zone string
 }
 
 // retrieveGCPMetadata retrieves value of each Attribute from Metadata Server
 // in GKE container and GCE instance environment.
 // Some attributes are retrieved from the system environment.
 // This is only executed once.
-func retrieveGCPMetadata() *GCPMetadata {
-	gcpMetadata := GCPMetadata{}
+func retrieveGCPMetadata() *gcpMetadata {
+	gcpMetadata := gcpMetadata{}
 
-	gcpMetadata.ProjectID, _ = metadata.ProjectID()
-	gcpMetadata.InstanceID, _ = metadata.InstanceID()
-	gcpMetadata.Zone, _ = metadata.Zone()
+	gcpMetadata.projectID, _ = metadata.ProjectID()
+	gcpMetadata.instanceID, _ = metadata.InstanceID()
+	gcpMetadata.zone, _ = metadata.Zone()
 	clusterName, _ := metadata.InstanceAttributeValue("cluster-name")
-	gcpMetadata.ClusterName = strings.TrimSpace(clusterName)
+	gcpMetadata.clusterName = strings.TrimSpace(clusterName)
 
 	// Following attributes are derived from environment variables. They are configured
 	// via yaml file. For details refer to:
 	// https://cloud.google.com/kubernetes-engine/docs/tutorials/custom-metrics-autoscaling#exporting_metrics_from_the_application
-	gcpMetadata.NamespaceID = os.Getenv("NAMESPACE")
-	gcpMetadata.ContainerName = os.Getenv("CONTAINER_NAME")
-	gcpMetadata.PodID = os.Getenv("HOSTNAME")
+	gcpMetadata.namespaceID = os.Getenv("NAMESPACE")
+	gcpMetadata.containerName = os.Getenv("CONTAINER_NAME")
+	gcpMetadata.podID = os.Getenv("HOSTNAME")
 
 	return &gcpMetadata
 }

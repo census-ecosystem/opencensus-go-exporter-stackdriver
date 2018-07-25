@@ -21,9 +21,14 @@ import (
 
 // awsIdentityDocument is used to store parsed AWS Identity Document.
 type awsIdentityDocument struct {
-	AccountID  string
-	InstanceID string
-	Region     string
+	// accountID is the AWS account number for the VM.
+	accountID string
+
+	// instanceID is the instance id of the instance.
+	instanceID string
+
+	// Region is the AWS region for the VM.
+	region string
 }
 
 // retrieveAWSIdentityDocument attempts to retrieve AWS Identity Document.
@@ -37,9 +42,9 @@ func retrieveAWSIdentityDocument() *awsIdentityDocument {
 	if err != nil {
 		return nil
 	}
-	awsIdentityDoc.Region = ec2InstanceIdentifyDocument.Region
-	awsIdentityDoc.InstanceID = ec2InstanceIdentifyDocument.InstanceID
-	awsIdentityDoc.AccountID = ec2InstanceIdentifyDocument.AccountID
+	awsIdentityDoc.region = ec2InstanceIdentifyDocument.Region
+	awsIdentityDoc.instanceID = ec2InstanceIdentifyDocument.InstanceID
+	awsIdentityDoc.accountID = ec2InstanceIdentifyDocument.AccountID
 
 	return &awsIdentityDoc
 }

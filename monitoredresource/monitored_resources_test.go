@@ -31,14 +31,15 @@ const (
 
 func TestGKEContainerMonitoredResources(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
-	var gcpMetadata GCPMetadata
-	gcpMetadata.InstanceID = GCP_INSTANCE_ID_STR
-	gcpMetadata.ProjectID = GCP_ACCOUNT_ID_STR
-	gcpMetadata.Zone = GCP_ZONE_STR
-	gcpMetadata.ClusterName = GCP_GKE_CLUSTER_NAME_STR
-	gcpMetadata.ContainerName = GCP_GKE_CONTAINER_NAME_STR
-	gcpMetadata.NamespaceID = GCP_GKE_NAMESPACE_STR
-	gcpMetadata.PodID = GCP_GKE_POD_ID_STR
+	gcpMetadata := gcpMetadata{
+		instanceID:    GCP_INSTANCE_ID_STR,
+		projectID:     GCP_ACCOUNT_ID_STR,
+		zone:          GCP_ZONE_STR,
+		clusterName:   GCP_GKE_CLUSTER_NAME_STR,
+		containerName: GCP_GKE_CONTAINER_NAME_STR,
+		namespaceID:   GCP_GKE_NAMESPACE_STR,
+		podID:         GCP_GKE_POD_ID_STR,
+	}
 	autoDetected := detectResourceType(nil, &gcpMetadata)
 
 	if autoDetected == nil {
@@ -59,10 +60,11 @@ func TestGKEContainerMonitoredResources(t *testing.T) {
 
 func TestGCEInstanceMonitoredResources(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "")
-	var gcpMetadata GCPMetadata
-	gcpMetadata.InstanceID = GCP_INSTANCE_ID_STR
-	gcpMetadata.ProjectID = GCP_ACCOUNT_ID_STR
-	gcpMetadata.Zone = GCP_ZONE_STR
+	gcpMetadata := gcpMetadata{
+		instanceID: GCP_INSTANCE_ID_STR,
+		projectID:  GCP_ACCOUNT_ID_STR,
+		zone:       GCP_ZONE_STR,
+	}
 	autoDetected := detectResourceType(nil, &gcpMetadata)
 
 	if autoDetected == nil {
@@ -79,8 +81,7 @@ func TestGCEInstanceMonitoredResources(t *testing.T) {
 
 func TestAWSEC2InstanceMonitoredResources(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "")
-	var gcpMetadata GCPMetadata
-	gcpMetadata.InstanceID = ""
+	gcpMetadata := gcpMetadata{}
 
 	awsIdentityDoc := &awsIdentityDocument{
 		"123456789012",

@@ -45,7 +45,7 @@ type GKEContainer struct {
 	// NamespaceID is the identifier for the cluster namespace the container is running in
 	NamespaceID string
 
-	// PodI is the identifier for the pod the container is running in.
+	// PodID is the identifier for the pod the container is running in.
 	PodID string
 
 	// Zone is the Compute Engine zone in which the VM is running.
@@ -132,35 +132,35 @@ func Autodetect() Interface {
 // awsIdentityDoc contains AWS EC2 specific attributes.
 func createAWSEC2InstanceMonitoredResource(awsIdentityDoc *awsIdentityDocument) *AWSEC2Instance {
 	aws_instance := AWSEC2Instance{
-		AWSAccount: awsIdentityDoc.AccountID,
-		InstanceID: awsIdentityDoc.InstanceID,
-		Region:     fmt.Sprintf("aws:%s", awsIdentityDoc.Region),
+		AWSAccount: awsIdentityDoc.accountID,
+		InstanceID: awsIdentityDoc.instanceID,
+		Region:     fmt.Sprintf("aws:%s", awsIdentityDoc.region),
 	}
 	return &aws_instance
 }
 
 // createGCEInstanceMonitoredResource creates a gce_instance monitored resource
 // gcpMetadata contains GCP (GKE or GCE) specific attributes.
-func createGCEInstanceMonitoredResource(gcpMetadata *GCPMetadata) *GCEInstance {
+func createGCEInstanceMonitoredResource(gcpMetadata *gcpMetadata) *GCEInstance {
 	gce_instance := GCEInstance{
-		ProjectID:  gcpMetadata.ProjectID,
-		InstanceID: gcpMetadata.InstanceID,
-		Zone:       gcpMetadata.Zone,
+		ProjectID:  gcpMetadata.projectID,
+		InstanceID: gcpMetadata.instanceID,
+		Zone:       gcpMetadata.zone,
 	}
 	return &gce_instance
 }
 
 // createGKEContainerMonitoredResource creates a gke_container monitored resource
 // gcpMetadata contains GCP (GKE or GCE) specific attributes.
-func createGKEContainerMonitoredResource(gcpMetadata *GCPMetadata) *GKEContainer {
+func createGKEContainerMonitoredResource(gcpMetadata *gcpMetadata) *GKEContainer {
 	gke_container := GKEContainer{
-		ProjectID:     gcpMetadata.ProjectID,
-		InstanceID:    gcpMetadata.InstanceID,
-		Zone:          gcpMetadata.Zone,
-		ContainerName: gcpMetadata.ContainerName,
-		ClusterName:   gcpMetadata.ClusterName,
-		NamespaceID:   gcpMetadata.NamespaceID,
-		PodID:         gcpMetadata.PodID,
+		ProjectID:     gcpMetadata.projectID,
+		InstanceID:    gcpMetadata.instanceID,
+		Zone:          gcpMetadata.zone,
+		ContainerName: gcpMetadata.containerName,
+		ClusterName:   gcpMetadata.clusterName,
+		NamespaceID:   gcpMetadata.namespaceID,
+		PodID:         gcpMetadata.podID,
 	}
 	return &gke_container
 }
@@ -170,10 +170,10 @@ var once sync.Once
 // detectResourceType determines the resource type.
 // awsIdentityDoc contains AWS EC2 attributes. nil if it is not AWS EC2 environment
 // gcpMetadata contains GCP (GKE or GCE) specific attributes.
-func detectResourceType(awsIdentityDoc *awsIdentityDocument, gcpMetadata *GCPMetadata) Interface {
+func detectResourceType(awsIdentityDoc *awsIdentityDocument, gcpMetadata *gcpMetadata) Interface {
 	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
 		return createGKEContainerMonitoredResource(gcpMetadata)
-	} else if gcpMetadata != nil && gcpMetadata.InstanceID != "" {
+	} else if gcpMetadata != nil && gcpMetadata.instanceID != "" {
 		return createGCEInstanceMonitoredResource(gcpMetadata)
 	} else if awsIdentityDoc != nil {
 		return createAWSEC2InstanceMonitoredResource(awsIdentityDoc)
