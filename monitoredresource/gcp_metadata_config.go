@@ -15,13 +15,14 @@
 package monitoredresource
 
 import (
+	"log"
 	"os"
 	"strings"
 
 	"cloud.google.com/go/compute/metadata"
 )
 
-// A type representing metadata retrieved from GKE and GCE environment.
+// gcpMetadata represents metadata retrieved from GCP (GKE and GCE) environment.
 type gcpMetadata struct {
 
 	// projectID is the identifier of the GCP project associated with this resource, such as "my-project".
@@ -49,14 +50,24 @@ type gcpMetadata struct {
 // retrieveGCPMetadata retrieves value of each Attribute from Metadata Server
 // in GKE container and GCE instance environment.
 // Some attributes are retrieved from the system environment.
-// This is only executed once.
+// This is only executed detectOnce.
 func retrieveGCPMetadata() *gcpMetadata {
 	gcpMetadata := gcpMetadata{}
+	var err error
+	gcpMetadata.instanceID, err = metadata.InstanceID()
+	if err != nil {
+		// Not a GCP environment
+		return &gcpMetadata
+	}
 
-	gcpMetadata.projectID, _ = metadata.ProjectID()
-	gcpMetadata.instanceID, _ = metadata.InstanceID()
-	gcpMetadata.zone, _ = metadata.Zone()
-	clusterName, _ := metadata.InstanceAttributeValue("cluster-name")
+	gcpMetadata.projectID, err = metadata.ProjectID()
+	logError(err)
+
+	gcpMetadata.zone, err = metadata.Zone()
+	logError(err)
+
+	clusterName, err := metadata.InstanceAttributeValue("cluster-name")
+	logError(err)
 	gcpMetadata.clusterName = strings.TrimSpace(clusterName)
 
 	// Following attributes are derived from environment variables. They are configured
@@ -67,4 +78,13 @@ func retrieveGCPMetadata() *gcpMetadata {
 	gcpMetadata.podID = os.Getenv("HOSTNAME")
 
 	return &gcpMetadata
+}
+
+// logError logs error only if the error is present and it is not 'not defined'
+func logError(err error) {
+	if err != nil {
+		if !strings.Contains(err.Error(), "not defined") {
+			log.Printf("Error retrieving gcp metadata: %v", err)
+		}
+	}
 }

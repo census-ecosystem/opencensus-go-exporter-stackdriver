@@ -117,12 +117,30 @@ type Options struct {
 	// with type global and no resource labels will be used. If you explicitly
 	// set this field, you may also want to set custom DefaultMonitoringLabels.
 	//
-	// Optional, but encouraged.
+	// Deprecated. Replaced by MonitoredResource
 	Resource *monitoredrespb.MonitoredResource
 
-	// Use this to represent an auto detected monitored resource or your custom
-	// monitored resource.
-	// This field, if non-nil, will take priority over Resource field. .
+	// MonitoredResource sets the MonitoredResource against which all views will be
+	// recorded by this exporter.
+	//
+	// All Stackdriver metrics created by this exporter are custom metrics,
+	// so only a limited number of MonitoredResource types are supported, see:
+	// https://cloud.google.com/monitoring/custom-metrics/creating-metrics#which-resource
+	//
+	// An important consideration when setting the MonitoredResource here is that
+	// Stackdriver Monitoring only allows a single writer per
+	// TimeSeries, see: https://cloud.google.com/monitoring/api/v3/metrics-details#intro-time-series
+	// A TimeSeries is uniquely defined by the metric type name
+	// (constructed from the view name and the MetricPrefix), the MonitoredResource field,
+	// and the set of label key/value pairs (in OpenCensus terminology: tag).
+	//
+	// If no custom MonitoredResource is set AND if Resource is also not set then
+	// a default MonitoredResource with type global and no resource labels will be used.
+	// If you explicitly set this field, you may also want to set custom DefaultMonitoringLabels.
+	//
+	// This field replaces Resource field. If this is set then it will override the
+	// Resource field.
+	// Optional, but encouraged.
 	MonitoredResource monitoredresource.Interface
 
 	// MetricPrefix overrides the prefix of a Stackdriver metric type names.

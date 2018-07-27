@@ -335,7 +335,7 @@ func checkExepectedMonitoredResourceKV(k string, v string, spb *tracepb.Span, t 
 	}
 }
 
-func createAwsEc2MonitoredResource() *monitoredrespb.MonitoredResource {
+func createAWSEC2MonitoredResource() *monitoredrespb.MonitoredResource {
 
 	mr := &monitoredrespb.MonitoredResource{
 		Type: "aws_ec2_instance",
@@ -348,7 +348,7 @@ func createAwsEc2MonitoredResource() *monitoredrespb.MonitoredResource {
 	return mr
 }
 
-func createGceInstanceMonitoredResource() *monitoredrespb.MonitoredResource {
+func createGCEInstanceMonitoredResource() *monitoredrespb.MonitoredResource {
 
 	mr := &monitoredrespb.MonitoredResource{
 		Type: "gce_instance",
@@ -361,7 +361,7 @@ func createGceInstanceMonitoredResource() *monitoredrespb.MonitoredResource {
 	return mr
 }
 
-func createGkeContainerMonitoredResource() *monitoredrespb.MonitoredResource {
+func createGKEContainerMonitoredResource() *monitoredrespb.MonitoredResource {
 
 	mr := &monitoredrespb.MonitoredResource{
 		Type: "gke_container",
@@ -388,7 +388,7 @@ func TestExportTraceWithMonitoredResource(t *testing.T) {
 
 	// Test GCE Insatance Type monitored resources
 	var gceSpbs spans
-	mr := createGceInstanceMonitoredResource()
+	mr := createGCEInstanceMonitoredResource()
 
 	for _, s := range te.spans {
 		gceSpbs = append(gceSpbs, protoFromSpanData(s, "testproject", mr))
@@ -402,7 +402,7 @@ func TestExportTraceWithMonitoredResource(t *testing.T) {
 
 	// Test GKE Container Type monitored resources
 	var gkeSpbs spans
-	mr = createGkeContainerMonitoredResource()
+	mr = createGKEContainerMonitoredResource()
 
 	for _, s := range te.spans {
 		gkeSpbs = append(gkeSpbs, protoFromSpanData(s, "testproject", mr))
@@ -420,7 +420,7 @@ func TestExportTraceWithMonitoredResource(t *testing.T) {
 
 	// Test AWS EC2 Instance type monitored resources
 	var awsEc2Spbs spans
-	mr = createAwsEc2MonitoredResource()
+	mr = createAWSEC2MonitoredResource()
 	for _, s := range te.spans {
 		awsEc2Spbs = append(awsEc2Spbs, protoFromSpanData(s, "testproject", mr))
 	}

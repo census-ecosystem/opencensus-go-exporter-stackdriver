@@ -38,6 +38,9 @@ type awsIdentityDocument struct {
 func retrieveAWSIdentityDocument() *awsIdentityDocument {
 	awsIdentityDoc := awsIdentityDocument{}
 	c := ec2metadata.New(session.New())
+	if c.Available() == false {
+		return nil
+	}
 	ec2InstanceIdentifyDocument, err := c.GetInstanceIdentityDocument()
 	if err != nil {
 		return nil

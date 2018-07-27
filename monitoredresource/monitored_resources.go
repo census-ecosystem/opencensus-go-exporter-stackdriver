@@ -22,10 +22,12 @@ import (
 
 // A type that represent monitor resource that satisfies monitoredresource.Interface
 type Interface interface {
+
+	// MonitoredResource returns the resource type and resource labels.
 	MonitoredResource() (resType string, labels map[string]string)
 }
 
-// A type representing gke_container type monitored resource.
+// GKEContainer represents gke_container type monitored resource.
 // For definition refer to
 // https://cloud.google.com/monitoring/api/resources#tag_gke_container
 type GKEContainer struct {
@@ -52,6 +54,7 @@ type GKEContainer struct {
 	Zone string
 }
 
+// MonitoredResource returns resource type and resource labels for GKEContainer
 func (gke *GKEContainer) MonitoredResource() (resType string, labels map[string]string) {
 	labels = map[string]string{
 		"project_id":     gke.ProjectID,
@@ -65,7 +68,7 @@ func (gke *GKEContainer) MonitoredResource() (resType string, labels map[string]
 	return "gke_container", labels
 }
 
-// A type representing gce_instance type monitored resource.
+// GCEInstance represents gce_instance type monitored resource.
 // For definition refer to
 // https://cloud.google.com/monitoring/api/resources#tag_gce_instance
 type GCEInstance struct {
@@ -80,6 +83,7 @@ type GCEInstance struct {
 	Zone string
 }
 
+// MonitoredResource returns resource type and resource labels for GCEInstance
 func (gce *GCEInstance) MonitoredResource() (resType string, labels map[string]string) {
 	labels = map[string]string{
 		"project_id":  gce.ProjectID,
@@ -89,7 +93,7 @@ func (gce *GCEInstance) MonitoredResource() (resType string, labels map[string]s
 	return "gce_instance", labels
 }
 
-// A type representing aws_ec2_instance type monitored resource.
+// AWSEC2Instance represents aws_ec2_instance type monitored resource.
 // For definition refer to
 // https://cloud.google.com/monitoring/api/resources#tag_aws_ec2_instance
 type AWSEC2Instance struct {
@@ -106,6 +110,7 @@ type AWSEC2Instance struct {
 	Region string
 }
 
+// MonitoredResource returns resource type and resource labels for AWSEC2Instance
 func (aws *AWSEC2Instance) MonitoredResource() (resType string, labels map[string]string) {
 	labels = map[string]string{
 		"aws_account": aws.AWSAccount,
@@ -125,7 +130,35 @@ func (aws *AWSEC2Instance) MonitoredResource() (resType string, labels map[strin
 // Returns MonitoredResInterface which implements getLabels() and getType()
 // For resource definition go to https://cloud.google.com/monitoring/api/resources
 func Autodetect() Interface {
-	return detectOnce()
+	return func() Interface {
+		var autoDetected Interface
+		var awsIdentityDoc *awsIdentityDocument
+		var gcpMetadata *gcpMetadata
+		detectOnce.Do(func() {
+
+			// First attempts to retrieve AWS Identity Doc and GCP metadata.
+			// It then determines the resource type
+			// In GCP and AWS environment both func finishes quickly. However,
+			// in an environment other than those (e.g local laptop) it
+			// takes 2 seconds for GCP and 5-6 for AWS.
+			var wg sync.WaitGroup
+			wg.Add(2)
+
+			go func() {
+				defer wg.Done()
+				awsIdentityDoc = retrieveAWSIdentityDocument()
+			}()
+			go func() {
+				defer wg.Done()
+				gcpMetadata = retrieveGCPMetadata()
+			}()
+
+			wg.Wait()
+			autoDetected = detectResourceType(awsIdentityDoc, gcpMetadata)
+		})
+		return autoDetected
+	}()
+
 }
 
 // createAWSEC2InstanceMonitoredResource creates a aws_ec2_instance monitored resource
@@ -165,13 +198,15 @@ func createGKEContainerMonitoredResource(gcpMetadata *gcpMetadata) *GKEContainer
 	return &gke_container
 }
 
-var once sync.Once
+// detectOnce is used to make sure GCP and AWS metadata detect function executes only once.
+var detectOnce sync.Once
 
 // detectResourceType determines the resource type.
 // awsIdentityDoc contains AWS EC2 attributes. nil if it is not AWS EC2 environment
 // gcpMetadata contains GCP (GKE or GCE) specific attributes.
 func detectResourceType(awsIdentityDoc *awsIdentityDocument, gcpMetadata *gcpMetadata) Interface {
-	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" {
+	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" &&
+		gcpMetadata != nil && gcpMetadata.instanceID != "" {
 		return createGKEContainerMonitoredResource(gcpMetadata)
 	} else if gcpMetadata != nil && gcpMetadata.instanceID != "" {
 		return createGCEInstanceMonitoredResource(gcpMetadata)
@@ -179,17 +214,4 @@ func detectResourceType(awsIdentityDoc *awsIdentityDocument, gcpMetadata *gcpMet
 		return createAWSEC2InstanceMonitoredResource(awsIdentityDoc)
 	}
 	return nil
-}
-
-// detectOnce runs only once to detect the resource type.
-// It first attempts to retrieve AWS Identity Doc and GCP metadata.
-// It then determines the resource type
-func detectOnce() Interface {
-	var autoDetected Interface
-	once.Do(func() {
-		awsIdentityDoc := retrieveAWSIdentityDocument()
-		gcpMetadata := retrieveGCPMetadata()
-		autoDetected = detectResourceType(awsIdentityDoc, gcpMetadata)
-	})
-	return autoDetected
 }
