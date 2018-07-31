@@ -21,10 +21,8 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"time"
 
-	"cloud.google.com/go/compute/metadata"
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/stats"
@@ -38,13 +36,6 @@ var videoSize = stats.Int64("my.org/measure/video_size", "size of processed vide
 func main() {
 	ctx := context.Background()
 
-	// Google Cloud Console project ID. If you run in GCP environment then ProjectID is autodetected.
-	// Otherwise it reads it from the env var PROJECT_ID
-	projectID, err := metadata.ProjectID()
-	if err != nil {
-		projectID = os.Getenv("PROJECT_ID")
-	}
-
 	// Collected view data will be reported to Stackdriver Monitoring API
 	// via the Stackdriver exporter.
 	//
@@ -56,7 +47,7 @@ func main() {
 	// See https://developers.google.com/identity/protocols/application-default-credentials
 	// for more details.
 	exporter, err := stackdriver.NewExporter(stackdriver.Options{
-		ProjectID:         projectID, // Google Cloud Console project ID.
+		ProjectID:         "your-project-id", // Google Cloud Console project ID for stackdriver.
 		MonitoredResource: monitoredresource.Autodetect(),
 	})
 	if err != nil {

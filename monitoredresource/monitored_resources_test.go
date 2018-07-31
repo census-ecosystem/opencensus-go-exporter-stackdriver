@@ -20,25 +20,25 @@ import (
 )
 
 const (
-	GCP_PROJECT_ID_STR         = "gcp-project"
-	GCP_INSTANCE_ID_STR        = "instance"
-	GCP_ZONE_STR               = "us-east1"
-	GCP_GKE_NAMESPACE_STR      = "namespace"
-	GCP_GKE_POD_ID_STR         = "pod-id"
-	GCP_GKE_CONTAINER_NAME_STR = "container"
-	GCP_GKE_CLUSTER_NAME_STR   = "cluster"
+	GCPProjectIDStr     = "gcp-project"
+	GCPInstanceIDStr    = "instance"
+	GCPZoneStr          = "us-east1"
+	GKENamespaceStr     = "namespace"
+	GKEPodIDStr         = "pod-id"
+	GKEContainerNameStr = "container"
+	GKEClusterNameStr   = "cluster"
 )
 
 func TestGKEContainerMonitoredResources(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
 	gcpMetadata := gcpMetadata{
-		instanceID:    GCP_INSTANCE_ID_STR,
-		projectID:     GCP_PROJECT_ID_STR,
-		zone:          GCP_ZONE_STR,
-		clusterName:   GCP_GKE_CLUSTER_NAME_STR,
-		containerName: GCP_GKE_CONTAINER_NAME_STR,
-		namespaceID:   GCP_GKE_NAMESPACE_STR,
-		podID:         GCP_GKE_POD_ID_STR,
+		instanceID:    GCPInstanceIDStr,
+		projectID:     GCPProjectIDStr,
+		zone:          GCPZoneStr,
+		clusterName:   GKEClusterNameStr,
+		containerName: GKEContainerNameStr,
+		namespaceID:   GKENamespaceStr,
+		podID:         GKEPodIDStr,
 	}
 	autoDetected := detectResourceType(nil, &gcpMetadata)
 
@@ -47,13 +47,13 @@ func TestGKEContainerMonitoredResources(t *testing.T) {
 	}
 	resType, labels := autoDetected.MonitoredResource()
 	if resType != "gke_container" ||
-		labels["instance_id"] != GCP_INSTANCE_ID_STR ||
-		labels["project_id"] != GCP_PROJECT_ID_STR ||
-		labels["cluster_name"] != GCP_GKE_CLUSTER_NAME_STR ||
-		labels["container_name"] != GCP_GKE_CONTAINER_NAME_STR ||
-		labels["zone"] != GCP_ZONE_STR ||
-		labels["namespace_id"] != GCP_GKE_NAMESPACE_STR ||
-		labels["pod_id"] != GCP_GKE_POD_ID_STR {
+		labels["instance_id"] != GCPInstanceIDStr ||
+		labels["project_id"] != GCPProjectIDStr ||
+		labels["cluster_name"] != GKEClusterNameStr ||
+		labels["container_name"] != GKEContainerNameStr ||
+		labels["zone"] != GCPZoneStr ||
+		labels["namespace_id"] != GKENamespaceStr ||
+		labels["pod_id"] != GKEPodIDStr {
 		t.Errorf("GKEContainerMonitoredResource Failed: %v", autoDetected)
 	}
 }
@@ -61,9 +61,9 @@ func TestGKEContainerMonitoredResources(t *testing.T) {
 func TestGCEInstanceMonitoredResources(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "")
 	gcpMetadata := gcpMetadata{
-		instanceID: GCP_INSTANCE_ID_STR,
-		projectID:  GCP_PROJECT_ID_STR,
-		zone:       GCP_ZONE_STR,
+		instanceID: GCPInstanceIDStr,
+		projectID:  GCPProjectIDStr,
+		zone:       GCPZoneStr,
 	}
 	autoDetected := detectResourceType(nil, &gcpMetadata)
 
@@ -72,9 +72,9 @@ func TestGCEInstanceMonitoredResources(t *testing.T) {
 	}
 	resType, labels := autoDetected.MonitoredResource()
 	if resType != "gce_instance" ||
-		labels["instance_id"] != GCP_INSTANCE_ID_STR ||
-		labels["project_id"] != GCP_PROJECT_ID_STR ||
-		labels["zone"] != GCP_ZONE_STR {
+		labels["instance_id"] != GCPInstanceIDStr ||
+		labels["project_id"] != GCPProjectIDStr ||
+		labels["zone"] != GCPZoneStr {
 		t.Errorf("GCEInstanceMonitoredResource Failed: %v", autoDetected)
 	}
 }

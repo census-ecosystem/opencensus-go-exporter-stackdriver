@@ -20,7 +20,7 @@ import (
 	"sync"
 )
 
-// A type that represent monitor resource that satisfies monitoredresource.Interface
+// Interface is a type that represent monitor resource that satisfies monitoredresource.Interface
 type Interface interface {
 
 	// MonitoredResource returns the resource type and resource labels.
@@ -164,29 +164,29 @@ func Autodetect() Interface {
 // createAWSEC2InstanceMonitoredResource creates a aws_ec2_instance monitored resource
 // awsIdentityDoc contains AWS EC2 specific attributes.
 func createAWSEC2InstanceMonitoredResource(awsIdentityDoc *awsIdentityDocument) *AWSEC2Instance {
-	aws_instance := AWSEC2Instance{
+	awsInstance := AWSEC2Instance{
 		AWSAccount: awsIdentityDoc.accountID,
 		InstanceID: awsIdentityDoc.instanceID,
 		Region:     fmt.Sprintf("aws:%s", awsIdentityDoc.region),
 	}
-	return &aws_instance
+	return &awsInstance
 }
 
 // createGCEInstanceMonitoredResource creates a gce_instance monitored resource
 // gcpMetadata contains GCP (GKE or GCE) specific attributes.
 func createGCEInstanceMonitoredResource(gcpMetadata *gcpMetadata) *GCEInstance {
-	gce_instance := GCEInstance{
+	gceInstance := GCEInstance{
 		ProjectID:  gcpMetadata.projectID,
 		InstanceID: gcpMetadata.instanceID,
 		Zone:       gcpMetadata.zone,
 	}
-	return &gce_instance
+	return &gceInstance
 }
 
 // createGKEContainerMonitoredResource creates a gke_container monitored resource
 // gcpMetadata contains GCP (GKE or GCE) specific attributes.
 func createGKEContainerMonitoredResource(gcpMetadata *gcpMetadata) *GKEContainer {
-	gke_container := GKEContainer{
+	gkeContainer := GKEContainer{
 		ProjectID:     gcpMetadata.projectID,
 		InstanceID:    gcpMetadata.instanceID,
 		Zone:          gcpMetadata.zone,
@@ -195,7 +195,7 @@ func createGKEContainerMonitoredResource(gcpMetadata *gcpMetadata) *GKEContainer
 		NamespaceID:   gcpMetadata.namespaceID,
 		PodID:         gcpMetadata.podID,
 	}
-	return &gke_container
+	return &gkeContainer
 }
 
 // detectOnce is used to make sure GCP and AWS metadata detect function executes only once.

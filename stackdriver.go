@@ -117,7 +117,7 @@ type Options struct {
 	// with type global and no resource labels will be used. If you explicitly
 	// set this field, you may also want to set custom DefaultMonitoringLabels.
 	//
-	// Deprecated. Replaced by MonitoredResource
+	// Deprecated: Use MonitoredResource instead.
 	Resource *monitoredrespb.MonitoredResource
 
 	// MonitoredResource sets the MonitoredResource against which all views will be
