@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"contrib.go.opencensus.io/exporter/stackdriver"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 )
@@ -46,7 +47,8 @@ func main() {
 	// See https://developers.google.com/identity/protocols/application-default-credentials
 	// for more details.
 	exporter, err := stackdriver.NewExporter(stackdriver.Options{
-		ProjectID: "project-id", // Google Cloud Console project ID.
+		ProjectID:         "your-project-id", // Google Cloud Console project ID for stackdriver.
+		MonitoredResource: monitoredresource.Autodetect(),
 	})
 	if err != nil {
 		log.Fatal(err)
