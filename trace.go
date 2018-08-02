@@ -15,7 +15,6 @@
 package stackdriver
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"sync"
@@ -43,7 +42,7 @@ type traceExporter struct {
 var _ trace.Exporter = (*traceExporter)(nil)
 
 func newTraceExporter(o Options) (*traceExporter, error) {
-	client, err := tracingclient.NewClient(context.Background(), o.TraceClientOptions...)
+	client, err := tracingclient.NewClient(o.Context, o.TraceClientOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("stackdriver: couldn't initialize trace client: %v", err)
 	}
@@ -118,7 +117,7 @@ func (e *traceExporter) uploadSpans(spans []*trace.SpanData) {
 	}
 	// Create a never-sampled span to prevent traces associated with exporter.
 	ctx, span := trace.StartSpan( // TODO: add timeouts
-		context.Background(),
+		e.o.Context,
 		"contrib.go.opencensus.io/exporter/stackdriver.uploadSpans",
 		trace.WithSampler(trace.NeverSample()),
 	)

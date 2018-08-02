@@ -16,6 +16,7 @@ package stackdriver
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -1011,6 +1012,62 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 				t.Errorf("%v: Exporter.makeReq() = \n      %v\nwant: %v", tt.name, resps, tt.want)
 			}
 		})
+	}
+}
+
+func TestExporter_customContext(t *testing.T) {
+	oldCreateMetricDescriptor := createMetricDescriptor
+	oldCreateTimeSeries := createTimeSeries
+
+	defer func() {
+		createMetricDescriptor = oldCreateMetricDescriptor
+		createTimeSeries = oldCreateTimeSeries
+	}()
+
+	var timedOut = 0
+	createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
+		select {
+		case <-time.After(15 * time.Millisecond):
+			fmt.Println("createMetricDescriptor did not time out")
+		case <-ctx.Done():
+			timedOut++
+		}
+		return &metric.MetricDescriptor{}, nil
+	}
+	createTimeSeries = func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+		select {
+		case <-time.After(15 * time.Millisecond):
+			fmt.Println("createTimeSeries did not time out")
+		case <-ctx.Done():
+			timedOut++
+		}
+		return nil
+	}
+
+	v := &view.View{
+		Name:        "test_view_count",
+		Description: "view_description",
+		Measure:     stats.Float64("test-measure/TestExporter_createMeasure", "measure desc", stats.UnitMilliseconds),
+		Aggregation: view.Count(),
+	}
+
+	data := &view.CountData{Value: 0}
+	vd := newTestViewData(v, time.Now(), time.Now(), data, data)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancel()
+	e := &statsExporter{
+		createdViews: make(map[string]*metricpb.MetricDescriptor),
+		o:            Options{ProjectID: "test_project", Context: ctx},
+	}
+	if err := e.uploadStats([]*view.Data{vd}); err != nil {
+		t.Errorf("Exporter.uploadStats() error = %v", err)
+	}
+	if ctx.Err() != context.DeadlineExceeded {
+		t.Errorf("expected context to time out; got %v", ctx.Err())
+	}
+	if timedOut != 2 {
+		t.Errorf("expected two functions to time out; got %d", timedOut)
 	}
 }
 
