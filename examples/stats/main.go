@@ -55,8 +55,10 @@ func main() {
 	}
 	view.RegisterExporter(exporter)
 
-	// Set reporting period to report data at every second.
-	view.SetReportingPeriod(1 * time.Second)
+	// Set reporting period to report data at 60 seconds.
+	// The recommended reporting period by Stackdriver Monitoring is >= 1 minute:
+	// https://cloud.google.com/monitoring/custom-metrics/creating-metrics#writing-ts.
+	view.SetReportingPeriod(60 * time.Second)
 
 	// Create view to see the processed video size cumulatively.
 	// Subscribe will allow view data to be exported.
