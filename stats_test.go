@@ -323,8 +323,8 @@ func TestExporter_makeReq(t *testing.T) {
 								},
 								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DistributionValue{
 									DistributionValue: &distribution.Distribution{
-										Count: 5,
-										Mean:  3.0,
+										Count:                 5,
+										Mean:                  3.0,
 										SumOfSquaredDeviation: 1.5,
 										BucketOptions: &distribution.Distribution_BucketOptions{
 											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
