@@ -154,8 +154,8 @@ func createExpectedSpans() spans {
 					{
 						Value: &tracepb.Span_TimeEvent_MessageEvent_{
 							MessageEvent: &tracepb.Span_TimeEvent_MessageEvent{
-								Type: tracepb.Span_TimeEvent_MessageEvent_SENT,
-								Id:   0x123,
+								Type:                  tracepb.Span_TimeEvent_MessageEvent_SENT,
+								Id:                    0x123,
 								UncompressedSizeBytes: 1024,
 								CompressedSizeBytes:   512,
 							},
@@ -184,8 +184,8 @@ func createExpectedSpans() spans {
 					{
 						Value: &tracepb.Span_TimeEvent_MessageEvent_{
 							MessageEvent: &tracepb.Span_TimeEvent_MessageEvent{
-								Type: tracepb.Span_TimeEvent_MessageEvent_RECEIVED,
-								Id:   0x456,
+								Type:                  tracepb.Span_TimeEvent_MessageEvent_RECEIVED,
+								Id:                    0x456,
 								UncompressedSizeBytes: 2048,
 								CompressedSizeBytes:   1536,
 							},
