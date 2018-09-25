@@ -189,7 +189,7 @@ func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.Cre
 		for _, row := range vd.Rows {
 			ts := &monitoringpb.TimeSeries{
 				Metric: &metricpb.Metric{
-					Type:   namespacedViewName(vd.View.Name),
+					Type:   e.metricType(vd.View),
 					Labels: newLabels(e.defaultLabels, row.Tags),
 				},
 				Resource: resource,
@@ -230,7 +230,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 		return e.equalMeasureAggTagKeys(md, m, agg, tagKeys)
 	}
 
-	metricType := namespacedViewName(viewName)
+	metricType := e.metricType(v)
 	var valueType metricpb.MetricDescriptor_ValueType
 	unit := m.Unit()
 	// Default metric Kind
@@ -263,16 +263,22 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 		return fmt.Errorf("unsupported aggregation type: %s", agg.Type.String())
 	}
 
-	displayNamePrefix := defaultDisplayNamePrefix
-	if e.o.MetricPrefix != "" {
-		displayNamePrefix = e.o.MetricPrefix
+	var displayName string
+	if e.o.GetMetricDisplayName == nil {
+		displayNamePrefix := defaultDisplayNamePrefix
+		if e.o.MetricPrefix != "" {
+			displayNamePrefix = e.o.MetricPrefix
+		}
+		displayName = path.Join(displayNamePrefix, viewName)
+	} else {
+		displayName = e.o.GetMetricDisplayName(v)
 	}
 
 	md, err := createMetricDescriptor(ctx, e.c, &monitoringpb.CreateMetricDescriptorRequest{
 		Name: fmt.Sprintf("projects/%s", e.o.ProjectID),
 		MetricDescriptor: &metricpb.MetricDescriptor{
 			Name:        fmt.Sprintf("projects/%s/metricDescriptors/%s", e.o.ProjectID, metricType),
-			DisplayName: path.Join(displayNamePrefix, viewName),
+			DisplayName: displayName,
 			Description: v.Description,
 			Unit:        unit,
 			Type:        metricType,
@@ -380,8 +386,12 @@ func newTypedValue(vd *view.View, r *view.Row) *monitoringpb.TypedValue {
 	return nil
 }
 
-func namespacedViewName(v string) string {
-	return path.Join("custom.googleapis.com", "opencensus", v)
+func (e *statsExporter) metricType(v *view.View) string {
+	if formatter := e.o.GetMetricType; formatter != nil {
+		return formatter(v)
+	} else {
+		return path.Join("custom.googleapis.com", "opencensus", v.Name)
+	}
 }
 
 func newLabels(defaults map[string]labelValue, tags []tag.Tag) map[string]string {

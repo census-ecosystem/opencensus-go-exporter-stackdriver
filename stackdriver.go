@@ -143,9 +143,24 @@ type Options struct {
 	// Optional, but encouraged.
 	MonitoredResource monitoredresource.Interface
 
-	// MetricPrefix overrides the prefix of a Stackdriver metric type names.
-	// Optional. If unset defaults to "OpenCensus".
+	// MetricPrefix overrides the prefix of a Stackdriver metric display names.
+	// Optional. If unset defaults to "OpenCensus/".
+	// Deprecated: Provide GetMetricDisplayName to change the display name of
+	// the metric.
+	// If GetMetricDisplayName is non-nil, this option is ignored.
 	MetricPrefix string
+
+	// GetMetricDisplayName allows customizing the display name for the metric
+	// associated with the given view. By default it will be:
+	//   MetricPrefix + view.Name
+	GetMetricDisplayName func(view *view.View) string
+
+	// GetMetricType allows customizing the metric type for the given view.
+	// By default, it will be:
+	//   "custom.googleapis.com/opencensus/" + view.Name
+	//
+	// See: https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.metricDescriptors#MetricDescriptor
+	GetMetricType func(view *view.View) string
 
 	// DefaultTraceAttributes will be appended to every span that is exported to
 	// Stackdriver Trace.
