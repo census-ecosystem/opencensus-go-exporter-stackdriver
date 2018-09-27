@@ -101,11 +101,3 @@ func TestAWSEC2InstanceMonitoredResources(t *testing.T) {
 		t.Errorf("AWSEC2InstanceMonitoredResource Failed: %v", autoDetected)
 	}
 }
-
-func TestNullMonitoredResources(t *testing.T) {
-	os.Setenv("KUBERNETES_SERVICE_HOST", "")
-	mr := Autodetect()
-	if mr != nil {
-		t.Errorf("Expected nil MonitoredResource but found %v", mr)
-	}
-}

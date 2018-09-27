@@ -87,6 +87,7 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		o:            o,
 		createdViews: make(map[string]*metricpb.MetricDescriptor),
 	}
+
 	if o.DefaultMonitoringLabels != nil {
 		e.defaultLabels = o.DefaultMonitoringLabels.m
 	} else {
@@ -105,6 +106,21 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		e.bundler.BundleCountThreshold = e.o.BundleCountThreshold
 	}
 	return e, nil
+}
+
+func (e *statsExporter) getMonitoredResource(v *view.View, tags []tag.Tag) ([]tag.Tag, *monitoredrespb.MonitoredResource) {
+	if get := e.o.GetMonitoredResource; get != nil {
+		newTags, mr := get(v, tags)
+		return newTags, convertMonitoredResourceToPB(mr)
+	} else {
+		resource := e.o.Resource
+		if resource == nil {
+			resource = &monitoredrespb.MonitoredResource{
+				Type: "global",
+			}
+		}
+		return tags, resource
+	}
 }
 
 // ExportView exports to the Stackdriver Monitoring if view data
@@ -177,20 +193,13 @@ func (e *statsExporter) uploadStats(vds []*view.Data) error {
 func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.CreateTimeSeriesRequest {
 	var reqs []*monitoringpb.CreateTimeSeriesRequest
 	var timeSeries []*monitoringpb.TimeSeries
-
-	resource := e.o.Resource
-	if resource == nil {
-		resource = &monitoredrespb.MonitoredResource{
-			Type: "global",
-		}
-	}
-
 	for _, vd := range vds {
 		for _, row := range vd.Rows {
+			tags, resource := e.getMonitoredResource(vd.View, append([]tag.Tag(nil), row.Tags...))
 			ts := &monitoringpb.TimeSeries{
 				Metric: &metricpb.Metric{
 					Type:   e.metricType(vd.View),
-					Labels: newLabels(e.defaultLabels, row.Tags),
+					Labels: newLabels(e.defaultLabels, tags),
 				},
 				Resource: resource,
 				Points:   []*monitoringpb.Point{newPoint(vd.View, row, vd.Start, vd.End)},
