@@ -23,6 +23,7 @@ import (
 
 	"cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
@@ -58,7 +59,7 @@ func TestExporter_makeReq(t *testing.T) {
 	}
 
 	v := &view.View{
-		Name:        "testview",
+		Name:        "example.com/views/testview",
 		Description: "desc",
 		TagKeys:     []tag.Key{key},
 		Measure:     m,
@@ -95,6 +96,7 @@ func TestExporter_makeReq(t *testing.T) {
 		projID string
 		vd     *view.Data
 		want   []*monitoringpb.CreateTimeSeriesRequest
+		opts   Options
 	}{
 		{
 			name:   "count agg + timeline",
@@ -105,7 +107,7 @@ func TestExporter_makeReq(t *testing.T) {
 				TimeSeries: []*monitoringpb.TimeSeries{
 					{
 						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
+							Type: "custom.googleapis.com/opencensus/example.com/views/testview",
 							Labels: map[string]string{
 								"test_key":        "test-value-1",
 								opencensusTaskKey: taskValue,
@@ -134,7 +136,7 @@ func TestExporter_makeReq(t *testing.T) {
 					},
 					{
 						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
+							Type: "custom.googleapis.com/opencensus/example.com/views/testview",
 							Labels: map[string]string{
 								"test_key":        "test-value-2",
 								opencensusTaskKey: taskValue,
@@ -165,15 +167,20 @@ func TestExporter_makeReq(t *testing.T) {
 			}},
 		},
 		{
-			name:   "sum agg + timeline",
+			name:   "metric type formatter",
 			projID: "proj-id",
 			vd:     newTestViewData(v, start, end, sum1, sum2),
+			opts: Options{
+				GetMetricType: func(v *view.View) string {
+					return fmt.Sprintf("external.googleapis.com/%s", v.Name)
+				},
+			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{{
 				Name: monitoring.MetricProjectPath("proj-id"),
 				TimeSeries: []*monitoringpb.TimeSeries{
 					{
 						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
+							Type: "external.googleapis.com/example.com/views/testview",
 							Labels: map[string]string{
 								"test_key":        "test-value-1",
 								opencensusTaskKey: taskValue,
@@ -202,7 +209,75 @@ func TestExporter_makeReq(t *testing.T) {
 					},
 					{
 						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
+							Type: "external.googleapis.com/example.com/views/testview",
+							Labels: map[string]string{
+								"test_key":        "test-value-2",
+								opencensusTaskKey: taskValue,
+							},
+						},
+						Resource: &monitoredrespb.MonitoredResource{
+							Type: "global",
+						},
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+									DoubleValue: -11.1,
+								}},
+							},
+						},
+					},
+				},
+			}},
+		},
+		{
+			name:   "sum agg + timeline",
+			projID: "proj-id",
+			vd:     newTestViewData(v, start, end, sum1, sum2),
+			want: []*monitoringpb.CreateTimeSeriesRequest{{
+				Name: monitoring.MetricProjectPath("proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/example.com/views/testview",
+							Labels: map[string]string{
+								"test_key":        "test-value-1",
+								opencensusTaskKey: taskValue,
+							},
+						},
+						Resource: &monitoredrespb.MonitoredResource{
+							Type: "global",
+						},
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+									DoubleValue: 5.5,
+								}},
+							},
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/example.com/views/testview",
 							Labels: map[string]string{
 								"test_key":        "test-value-2",
 								opencensusTaskKey: taskValue,
@@ -323,8 +398,8 @@ func TestExporter_makeReq(t *testing.T) {
 								},
 								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DistributionValue{
 									DistributionValue: &distribution.Distribution{
-										Count: 5,
-										Mean:  3.0,
+										Count:                 5,
+										Mean:                  3.0,
 										SumOfSquaredDeviation: 1.5,
 										BucketOptions: &distribution.Distribution_BucketOptions{
 											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
@@ -341,7 +416,10 @@ func TestExporter_makeReq(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			e, err := newStatsExporter(Options{ProjectID: tt.projID, MonitoringClientOptions: authOptions})
+			opts := tt.opts
+			opts.ProjectID = tt.projID
+			opts.MonitoringClientOptions = authOptions
+			e, err := newStatsExporter(opts)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -352,8 +430,8 @@ func TestExporter_makeReq(t *testing.T) {
 			if len(tt.want) == 0 {
 				return
 			}
-			if !reflect.DeepEqual(resps, tt.want) {
-				t.Errorf("%v: Exporter.makeReq() = %v, want %v", tt.name, resps, tt.want)
+			if diff := cmp.Diff(resps, tt.want); diff != "" {
+				t.Errorf("Values differ -got +want: %s", diff)
 			}
 		})
 	}
