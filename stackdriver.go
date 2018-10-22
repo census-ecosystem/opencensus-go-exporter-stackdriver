@@ -57,6 +57,7 @@ import (
 	traceapi "cloud.google.com/go/trace/apiv2"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/stats/view"
+	"go.opencensus.io/tag"
 	"go.opencensus.io/trace"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -183,7 +184,7 @@ type Options struct {
 	// the Resource you set uniquely identifies this Go process.
 	DefaultMonitoringLabels *Labels
 
-	// Context allows users to provide a custom context for API calls.
+	// Context allows you to provide a custom context for API calls.
 	//
 	// This context will be used several times: first, to create Stackdriver
 	// trace and metric clients, and then every time a new batch of traces or
@@ -191,10 +192,28 @@ type Options struct {
 	//
 	// If unset, context.Background() will be used.
 	Context context.Context
+
+	// GetMonitoredResource may be provided to supply the details of the
+	// monitored resource dynamically based on the tags associated with each
+	// data point. Most users will not need to set this, but should instead
+	// set the MonitoredResource field.
+	//
+	// GetMonitoredResource may add or remove tags by returning a new set of
+	// tags. It is safe for the function to mutate its argument and return it.
+	//
+	// See the documentation on the MonitoredResource field for guidance on the
+	// interaction between monitored resources and labels.
+	//
+	// The MonitoredResource field is ignored if this field is set to a non-nil
+	// value.
+	GetMonitoredResource func(*view.View, []tag.Tag) ([]tag.Tag, monitoredresource.Interface)
 }
 
-// Exporter is a stats.Exporter and trace.Exporter
-// implementation that uploads data to Stackdriver.
+// Exporter is a stats and trace exporter that uploads data to Stackdriver.
+//
+// You can create a single Exporter and register it as both a trace exporter
+// (to export to Stackdriver Trace) and a stats exporter (to integrate with
+// Stackdriver Monitoring).
 type Exporter struct {
 	traceExporter *traceExporter
 	statsExporter *statsExporter

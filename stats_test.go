@@ -16,8 +16,8 @@ package stackdriver
 
 import (
 	"context"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -38,6 +38,8 @@ import (
 )
 
 var authOptions = []option.ClientOption{option.WithGRPCConn(&grpc.ClientConn{})}
+
+var testOptions = Options{ProjectID: "opencensus-test", MonitoringClientOptions: authOptions}
 
 func TestRejectBlankProjectID(t *testing.T) {
 	ids := []string{"", "     ", " "}
@@ -492,7 +494,10 @@ func TestExporter_makeReq_batching(t *testing.T) {
 			vds = append(vds, newTestViewData(v, time.Now(), time.Now(), count1, count2))
 		}
 
-		e := &statsExporter{}
+		e, err := newStatsExporter(testOptions)
+		if err != nil {
+			t.Fatal(err)
+		}
 		resps := e.makeReq(vds, tt.limit)
 		if len(resps) != tt.wantReqs {
 			t.Errorf("%v: got %v; want %d requests", tt.name, resps, tt.wantReqs)
@@ -646,7 +651,7 @@ func TestEqualAggWindowTagKeys(t *testing.T) {
 			wantErr: false,
 		},
 	}
-	e, err := newStatsExporter(Options{ProjectID: "opencensus-test", MonitoringClientOptions: authOptions})
+	e, err := newStatsExporter(testOptions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -860,8 +865,18 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 	taskValue := getTaskValue()
 
 	resource := &monitoredrespb.MonitoredResource{
-		Type:   "gce_instance",
-		Labels: map[string]string{"instance_id": "instance", "zone": "us-west-1a"},
+		Type: "gce_instance",
+		Labels: map[string]string{
+			"project_id":  "proj-id",
+			"instance_id": "instance",
+			"zone":        "us-west-1a",
+		},
+	}
+
+	gceInst := &monitoredresource.GCEInstance{
+		ProjectID:  "proj-id",
+		InstanceID: "instance",
+		Zone:       "us-west-1a",
 	}
 
 	tests := []struct {
@@ -910,6 +925,150 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 							Labels: map[string]string{
 								"test_key":        "test-value-2",
 								opencensusTaskKey: taskValue,
+							},
+						},
+						Resource: resource,
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+									Int64Value: 16,
+								}},
+							},
+						},
+					},
+				},
+			}},
+		},
+		{
+			name: "with MonitoredResource and labels",
+			opts: func() Options {
+				var labels Labels
+				labels.Set("pid", "1234", "Process identifier")
+				return Options{
+					MonitoredResource:       gceInst,
+					DefaultMonitoringLabels: &labels,
+				}
+			}(),
+			vd: newTestViewData(v, start, end, count1, count2),
+			want: []*monitoringpb.CreateTimeSeriesRequest{{
+				Name: monitoring.MetricProjectPath("proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/testview",
+							Labels: map[string]string{
+								"test_key": "test-value-1",
+								"pid":      "1234",
+							},
+						},
+						Resource: resource,
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+									Int64Value: 10,
+								}},
+							},
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/testview",
+							Labels: map[string]string{
+								"test_key": "test-value-2",
+								"pid":      "1234",
+							},
+						},
+						Resource: resource,
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+									Int64Value: 16,
+								}},
+							},
+						},
+					},
+				},
+			}},
+		},
+		{
+			name: "GetMonitoredResource and labels",
+			opts: func() Options {
+				var labels Labels
+				labels.Set("pid", "1234", "Process identifier")
+				return Options{
+					GetMonitoredResource: func(v *view.View, t []tag.Tag) ([]tag.Tag, monitoredresource.Interface) {
+						return t, gceInst
+					},
+					DefaultMonitoringLabels: &labels,
+				}
+			}(),
+			vd: newTestViewData(v, start, end, count1, count2),
+			want: []*monitoringpb.CreateTimeSeriesRequest{{
+				Name: monitoring.MetricProjectPath("proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/testview",
+							Labels: map[string]string{
+								"test_key": "test-value-1",
+								"pid":      "1234",
+							},
+						},
+						Resource: resource,
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+									Int64Value: 10,
+								}},
+							},
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/testview",
+							Labels: map[string]string{
+								"test_key": "test-value-2",
+								"pid":      "1234",
 							},
 						},
 						Resource: resource,
@@ -1075,19 +1234,19 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 			opts := tt.opts
 			opts.MonitoringClientOptions = authOptions
 			opts.ProjectID = "proj-id"
-			e, err := newStatsExporter(opts)
+			e, err := NewExporter(opts)
 			if err != nil {
 				t.Fatal(err)
 			}
-			resps := e.makeReq([]*view.Data{tt.vd}, maxTimeSeriesPerUpload)
+			resps := e.statsExporter.makeReq([]*view.Data{tt.vd}, maxTimeSeriesPerUpload)
 			if got, want := len(resps), len(tt.want); got != want {
 				t.Fatalf("%v: Exporter.makeReq() returned %d responses; want %d", tt.name, got, want)
 			}
 			if len(tt.want) == 0 {
 				return
 			}
-			if !reflect.DeepEqual(resps, tt.want) {
-				t.Errorf("%v: Exporter.makeReq() = \n      %v\nwant: %v", tt.name, resps, tt.want)
+			if diff := cmp.Diff(resps, tt.want); diff != "" {
+				t.Errorf("Requests differ, -got +want: %s", diff)
 			}
 		})
 	}
@@ -1105,7 +1264,7 @@ func TestExporter_customContext(t *testing.T) {
 	var timedOut = 0
 	createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
 		select {
-		case <-time.After(15 * time.Millisecond):
+		case <-time.After(1 * time.Second):
 			fmt.Println("createMetricDescriptor did not time out")
 		case <-ctx.Done():
 			timedOut++
@@ -1114,7 +1273,7 @@ func TestExporter_customContext(t *testing.T) {
 	}
 	createTimeSeries = func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
 		select {
-		case <-time.After(15 * time.Millisecond):
+		case <-time.After(1 * time.Second):
 			fmt.Println("createTimeSeries did not time out")
 		case <-ctx.Done():
 			timedOut++
