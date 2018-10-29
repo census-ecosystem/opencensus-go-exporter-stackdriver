@@ -51,7 +51,7 @@ const (
 	version                   = "0.8.0"
 )
 
-var userAgent = fmt.Sprintf("opencensus-go %s; stackdriver-exporter %s", opencensus.Version(), version)
+var userAgent = fmt.Sprintf("opencensus-go [%s]; stackdriver-exporter [%s]", opencensus.Version(), version)
 
 // statsExporter exports stats to the Stackdriver Monitoring.
 type statsExporter struct {
