@@ -99,19 +99,14 @@ func TestTraceSpansBufferMaxBytes(t *testing.T) {
 }
 
 func makeSampleSpanData() *trace.SpanData {
-	sd := &trace.SpanData{}
-	for i := 0; i < 32; i++ {
-		sd.Annotations = append(sd.Annotations, trace.Annotation{})
+	sd := &trace.SpanData{
+		Annotations:   make([]trace.Annotation, 32),
+		Links:         make([]trace.Link, 32),
+		MessageEvents: make([]trace.MessageEvent, 128),
+		Attributes:    make(map[string]interface{}),
 	}
-	sd.Attributes = make(map[string]interface{})
 	for i := 0; i < 32; i++ {
 		sd.Attributes[fmt.Sprintf("attribute-%d", i)] = ""
-	}
-	for i := 0; i < 32; i++ {
-		sd.Links = append(sd.Links, trace.Link{})
-	}
-	for i := 0; i < 128; i++ {
-		sd.MessageEvents = append(sd.MessageEvents, trace.MessageEvent{})
 	}
 	return sd
 }

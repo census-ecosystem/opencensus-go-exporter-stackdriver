@@ -201,7 +201,7 @@ type Options struct {
 	// If unset, context.Background() will be used.
 	Context context.Context
 
-	// Timeout for all API calls. If not set, defaults to 2 seconds.
+	// Timeout for all API calls. If not set, defaults to 5 seconds.
 	Timeout time.Duration
 
 	// GetMonitoredResource may be provided to supply the details of the
@@ -220,7 +220,7 @@ type Options struct {
 	GetMonitoredResource func(*view.View, []tag.Tag) ([]tag.Tag, monitoredresource.Interface)
 }
 
-const defaultTimeout = 2 * time.Second
+const defaultTimeout = 5 * time.Second
 
 // Exporter is a stats and trace exporter that uploads data to Stackdriver.
 //
@@ -317,7 +317,7 @@ func (o Options) newContextWithTimeout() (context.Context, func()) {
 		ctx = context.Background()
 	}
 	timeout := o.Timeout
-	if timeout == 0 {
+	if timeout <= 0 {
 		timeout = defaultTimeout
 	}
 	return context.WithTimeout(ctx, timeout)
