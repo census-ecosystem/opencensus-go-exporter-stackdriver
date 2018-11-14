@@ -16,10 +16,12 @@ package stackdriver
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	"go.opencensus.io/trace"
+	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
 )
 
 func TestBundling(t *testing.T) {
@@ -29,8 +31,8 @@ func TestBundling(t *testing.T) {
 		BundleCountThreshold: 10,
 	}, nil)
 
-	ch := make(chan []*trace.SpanData)
-	exporter.uploadFn = func(spans []*trace.SpanData) {
+	ch := make(chan []*tracepb.Span)
+	exporter.uploadFn = func(spans []*tracepb.Span) {
 		ch <- spans
 	}
 	trace.RegisterExporter(exporter)
@@ -59,4 +61,52 @@ func TestBundling(t *testing.T) {
 		t.Errorf("too many bundles sent")
 	case <-time.After(time.Second / 5):
 	}
+}
+
+func TestNewContext_Timeout(t *testing.T) {
+	e := newTraceExporterWithClient(Options{
+		Timeout: 10 * time.Millisecond,
+	}, nil)
+	ctx, cancel := e.o.newContextWithTimeout()
+	defer cancel()
+	select {
+	case <-time.After(60 * time.Second):
+		t.Fatal("should have timed out")
+	case <-ctx.Done():
+	}
+}
+
+func TestTraceSpansBufferMaxBytes(t *testing.T) {
+	e := newTraceExporterWithClient(Options{
+		Context:                  context.Background(),
+		Timeout:                  10 * time.Millisecond,
+		TraceSpansBufferMaxBytes: 20000,
+	}, nil)
+	waitCh := make(chan struct{})
+	exported := 0
+	e.uploadFn = func(spans []*tracepb.Span) {
+		<-waitCh
+		exported++
+	}
+	for i := 0; i < 10; i++ {
+		e.ExportSpan(makeSampleSpanData())
+	}
+	close(waitCh)
+	e.Flush()
+	if exported != 2 {
+		t.Errorf("exported = %d; want 2", exported)
+	}
+}
+
+func makeSampleSpanData() *trace.SpanData {
+	sd := &trace.SpanData{
+		Annotations:   make([]trace.Annotation, 32),
+		Links:         make([]trace.Link, 32),
+		MessageEvents: make([]trace.MessageEvent, 128),
+		Attributes:    make(map[string]interface{}),
+	}
+	for i := 0; i < 32; i++ {
+		sd.Attributes[fmt.Sprintf("attribute-%d", i)] = ""
+	}
+	return sd
 }

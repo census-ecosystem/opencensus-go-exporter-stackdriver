@@ -16,10 +16,11 @@ package stackdriver
 
 import (
 	"context"
-	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"fmt"
 	"testing"
 	"time"
+
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 
 	"cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
