@@ -278,11 +278,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 
 	var displayName string
 	if e.o.GetMetricDisplayName == nil {
-		displayNamePrefix := defaultDisplayNamePrefix
-		if e.o.MetricPrefix != "" {
-			displayNamePrefix = e.o.MetricPrefix
-		}
-		displayName = path.Join(displayNamePrefix, viewName)
+		displayName = e.displayName(viewName)
 	} else {
 		displayName = e.o.GetMetricDisplayName(v)
 	}
@@ -306,6 +302,14 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 
 	e.createdViews[viewName] = md
 	return nil
+}
+
+func (e *statsExporter) displayName(suffix string) string {
+	displayNamePrefix := defaultDisplayNamePrefix
+	if e.o.MetricPrefix != "" {
+		displayNamePrefix = e.o.MetricPrefix
+	}
+	return path.Join(displayNamePrefix, suffix)
 }
 
 func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {

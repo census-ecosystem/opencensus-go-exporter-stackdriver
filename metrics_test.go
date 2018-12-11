@@ -17,14 +17,101 @@ package stackdriver
 import (
 	"encoding/json"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
+	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 )
+
+func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
+	tests := []struct {
+		in      *metricspb.Metric
+		want    *googlemetricpb.MetricDescriptor
+		wantErr string
+
+		statsExporter *statsExporter
+	}{
+		{in: nil, wantErr: "non-nil metric"},
+		{
+			in: &metricspb.Metric{},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "test"},
+			},
+			want: &googlemetricpb.MetricDescriptor{
+				Name:        "projects/test/metricDescriptors/custom.googleapis.com/opencensus",
+				Type:        "custom.googleapis.com/opencensus",
+				DisplayName: "OpenCensus",
+			},
+		},
+		{
+			in: &metricspb.Metric{
+				Descriptor_: &metricspb.Metric_Name{Name: "with_name"},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "test"},
+			},
+			want: &googlemetricpb.MetricDescriptor{
+				Name:        "projects/test/metricDescriptors/custom.googleapis.com/opencensus/with_name",
+				Type:        "custom.googleapis.com/opencensus/with_name",
+				DisplayName: "OpenCensus/with_name",
+			},
+		},
+		{
+			in: &metricspb.Metric{
+				Descriptor_: &metricspb.Metric_MetricDescriptor{
+					MetricDescriptor: &metricspb.MetricDescriptor{
+						Name:        "with_metric_descriptor",
+						Description: "This is with metric descriptor",
+						Unit:        "By",
+					},
+				},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "test"},
+			},
+			want: &googlemetricpb.MetricDescriptor{
+				Name:        "projects/test/metricDescriptors/custom.googleapis.com/opencensus/with_metric_descriptor",
+				Type:        "custom.googleapis.com/opencensus/with_metric_descriptor",
+				DisplayName: "OpenCensus/with_metric_descriptor",
+				Description: "This is with metric descriptor",
+				Unit:        "By",
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		se := tt.statsExporter
+		if se == nil {
+			se = new(statsExporter)
+		}
+		got, err := se.protoToMonitoringMetricDescriptor(tt.in)
+		if tt.wantErr != "" {
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("#%d: \nGot %v\nWanted error substring %q", i, err, tt.wantErr)
+			}
+			continue
+		}
+
+		if err != nil {
+			t.Errorf("#%d: Unexpected error: %v", i, err)
+			continue
+		}
+
+		if !reflect.DeepEqual(got, tt.want) {
+			// Our saving grace is serialization equality since some
+			// unexported fields could be present in the various values.
+			gj, wj := serializeAsJSON(got), serializeAsJSON(tt.want)
+			if gj != wj {
+				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)
+			}
+		}
+	}
+}
 
 func TestProtoMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 	startTimestamp := &timestamp.Timestamp{
