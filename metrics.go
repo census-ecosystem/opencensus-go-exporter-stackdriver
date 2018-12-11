@@ -29,9 +29,11 @@ import (
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
+	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 )
 
 var errNilMetric = errors.New("expecting a non-nil metric")
@@ -237,4 +239,20 @@ func protoMetricDescriptorTypeToMetricKind(m *metricspb.Metric) (googlemetricpb.
 	default:
 		return googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED, googlemetricpb.MetricDescriptor_VALUE_TYPE_UNSPECIFIED
 	}
+}
+
+func protoResourceToMonitoredResource(rsp *resourcepb.Resource) *monitoredrespb.MonitoredResource {
+	if rsp == nil {
+		return nil
+	}
+	mrsp := &monitoredrespb.MonitoredResource{
+		Type: rsp.Type,
+	}
+	if rsp.Labels != nil {
+		mrsp.Labels = make(map[string]string, len(rsp.Labels))
+		for k, v := range rsp.Labels {
+			mrsp.Labels[k] = v
+		}
+	}
+	return mrsp
 }

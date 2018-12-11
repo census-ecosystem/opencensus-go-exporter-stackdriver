@@ -23,10 +23,60 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
+	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 )
+
+func TestProtoResourceToMonitoringResource(t *testing.T) {
+	tests := []struct {
+		in   *resourcepb.Resource
+		want *monitoredrespb.MonitoredResource
+	}{
+		{in: nil, want: nil},
+		{in: &resourcepb.Resource{}, want: &monitoredrespb.MonitoredResource{}},
+		{
+			in: &resourcepb.Resource{
+				Type: "foo",
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "foo",
+			},
+		},
+		{
+			in: &resourcepb.Resource{
+				Type:   "foo",
+				Labels: map[string]string{},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type:   "foo",
+				Labels: map[string]string{},
+			},
+		},
+		{
+			in: &resourcepb.Resource{
+				Type:   "foo",
+				Labels: map[string]string{"a": "A"},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type:   "foo",
+				Labels: map[string]string{"a": "A"},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		got := protoResourceToMonitoredResource(tt.in)
+		if !reflect.DeepEqual(got, tt.want) {
+			gj, wj := serializeAsJSON(got), serializeAsJSON(tt.want)
+			if gj != wj {
+				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)
+			}
+		}
+	}
+}
 
 func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
 	tests := []struct {
