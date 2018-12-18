@@ -15,6 +15,7 @@
 package stackdriver
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -35,7 +36,7 @@ func TestProtoResourceToMonitoringResource(t *testing.T) {
 		in   *resourcepb.Resource
 		want *monitoredrespb.MonitoredResource
 	}{
-		{in: nil, want: nil},
+		{in: nil, want: &monitoredrespb.MonitoredResource{Type: "global"}},
 		{in: &resourcepb.Resource{}, want: &monitoredrespb.MonitoredResource{}},
 		{
 			in: &resourcepb.Resource{
@@ -70,6 +71,132 @@ func TestProtoResourceToMonitoringResource(t *testing.T) {
 	for i, tt := range tests {
 		got := protoResourceToMonitoredResource(tt.in)
 		if !reflect.DeepEqual(got, tt.want) {
+			gj, wj := serializeAsJSON(got), serializeAsJSON(tt.want)
+			if gj != wj {
+				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)
+			}
+		}
+	}
+}
+
+func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
+	startTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000090,
+	}
+	endTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000997,
+	}
+
+	tests := []struct {
+		in            *metricspb.Metric
+		want          *monitoringpb.CreateTimeSeriesRequest
+		wantErr       string
+		statsExporter *statsExporter
+	}{
+		{
+			in: &metricspb.Metric{
+				Descriptor_: &metricspb.Metric_MetricDescriptor{
+					MetricDescriptor: &metricspb.MetricDescriptor{
+						Name:        "with_metric_descriptor",
+						Description: "This is a test",
+						Unit:        "By",
+					},
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimestamp,
+						Points: []*metricspb.Point{
+							{
+								Timestamp: endTimestamp,
+								Value: &metricspb.Point_DistributionValue{
+									DistributionValue: &metricspb.DistributionValue{
+										Count:                 1,
+										Sum:                   11.9,
+										SumOfSquaredDeviation: 0,
+										Buckets: []*metricspb.DistributionValue_Bucket{
+											{}, {Count: 1}, {}, {}, {},
+										},
+										BucketOptions: &metricspb.DistributionValue_BucketOptions{
+											Type: &metricspb.DistributionValue_BucketOptions_Explicit_{
+												Explicit: &metricspb.DistributionValue_BucketOptions_Explicit{
+													Bounds: []float64{0, 10, 20, 30, 40},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo"},
+			},
+			want: &monitoringpb.CreateTimeSeriesRequest{
+				Name: "projects/foo",
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &googlemetricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/with_metric_descriptor",
+						},
+						Resource: &monitoredrespb.MonitoredResource{
+							Type: "global",
+						},
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: startTimestamp,
+									EndTime:   endTimestamp,
+								},
+								Value: &monitoringpb.TypedValue{
+									Value: &monitoringpb.TypedValue_DistributionValue{
+										DistributionValue: &distributionpb.Distribution{
+											Count:                 1,
+											Mean:                  11.9,
+											SumOfSquaredDeviation: 0,
+											BucketCounts:          []int64{0, 1, 0, 0, 0},
+											BucketOptions: &distributionpb.Distribution_BucketOptions{
+												Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
+													ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
+														Bounds: []float64{0, 10, 20, 30, 40},
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		se := tt.statsExporter
+		if se == nil {
+			se = new(statsExporter)
+		}
+		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, nil, tt.in)
+		if tt.wantErr != "" {
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("#%d: unexpected error: %v", i, err)
+			continue
+		}
+
+		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
+		if !reflect.DeepEqual(got, tt.want) {
+			// Our saving grace is serialization equality since some
+			// unexported fields could be present in the various values.
 			gj, wj := serializeAsJSON(got), serializeAsJSON(tt.want)
 			if gj != wj {
 				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)

@@ -20,23 +20,238 @@ directly to Stackdriver Metrics.
 */
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"go.opencensus.io/stats"
+	"go.opencensus.io/trace"
 
+	monitoring "cloud.google.com/go/monitoring/apiv3"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
+	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 )
 
 var errNilMetric = errors.New("expecting a non-nil metric")
+
+type metricPayload struct {
+	node     *commonpb.Node
+	resource *resourcepb.Resource
+	metric   *metricspb.Metric
+}
+
+// ExportMetric exports OpenCensus Metrics to Stackdriver Monitoring.
+func (se *statsExporter) ExportMetric(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) error {
+	if metric == nil {
+		return errNilMetric
+	}
+
+	payload := &metricPayload{
+		metric:   metric,
+		resource: rsc,
+		node:     node,
+	}
+	se.protoMetricsBundler.Add(payload, 1)
+
+	return nil
+}
+
+func (se *statsExporter) handleMetricsUpload(payloads []*metricPayload) error {
+	ctx, cancel := se.o.newContextWithTimeout()
+	defer cancel()
+
+	ctx, span := trace.StartSpan(
+		ctx,
+		"contrib.go.opencensus.io/exporter/stackdriver.uploadMetrics",
+		trace.WithSampler(trace.NeverSample()),
+	)
+	defer span.End()
+
+	for _, payload := range payloads {
+		// Now create the metric descriptor remotely.
+		if err := se.createMetricDescriptor(ctx, payload.metric); err != nil {
+			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
+			return err
+		}
+	}
+
+	var allTimeSeries []*monitoringpb.TimeSeries
+	for _, payload := range payloads {
+		tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, payload.metric)
+		if err != nil {
+			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
+			return err
+		}
+		allTimeSeries = append(allTimeSeries, tsl...)
+	}
+
+	// Now batch timeseries up and then export.
+	for start, end := 0, 0; start < len(allTimeSeries); start = end {
+		end = start + maxTimeSeriesPerUpload
+		if end > len(allTimeSeries) {
+			end = len(allTimeSeries)
+		}
+		batch := allTimeSeries[start:end]
+		ctsreq := se.combineTimeSeriesToCreateTimeSeriesRequest(batch)
+		if err := createTimeSeries(ctx, se.c, ctsreq); err != nil {
+			// span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
+			// TODO(@odeke-em, @jbd): Don't fail fast here, perhaps batch errors?
+			// return err
+		}
+	}
+
+	return nil
+}
+
+func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monitoringpb.TimeSeries) *monitoringpb.CreateTimeSeriesRequest {
+	if len(ts) == 0 {
+		return nil
+	}
+	return &monitoringpb.CreateTimeSeriesRequest{
+		Name:       monitoring.MetricProjectPath(se.o.ProjectID),
+		TimeSeries: ts,
+	}
+}
+
+// protoMetricToTimeSeries converts a metric into a Stackdriver Monitoring v3 API CreateTimeSeriesRequest
+// but it doesn't invoke any remote API.
+func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) ([]*monitoringpb.TimeSeries, error) {
+	if metric == nil {
+		return nil, errNilMetric
+	}
+
+	var resource = rsc
+	if metric.Resource != nil {
+		resource = metric.Resource
+	}
+
+	metricName, _, _, _ := metricProseFromProto(metric)
+	metricType, _ := se.metricTypeFromProto(metricName)
+	metricLabelKeys := metric.GetMetricDescriptor().GetLabelKeys()
+	metricKind, _ := protoMetricDescriptorTypeToMetricKind(metric)
+
+	timeSeries := make([]*monitoringpb.TimeSeries, 0, len(metric.Timeseries))
+	for _, protoTimeSeries := range metric.Timeseries {
+		sdPoints, err := se.protoTimeSeriesToMonitoringPoints(protoTimeSeries, metricKind)
+		if err != nil {
+			return nil, err
+		}
+
+		// Each TimeSeries has labelValues which MUST be correlated
+		// with that from the MetricDescriptor
+		labels, err := labelsPerTimeSeries(se.defaultLabels, metricLabelKeys, protoTimeSeries.GetLabelValues())
+		if err != nil {
+			// TODO: (@odeke-em) perhaps log this error from labels extraction, if non-nil.
+			continue
+		}
+		timeSeries = append(timeSeries, &monitoringpb.TimeSeries{
+			Metric: &googlemetricpb.Metric{
+				Type:   metricType,
+				Labels: labels,
+			},
+			Resource: protoResourceToMonitoredResource(resource),
+			Points:   sdPoints,
+		})
+	}
+
+	return timeSeries, nil
+}
+
+func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []*metricspb.LabelKey, labelValues []*metricspb.LabelValue) (map[string]string, error) {
+	labels := make(map[string]string)
+	// Fill in the defaults firstly, irrespective of if the labelKeys and labelValues are mismatched.
+	for key, label := range defaults {
+		labels[sanitize(key)] = label.val
+	}
+
+	// Perform this sanity check now.
+	if len(labelKeys) != len(labelValues) {
+		return labels, fmt.Errorf("Length mismatch: len(labelKeys)=%d len(labelValues)=%d", len(labelKeys), len(labelValues))
+	}
+
+	for i, labelKey := range labelKeys {
+		labelValue := labelValues[i]
+		labels[sanitize(labelKey.GetKey())] = labelValue.GetValue()
+	}
+
+	return labels, nil
+}
+
+func (se *statsExporter) protoMetricDescriptorToCreateMetricDescriptorRequest(ctx context.Context, metric *metricspb.Metric) (*monitoringpb.CreateMetricDescriptorRequest, error) {
+	// Otherwise, we encountered a cache-miss and
+	// should create the metric descriptor remotely.
+	inMD, err := se.protoToMonitoringMetricDescriptor(metric)
+	if err != nil {
+		return nil, err
+	}
+
+	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
+		Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
+		MetricDescriptor: inMD,
+	}
+
+	return cmrdesc, nil
+}
+
+// createMetricDescriptor creates a metric descriptor from the OpenCensus proto metric
+// and then creates it remotely using Stackdriver's API.
+func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *metricspb.Metric) error {
+	se.protoMu.Lock()
+	defer se.protoMu.Unlock()
+
+	name := metric.GetMetricDescriptor().GetName()
+	if _, created := se.protoMetricDescriptors[name]; created {
+		return nil
+	}
+
+	// Otherwise, we encountered a cache-miss and
+	// should create the metric descriptor remotely.
+	inMD, err := se.protoToMonitoringMetricDescriptor(metric)
+	if err != nil {
+		return err
+	}
+
+	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
+		Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
+		MetricDescriptor: inMD,
+	}
+	md, err := createMetricDescriptor(ctx, se.c, cmrdesc)
+
+	if err == nil {
+		// Now record the metric as having been created.
+		se.protoMetricDescriptors[name] = md
+	}
+
+	return err
+}
+
+func (se *statsExporter) protoTimeSeriesToMonitoringPoints(ts *metricspb.TimeSeries, metricKind googlemetricpb.MetricDescriptor_MetricKind) (sptl []*monitoringpb.Point, err error) {
+	for _, pt := range ts.Points {
+
+		// If we have a last value aggregation point i.e. MetricDescriptor_GAUGE
+		// StartTime should be nil.
+		startTime := ts.StartTimestamp
+		if metricKind == googlemetricpb.MetricDescriptor_GAUGE {
+			startTime = nil
+		}
+
+		spt, err := fromProtoPoint(startTime, pt)
+		if err != nil {
+			return nil, err
+		}
+		sptl = append(sptl, spt)
+	}
+	return sptl, nil
+}
 
 func (se *statsExporter) protoToMonitoringMetricDescriptor(metric *metricspb.Metric) (*googlemetricpb.MetricDescriptor, error) {
 	if metric == nil {
@@ -97,6 +312,12 @@ func metricProseFromProto(metric *metricspb.Metric) (name, description, unit str
 	name = md.GetName()
 	unit = md.GetUnit()
 	description = md.GetDescription()
+
+	if md != nil && md.Type == metricspb.MetricDescriptor_CUMULATIVE_INT64 {
+		// If the aggregation type is count, which counts the number of recorded measurements, the unit must be "1",
+		// because this view does not apply to the recorded values.
+		unit = stats.UnitDimensionless
+	}
 
 	return
 }
@@ -243,7 +464,9 @@ func protoMetricDescriptorTypeToMetricKind(m *metricspb.Metric) (googlemetricpb.
 
 func protoResourceToMonitoredResource(rsp *resourcepb.Resource) *monitoredrespb.MonitoredResource {
 	if rsp == nil {
-		return nil
+		return &monitoredrespb.MonitoredResource{
+			Type: "global",
+		}
 	}
 	mrsp := &monitoredrespb.MonitoredResource{
 		Type: rsp.Type,

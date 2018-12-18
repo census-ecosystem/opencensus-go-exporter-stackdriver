@@ -55,11 +55,16 @@ var userAgent = fmt.Sprintf("opencensus-go %s; stackdriver-exporter %s", opencen
 
 // statsExporter exports stats to the Stackdriver Monitoring.
 type statsExporter struct {
-	bundler *bundler.Bundler
-	o       Options
+	o Options
+
+	viewDataBundler     *bundler.Bundler
+	protoMetricsBundler *bundler.Bundler
 
 	createdViewsMu sync.Mutex
 	createdViews   map[string]*metricpb.MetricDescriptor // Views already created remotely
+
+	protoMu                sync.Mutex
+	protoMetricDescriptors map[string]*metricpb.MetricDescriptor // Saves the metric descriptors that were already created remotely
 
 	c             *monitoring.MetricClient
 	defaultLabels map[string]labelValue
@@ -85,9 +90,10 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		return nil, err
 	}
 	e := &statsExporter{
-		c:            client,
-		o:            o,
-		createdViews: make(map[string]*metricpb.MetricDescriptor),
+		c:                      client,
+		o:                      o,
+		createdViews:           make(map[string]*metricpb.MetricDescriptor),
+		protoMetricDescriptors: make(map[string]*metricpb.MetricDescriptor),
 	}
 
 	if o.DefaultMonitoringLabels != nil {
@@ -97,15 +103,22 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 			opencensusTaskKey: {val: getTaskValue(), desc: opencensusTaskDescription},
 		}
 	}
-	e.bundler = bundler.NewBundler((*view.Data)(nil), func(bundle interface{}) {
+
+	e.viewDataBundler = bundler.NewBundler((*view.Data)(nil), func(bundle interface{}) {
 		vds := bundle.([]*view.Data)
 		e.handleUpload(vds...)
 	})
-	if e.o.BundleDelayThreshold > 0 {
-		e.bundler.DelayThreshold = e.o.BundleDelayThreshold
+	e.protoMetricsBundler = bundler.NewBundler((*metricPayload)(nil), func(bundle interface{}) {
+		payloads := bundle.([]*metricPayload)
+		e.handleMetricsUpload(payloads)
+	})
+	if delayThreshold := e.o.BundleDelayThreshold; delayThreshold > 0 {
+		e.viewDataBundler.DelayThreshold = delayThreshold
+		e.protoMetricsBundler.DelayThreshold = delayThreshold
 	}
-	if e.o.BundleCountThreshold > 0 {
-		e.bundler.BundleCountThreshold = e.o.BundleCountThreshold
+	if countThreshold := e.o.BundleCountThreshold; countThreshold > 0 {
+		e.viewDataBundler.BundleCountThreshold = countThreshold
+		e.protoMetricsBundler.BundleCountThreshold = countThreshold
 	}
 	return e, nil
 }
@@ -131,7 +144,7 @@ func (e *statsExporter) ExportView(vd *view.Data) {
 	if len(vd.Rows) == 0 {
 		return
 	}
-	err := e.bundler.Add(vd, 1)
+	err := e.viewDataBundler.Add(vd, 1)
 	switch err {
 	case nil:
 		return
@@ -160,12 +173,13 @@ func (e *statsExporter) handleUpload(vds ...*view.Data) {
 	}
 }
 
-// Flush waits for exported view data to be uploaded.
+// Flush waits for exported view data and metrics to be uploaded.
 //
 // This is useful if your program is ending and you do not
-// want to lose recent spans.
+// want to lose data that hasn't yet been exported.
 func (e *statsExporter) Flush() {
-	e.bundler.Flush()
+	e.viewDataBundler.Flush()
+	e.protoMetricsBundler.Flush()
 }
 
 func (e *statsExporter) uploadStats(vds []*view.Data) error {
@@ -227,21 +241,10 @@ func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.Cre
 	return reqs
 }
 
-// createMeasure creates a MetricDescriptor for the given view data in Stackdriver Monitoring.
-// An error will be returned if there is already a metric descriptor created with the same name
-// but it has a different aggregation or keys.
-func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
-	e.createdViewsMu.Lock()
-	defer e.createdViewsMu.Unlock()
-
+func (e *statsExporter) viewToMetricDescriptor(ctx context.Context, v *view.View) (*monitoringpb.CreateMetricDescriptorRequest, error) {
 	m := v.Measure
 	agg := v.Aggregation
-	tagKeys := v.TagKeys
 	viewName := v.Name
-
-	if md, ok := e.createdViews[viewName]; ok {
-		return e.equalMeasureAggTagKeys(md, m, agg, tagKeys)
-	}
 
 	metricType := e.metricType(v)
 	var valueType metricpb.MetricDescriptor_ValueType
@@ -273,7 +276,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 			valueType = metricpb.MetricDescriptor_DOUBLE
 		}
 	default:
-		return fmt.Errorf("unsupported aggregation type: %s", agg.Type.String())
+		return nil, fmt.Errorf("unsupported aggregation type: %s", agg.Type.String())
 	}
 
 	var displayName string
@@ -283,7 +286,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 		displayName = e.o.GetMetricDisplayName(v)
 	}
 
-	md, err := createMetricDescriptor(ctx, e.c, &monitoringpb.CreateMetricDescriptorRequest{
+	res := &monitoringpb.CreateMetricDescriptorRequest{
 		Name: fmt.Sprintf("projects/%s", e.o.ProjectID),
 		MetricDescriptor: &metricpb.MetricDescriptor{
 			Name:        fmt.Sprintf("projects/%s/metricDescriptors/%s", e.o.ProjectID, metricType),
@@ -295,13 +298,36 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 			ValueType:   valueType,
 			Labels:      newLabelDescriptors(e.defaultLabels, v.TagKeys),
 		},
-	})
+	}
+	return res, nil
+}
+
+// createMeasure creates a MetricDescriptor for the given view data in Stackdriver Monitoring.
+// An error will be returned if there is already a metric descriptor created with the same name
+// but it has a different aggregation or keys.
+func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
+	e.createdViewsMu.Lock()
+	defer e.createdViewsMu.Unlock()
+
+	viewName := v.Name
+
+	if md, ok := e.createdViews[viewName]; ok {
+		return e.equalMeasureAggTagKeys(md, v.Measure, v.Aggregation, v.TagKeys)
+	}
+
+	pmd, err := e.viewToMetricDescriptor(ctx, v)
 	if err != nil {
 		return err
 	}
 
-	e.createdViews[viewName] = md
-	return nil
+	dmd, err := createMetricDescriptor(ctx, e.c, pmd)
+	if err != nil {
+		return err
+	}
+
+	// Now cache the metric descriptor
+	e.createdViews[viewName] = dmd
+	return err
 }
 
 func (e *statsExporter) displayName(suffix string) string {
