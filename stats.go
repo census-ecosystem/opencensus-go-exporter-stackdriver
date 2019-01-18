@@ -208,35 +208,38 @@ func (e *statsExporter) uploadStats(vds []*view.Data) error {
 	return nil
 }
 
-func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.CreateTimeSeriesRequest {
+func (se *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.CreateTimeSeriesRequest {
 	var reqs []*monitoringpb.CreateTimeSeriesRequest
-	var timeSeries []*monitoringpb.TimeSeries
+
+	var allTimeSeries []*monitoringpb.TimeSeries
 	for _, vd := range vds {
 		for _, row := range vd.Rows {
-			tags, resource := e.getMonitoredResource(vd.View, append([]tag.Tag(nil), row.Tags...))
+			tags, resource := se.getMonitoredResource(vd.View, append([]tag.Tag(nil), row.Tags...))
 			ts := &monitoringpb.TimeSeries{
 				Metric: &metricpb.Metric{
-					Type:   e.metricType(vd.View),
-					Labels: newLabels(e.defaultLabels, tags),
+					Type:   se.metricType(vd.View),
+					Labels: newLabels(se.defaultLabels, tags),
 				},
 				Resource: resource,
 				Points:   []*monitoringpb.Point{newPoint(vd.View, row, vd.Start, vd.End)},
 			}
-			timeSeries = append(timeSeries, ts)
-			if len(timeSeries) == limit {
-				reqs = append(reqs, &monitoringpb.CreateTimeSeriesRequest{
-					Name:       monitoring.MetricProjectPath(e.o.ProjectID),
-					TimeSeries: timeSeries,
-				})
-				timeSeries = []*monitoringpb.TimeSeries{}
-			}
+			allTimeSeries = append(allTimeSeries, ts)
 		}
 	}
+
+	var timeSeries []*monitoringpb.TimeSeries
+	for _, ts := range allTimeSeries {
+		timeSeries = append(timeSeries, ts)
+		if len(timeSeries) == limit {
+			ctsreql := se.combineTimeSeriesToCreateTimeSeriesRequest(timeSeries)
+			reqs = append(reqs, ctsreql...)
+			timeSeries = timeSeries[:0]
+		}
+	}
+
 	if len(timeSeries) > 0 {
-		reqs = append(reqs, &monitoringpb.CreateTimeSeriesRequest{
-			Name:       monitoring.MetricProjectPath(e.o.ProjectID),
-			TimeSeries: timeSeries,
-		})
+		ctsreql := se.combineTimeSeriesToCreateTimeSeriesRequest(timeSeries)
+		reqs = append(reqs, ctsreql...)
 	}
 	return reqs
 }

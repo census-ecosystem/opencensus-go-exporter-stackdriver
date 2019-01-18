@@ -21,6 +21,7 @@ import (
 	"strings"
 	"testing"
 
+	monitoring "cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
@@ -37,7 +38,7 @@ func TestProtoResourceToMonitoringResource(t *testing.T) {
 		want *monitoredrespb.MonitoredResource
 	}{
 		{in: nil, want: &monitoredrespb.MonitoredResource{Type: "global"}},
-		{in: &resourcepb.Resource{}, want: &monitoredrespb.MonitoredResource{}},
+		{in: &resourcepb.Resource{}, want: &monitoredrespb.MonitoredResource{Type: "global"}},
 		{
 			in: &resourcepb.Resource{
 				Type: "foo",
@@ -91,7 +92,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 
 	tests := []struct {
 		in            *metricspb.Metric
-		want          *monitoringpb.CreateTimeSeriesRequest
+		want          []*monitoringpb.CreateTimeSeriesRequest
 		wantErr       string
 		statsExporter *statsExporter
 	}{
@@ -135,33 +136,35 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 			statsExporter: &statsExporter{
 				o: Options{ProjectID: "foo"},
 			},
-			want: &monitoringpb.CreateTimeSeriesRequest{
-				Name: "projects/foo",
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &googlemetricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/with_metric_descriptor",
-						},
-						Resource: &monitoredrespb.MonitoredResource{
-							Type: "global",
-						},
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: startTimestamp,
-									EndTime:   endTimestamp,
-								},
-								Value: &monitoringpb.TypedValue{
-									Value: &monitoringpb.TypedValue_DistributionValue{
-										DistributionValue: &distributionpb.Distribution{
-											Count:                 1,
-											Mean:                  11.9,
-											SumOfSquaredDeviation: 0,
-											BucketCounts:          []int64{0, 1, 0, 0, 0},
-											BucketOptions: &distributionpb.Distribution_BucketOptions{
-												Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
-													ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
-														Bounds: []float64{0, 10, 20, 30, 40},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/foo",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/with_metric_descriptor",
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: startTimestamp,
+										EndTime:   endTimestamp,
+									},
+									Value: &monitoringpb.TypedValue{
+										Value: &monitoringpb.TypedValue_DistributionValue{
+											DistributionValue: &distributionpb.Distribution{
+												Count:                 1,
+												Mean:                  11.9,
+												SumOfSquaredDeviation: 0,
+												BucketCounts:          []int64{0, 1, 0, 0, 0},
+												BucketOptions: &distributionpb.Distribution_BucketOptions{
+													Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
+														ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
+															Bounds: []float64{0, 10, 20, 30, 40},
+														},
 													},
 												},
 											},
@@ -397,6 +400,98 @@ func TestProtoMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 			// Our saving grace is serialization equality since some
 			// unexported fields could be present in the various values.
 			gj, wj := serializeAsJSON(g), serializeAsJSON(w)
+			if gj != wj {
+				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)
+			}
+		}
+	}
+}
+
+func TestCombineTimeSeriesAndDeduplication(t *testing.T) {
+	se := new(statsExporter)
+
+	tests := []struct {
+		in   []*monitoringpb.TimeSeries
+		want []*monitoringpb.CreateTimeSeriesRequest
+	}{
+		{
+			in: []*monitoringpb.TimeSeries{
+				{
+					Metric: &googlemetricpb.Metric{
+						Type: "a/b/c",
+					},
+				},
+				{
+					Metric: &googlemetricpb.Metric{
+						Type: "a/b/c",
+					},
+				},
+				{
+					Metric: &googlemetricpb.Metric{
+						Type: "A/b/c",
+					},
+				},
+				{
+					Metric: &googlemetricpb.Metric{
+						Type: "a/b/c",
+					},
+				},
+				{
+					Metric: &googlemetricpb.Metric{
+						Type: "X/Y/Z",
+					},
+				},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: monitoring.MetricProjectPath(se.o.ProjectID),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: "a/b/c",
+							},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: "A/b/c",
+							},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: "X/Y/Z",
+							},
+						},
+					},
+				},
+				{
+					Name: monitoring.MetricProjectPath(se.o.ProjectID),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: "a/b/c",
+							},
+						},
+					},
+				},
+				{
+					Name: monitoring.MetricProjectPath(se.o.ProjectID),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: "a/b/c",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tt.in)
+		want := tt.want
+		if !reflect.DeepEqual(got, want) {
+			gj, wj := serializeAsJSON(got), serializeAsJSON(want)
 			if gj != wj {
 				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)
 			}

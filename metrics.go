@@ -101,25 +101,78 @@ func (se *statsExporter) handleMetricsUpload(payloads []*metricPayload) error {
 			end = len(allTimeSeries)
 		}
 		batch := allTimeSeries[start:end]
-		ctsreq := se.combineTimeSeriesToCreateTimeSeriesRequest(batch)
-		if err := createTimeSeries(ctx, se.c, ctsreq); err != nil {
-			// span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
-			// TODO(@odeke-em, @jbd): Don't fail fast here, perhaps batch errors?
-			// return err
+		ctsreql := se.combineTimeSeriesToCreateTimeSeriesRequest(batch)
+		for _, ctsreq := range ctsreql {
+			if err := createTimeSeries(ctx, se.c, ctsreq); err != nil {
+				span.SetStatus(trace.Status{Code: trace.StatusCodeUnknown, Message: err.Error()})
+				// TODO(@odeke-em): Don't fail fast here, perhaps batch errors?
+				// return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monitoringpb.TimeSeries) *monitoringpb.CreateTimeSeriesRequest {
+func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monitoringpb.TimeSeries) (ctsreql []*monitoringpb.CreateTimeSeriesRequest) {
 	if len(ts) == 0 {
 		return nil
 	}
-	return &monitoringpb.CreateTimeSeriesRequest{
-		Name:       monitoring.MetricProjectPath(se.o.ProjectID),
-		TimeSeries: ts,
+
+	// Since there are scenarios in which Metrics with the same Type
+	// can be bunched in the same TimeSeries, we have to ensure that
+	// we create a unique CreateTimeSeriesRequest with entirely unique Metrics
+	// per TimeSeries, lest we'll encounter:
+	//
+	//      err: rpc error: code = InvalidArgument desc = One or more TimeSeries could not be written:
+	//      Field timeSeries[2] had an invalid value: Duplicate TimeSeries encountered.
+	//      Only one point can be written per TimeSeries per request.: timeSeries[2]
+	//
+	// This scenario happens when we are using the OpenCensus Agent in which multiple metrics
+	// are streamed by various client applications.
+	// See https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/73
+	uniqueTimeSeries := make([]*monitoringpb.TimeSeries, 0, len(ts))
+	nonUniqueTimeSeries := make([]*monitoringpb.TimeSeries, 0, len(ts))
+	seenMetrics := make(map[string]struct{})
+
+	for _, tti := range ts {
+		signature := tti.Metric.GetType()
+		if _, alreadySeen := seenMetrics[signature]; !alreadySeen {
+			uniqueTimeSeries = append(uniqueTimeSeries, tti)
+			seenMetrics[signature] = struct{}{}
+		} else {
+			nonUniqueTimeSeries = append(nonUniqueTimeSeries, tti)
+		}
 	}
+
+	// UniqueTimeSeries can be bunched up together
+	// While for each nonUniqueTimeSeries, we have
+	// to make a unique CreateTimeSeriesRequest.
+	ctsreql = append(ctsreql, &monitoringpb.CreateTimeSeriesRequest{
+		Name:       monitoring.MetricProjectPath(se.o.ProjectID),
+		TimeSeries: uniqueTimeSeries,
+	})
+
+	// Now recursively also combine the non-unique TimeSeries
+	// that were singly added to nonUniqueTimeSeries.
+	// The reason is that we need optimal combinations
+	// for optimal combinations because:
+	// * "a/b/c"
+	// * "a/b/c"
+	// * "x/y/z"
+	// * "a/b/c"
+	// * "x/y/z"
+	// * "p/y/z"
+	// * "d/y/z"
+	//
+	// should produce:
+	//      CreateTimeSeries(uniqueTimeSeries)    :: ["a/b/c", "x/y/z", "p/y/z", "d/y/z"]
+	//      CreateTimeSeries(nonUniqueTimeSeries) :: ["a/b/c"]
+	//      CreateTimeSeries(nonUniqueTimeSeries) :: ["a/b/c", "x/y/z"]
+	nonUniqueRequests := se.combineTimeSeriesToCreateTimeSeriesRequest(nonUniqueTimeSeries)
+	ctsreql = append(ctsreql, nonUniqueRequests...)
+
+	return ctsreql
 }
 
 // protoMetricToTimeSeries converts a metric into a Stackdriver Monitoring v3 API CreateTimeSeriesRequest
@@ -468,8 +521,12 @@ func protoResourceToMonitoredResource(rsp *resourcepb.Resource) *monitoredrespb.
 			Type: "global",
 		}
 	}
+	typ := rsp.Type
+	if typ == "" {
+		typ = "global"
+	}
 	mrsp := &monitoredrespb.MonitoredResource{
-		Type: rsp.Type,
+		Type: typ,
 	}
 	if rsp.Labels != nil {
 		mrsp.Labels = make(map[string]string, len(rsp.Labels))

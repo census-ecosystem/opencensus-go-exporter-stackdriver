@@ -111,7 +111,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 		vdl := []*view.Data{vd}
 		sctreql := se.makeReq(vdl, maxTimeSeriesPerUpload)
 		tsl, _ := se.protoMetricToTimeSeries(ctx, last.Node, last.Resource, last.Metrics[0])
-		pctreql := []*monitoringpb.CreateTimeSeriesRequest{se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)}
+		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
 		if !reflect.DeepEqual(sctreql, pctreql) {
 			t.Errorf("#%d: TimeSeries Mismatch\nStats CreateTimeSeriesRequest:\n\t%v\nProto CreateTimeSeriesRequest:\n\t%v\n",
 				i, sctreql, pctreql)
