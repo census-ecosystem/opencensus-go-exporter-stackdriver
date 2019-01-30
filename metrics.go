@@ -274,7 +274,7 @@ func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *met
 	}
 
 	var md *googlemetricpb.MetricDescriptor
-	if isTypeInBuilt(inMD.Type) {
+	if builtinMetric(inMD.Type) {
 		gmrdesc := &monitoringpb.GetMetricDescriptorRequest{
 			Name: inMD.Name,
 		}

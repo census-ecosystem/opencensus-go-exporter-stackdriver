@@ -334,7 +334,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 	}
 
 	var dmd *metric.MetricDescriptor
-	if isTypeInBuilt(inMD.Type) {
+	if builtinMetric(inMD.Type) {
 		gmrdesc := &monitoringpb.GetMetricDescriptorRequest{
 			Name: inMD.Name,
 		}
@@ -550,6 +550,18 @@ var createTimeSeries = func(ctx context.Context, c *monitoring.MetricClient, ts 
 	return c.CreateTimeSeries(ctx, ts)
 }
 
-var isTypeInBuilt = func(metricType string) bool {
-	return strings.HasPrefix(metricType, "appengine.googleapis.com")
+var knownExternalMetricPrefixes = []string{
+	"custom.googleapis.com/",
+	"external.googleapis.com/",
+}
+
+// builtinMetric returns true if a MetricType is a heuristically known
+// built-in Stackdriver metric
+func builtinMetric(metricType string) bool {
+	for _, knownExternalMetric := range knownExternalMetricPrefixes {
+		if strings.HasPrefix(metricType, knownExternalMetric) {
+			return false
+		}
+	}
+	return true
 }
