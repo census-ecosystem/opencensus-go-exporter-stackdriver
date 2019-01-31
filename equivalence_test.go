@@ -96,7 +96,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 		}
 
 		ctx := context.Background()
-		sMD, err := se.viewToMetricDescriptor(ctx, vd.View)
+		sMD, err := se.viewToCreateMetricDescriptorRequest(ctx, vd.View)
 		if err != nil {
 			t.Errorf("#%d: Stats.viewToMetricDescriptor: %v", i, err)
 		}
