@@ -317,7 +317,7 @@ func (o Options) handleError(err error) {
 		o.OnError(err)
 		return
 	}
-	log.Printf("Failed to export to Stackdriver: %v", err)
+	log.Printf("Test: Failed to export to Stackdriver: %v", err)
 }
 
 func (o Options) newContextWithTimeout() (context.Context, func()) {

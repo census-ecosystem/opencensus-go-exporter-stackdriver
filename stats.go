@@ -325,6 +325,10 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 	viewName := v.Name
 
 	if md, ok := e.createdViews[viewName]; ok {
+		// [TODO:rghetia] Temporary fix for https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/76#issuecomment-459459091
+		if builtinMetric(md.Type) {
+			return nil
+		}
 		return e.equalMeasureAggTagKeys(md, v.Measure, v.Aggregation, v.TagKeys)
 	}
 
@@ -347,7 +351,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 		dmd, err = createMetricDescriptor(ctx, e.c, cmrdesc)
 	}
 	if err != nil {
-		return err
+		return errors.New(fmt.Sprintf("SD err: %v for metric %s", err, inMD.Type))
 	}
 
 	// Now cache the metric descriptor
