@@ -45,7 +45,7 @@
 //
 // This exporter supports exporting Trace Spans to Stackdriver Trace. It also
 // supports the Google "Cloud Trace" propagation format header.
-package stackdriver // import "contrib.go.opencensus.io/exporter/stackdriver"
+package stackdriver 
 
 import (
 	"context"
