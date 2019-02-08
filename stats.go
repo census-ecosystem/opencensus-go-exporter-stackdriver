@@ -325,6 +325,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 	viewName := v.Name
 
 	if md, ok := e.createdViews[viewName]; ok {
+		fmt.Printf("Cached MD: %v\n", md)
 		// [TODO:rghetia] Temporary fix for https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/76#issuecomment-459459091
 		if builtinMetric(md.Type) {
 			return nil
@@ -356,6 +357,7 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 
 	// Now cache the metric descriptor
 	e.createdViews[viewName] = dmd
+	fmt.Printf("MD: %v\n", dmd)
 	return err
 }
 
