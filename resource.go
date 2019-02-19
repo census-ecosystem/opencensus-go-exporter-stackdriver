@@ -23,7 +23,7 @@ import (
 type resourceMap struct {
 	// Mapping from the input resource type to the monitored resource type in Stackdriver.
 	srcType, dstType string
-	// Mapping to Stackdriver monitored resource label to an OpenCensus resource label.
+	// Mapping from Stackdriver monitored resource label to an OpenCensus resource label.
 	labels map[string]string
 }
 
