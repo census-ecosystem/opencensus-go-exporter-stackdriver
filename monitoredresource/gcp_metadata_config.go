@@ -38,9 +38,6 @@ type gcpMetadata struct {
 	// clusterName is the name for the cluster the container is running in.
 	clusterName string
 
-	// clusterLocation is the name of zone/region where is cluster master is located.
-	clusterLocation string
-
 	// containerName is the name of the container.
 	containerName string
 
