@@ -423,6 +423,7 @@ func newTypedValue(vd *view.View, r *view.Row) *monitoringpb.TypedValue {
 			}}
 		}
 	case *view.DistributionData:
+		insertZeroBound := shouldInsertZeroBound(vd.Aggregation.Buckets...)
 		return &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DistributionValue{
 			DistributionValue: &distributionpb.Distribution{
 				Count:                 v.Count,
@@ -436,11 +437,11 @@ func newTypedValue(vd *view.View, r *view.Row) *monitoringpb.TypedValue {
 				BucketOptions: &distributionpb.Distribution_BucketOptions{
 					Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
 						ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
-							Bounds: vd.Aggregation.Buckets,
+							Bounds: addZeroBound(insertZeroBound, vd.Aggregation.Buckets...),
 						},
 					},
 				},
-				BucketCounts: v.CountPerBucket,
+				BucketCounts: addZeroBucketCount(insertZeroBound, v.CountPerBucket...),
 			},
 		}}
 	case *view.LastValueData:
@@ -456,6 +457,27 @@ func newTypedValue(vd *view.View, r *view.Row) *monitoringpb.TypedValue {
 		}
 	}
 	return nil
+}
+
+func shouldInsertZeroBound(bounds ...float64) bool {
+	if len(bounds) > 0 && bounds[0] != 0.0 {
+		return true
+	}
+	return false
+}
+
+func addZeroBucketCount(insert bool, counts ...int64) []int64 {
+	if insert {
+		return append([]int64{0}, counts...)
+	}
+	return counts
+}
+
+func addZeroBound(insert bool, bounds ...float64) []float64 {
+	if insert {
+		return append([]float64{0.0}, bounds...)
+	}
+	return bounds
 }
 
 func (e *statsExporter) metricType(v *view.View) string {

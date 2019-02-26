@@ -117,12 +117,13 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 										Sum:                   11.9,
 										SumOfSquaredDeviation: 0,
 										Buckets: []*metricspb.DistributionValue_Bucket{
-											{}, {Count: 1}, {}, {}, {},
+											{Count: 1}, {}, {}, {},
 										},
 										BucketOptions: &metricspb.DistributionValue_BucketOptions{
 											Type: &metricspb.DistributionValue_BucketOptions_Explicit_{
 												Explicit: &metricspb.DistributionValue_BucketOptions_Explicit{
-													Bounds: []float64{0, 10, 20, 30, 40},
+													// Without zero bucket in
+													Bounds: []float64{10, 20, 30, 40},
 												},
 											},
 										},
@@ -322,6 +323,7 @@ func TestProtoMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 						BucketOptions: &metricspb.DistributionValue_BucketOptions{
 							Type: &metricspb.DistributionValue_BucketOptions_Explicit_{
 								Explicit: &metricspb.DistributionValue_BucketOptions_Explicit{
+									// With zero bucket in
 									Bounds: []float64{0, 10, 20, 30, 40},
 								},
 							},

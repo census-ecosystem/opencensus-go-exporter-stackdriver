@@ -461,22 +461,28 @@ func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
 					Count:                 dv.Count,
 					Mean:                  mean,
 					SumOfSquaredDeviation: dv.SumOfSquaredDeviation,
-					BucketCounts:          bucketCounts(dv.Buckets),
 				},
 			}
 
+			insertZeroBound := false
 			if bopts := dv.BucketOptions; bopts != nil && bopts.Type != nil {
 				bexp, ok := bopts.Type.(*metricspb.DistributionValue_BucketOptions_Explicit_)
 				if ok && bexp != nil && bexp.Explicit != nil {
+					insertZeroBound = shouldInsertZeroBound(bexp.Explicit.Bounds...)
 					mv.DistributionValue.BucketOptions = &distributionpb.Distribution_BucketOptions{
 						Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
 							ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
-								Bounds: bexp.Explicit.Bounds[:],
+								// The first bucket bound should be 0.0 because the Metrics first bucket is
+								// [0, first_bound) but Stackdriver monitoring bucket bounds begin with -infinity
+								// (first bucket is (-infinity, 0))
+								Bounds: addZeroBound(insertZeroBound, bexp.Explicit.Bounds...),
 							},
 						},
 					}
 				}
 			}
+			mv.DistributionValue.BucketCounts = addZeroBucketCount(insertZeroBound, bucketCounts(dv.Buckets)...)
+
 		}
 		tval = &monitoringpb.TypedValue{Value: mv}
 	}
