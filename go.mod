@@ -1,17 +1,17 @@
 module contrib.go.opencensus.io/exporter/stackdriver
 
 require (
-	cloud.google.com/go v0.23.0
-	github.com/aws/aws-sdk-go v1.15.31
-	github.com/golang/protobuf v1.1.0
-	github.com/googleapis/gax-go v2.0.0+incompatible
-	go.opencensus.io v0.15.0
-	golang.org/x/net v0.0.0-20180530234432-1e491301e022
-	golang.org/x/oauth2 v0.0.0-20180603041954-1e0a3fa8ba9a
-	golang.org/x/sync v0.0.0-20180314180146-1d60e4601c6f
-	golang.org/x/text v0.3.0
-	google.golang.org/api v0.0.0-20180603000442-8e296ef26005
-	google.golang.org/appengine v1.0.0
-	google.golang.org/genproto v0.0.0-20180601223552-81158efcc9f2
-	google.golang.org/grpc v1.12.0
+	cloud.google.com/go v0.36.0
+	contrib.go.opencensus.io/exporter/ocagent v0.4.6
+	contrib.go.opencensus.io/resource v0.0.0-20190131005048-21591786a5e0
+	github.com/aws/aws-sdk-go v1.17.5
+	github.com/census-instrumentation/opencensus-proto v0.1.0
+	github.com/golang/protobuf v1.2.0
+	github.com/google/go-cmp v0.2.0
+	go.opencensus.io v0.19.0
+	golang.org/x/net v0.0.0-20181217023233-e147a9138326
+	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890
+	google.golang.org/api v0.1.0
+	google.golang.org/genproto v0.0.0-20190201180003-4b09977fb922
+	google.golang.org/grpc v1.18.0
 )
