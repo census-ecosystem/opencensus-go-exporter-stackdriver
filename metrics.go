@@ -475,13 +475,13 @@ func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
 								// The first bucket bound should be 0.0 because the Metrics first bucket is
 								// [0, first_bound) but Stackdriver monitoring bucket bounds begin with -infinity
 								// (first bucket is (-infinity, 0))
-								Bounds: addZeroBound(insertZeroBound, bexp.Explicit.Bounds...),
+								Bounds: addZeroBoundOnCondition(insertZeroBound, bexp.Explicit.Bounds...),
 							},
 						},
 					}
 				}
 			}
-			mv.DistributionValue.BucketCounts = addZeroBucketCount(insertZeroBound, bucketCounts(dv.Buckets)...)
+			mv.DistributionValue.BucketCounts = addZeroBucketCountOnCondition(insertZeroBound, bucketCounts(dv.Buckets)...)
 
 		}
 		tval = &monitoringpb.TypedValue{Value: mv}

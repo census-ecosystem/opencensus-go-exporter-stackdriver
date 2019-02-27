@@ -437,11 +437,11 @@ func newTypedValue(vd *view.View, r *view.Row) *monitoringpb.TypedValue {
 				BucketOptions: &distributionpb.Distribution_BucketOptions{
 					Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
 						ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
-							Bounds: addZeroBound(insertZeroBound, vd.Aggregation.Buckets...),
+							Bounds: addZeroBoundOnCondition(insertZeroBound, vd.Aggregation.Buckets...),
 						},
 					},
 				},
-				BucketCounts: addZeroBucketCount(insertZeroBound, v.CountPerBucket...),
+				BucketCounts: addZeroBucketCountOnCondition(insertZeroBound, v.CountPerBucket...),
 			},
 		}}
 	case *view.LastValueData:
@@ -466,14 +466,14 @@ func shouldInsertZeroBound(bounds ...float64) bool {
 	return false
 }
 
-func addZeroBucketCount(insert bool, counts ...int64) []int64 {
+func addZeroBucketCountOnCondition(insert bool, counts ...int64) []int64 {
 	if insert {
 		return append([]int64{0}, counts...)
 	}
 	return counts
 }
 
-func addZeroBound(insert bool, bounds ...float64) []float64 {
+func addZeroBoundOnCondition(insert bool, bounds ...float64) []float64 {
 	if insert {
 		return append([]float64{0.0}, bounds...)
 	}
