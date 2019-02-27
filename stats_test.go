@@ -399,7 +399,7 @@ func TestExporter_makeReq(t *testing.T) {
 			},
 		},
 		{
-			name:   "dist agg + time window",
+			name:   "dist agg + time window - without zero bucket",
 			projID: "proj-id",
 			vd:     newTestDistViewData(distView, start, end),
 			want: []*monitoringpb.CreateTimeSeriesRequest{{
@@ -435,8 +435,54 @@ func TestExporter_makeReq(t *testing.T) {
 										BucketOptions: &distribution.Distribution_BucketOptions{
 											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
 												ExplicitBuckets: &distribution.Distribution_BucketOptions_Explicit{
-													Bounds: []float64{2.0, 4.0, 7.0}}}},
-										BucketCounts: []int64{2, 2, 1}},
+													Bounds: []float64{0.0, 2.0, 4.0, 7.0}}}},
+										BucketCounts: []int64{0, 2, 2, 1}},
+								}},
+							},
+						},
+					},
+				},
+			}},
+		},
+		{
+			name:   "dist agg + time window + zero bucket",
+			projID: "proj-id",
+			vd:     newTestDistViewData(distView, start, end),
+			want: []*monitoringpb.CreateTimeSeriesRequest{{
+				Name: monitoring.MetricProjectPath("proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/distview",
+							Labels: map[string]string{
+								opencensusTaskKey: taskValue,
+							},
+						},
+						Resource: &monitoredrespb.MonitoredResource{
+							Type: "global",
+						},
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DistributionValue{
+									DistributionValue: &distribution.Distribution{
+										Count:                 5,
+										Mean:                  3.0,
+										SumOfSquaredDeviation: 1.5,
+										BucketOptions: &distribution.Distribution_BucketOptions{
+											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
+												ExplicitBuckets: &distribution.Distribution_BucketOptions_Explicit{
+													Bounds: []float64{0.0, 2.0, 4.0, 7.0}}}},
+										BucketCounts: []int64{0, 2, 2, 1}},
 								}},
 							},
 						},
@@ -1405,6 +1451,24 @@ func newTestDistViewData(v *view.View, start, end time.Time) *view.Data {
 				Mean:            3,
 				SumOfSquaredDev: 1.5,
 				CountPerBucket:  []int64{2, 2, 1},
+			}},
+		},
+		Start: start,
+		End:   end,
+	}
+}
+
+func newTestDistViewDataWithZeroBucket(v *view.View, start, end time.Time) *view.Data {
+	return &view.Data{
+		View: v,
+		Rows: []*view.Row{
+			{Data: &view.DistributionData{
+				Count:           5,
+				Min:             1,
+				Max:             7,
+				Mean:            3,
+				SumOfSquaredDev: 1.5,
+				CountPerBucket:  []int64{0, 2, 2, 1},
 			}},
 		},
 		Start: start,

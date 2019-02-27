@@ -182,7 +182,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 				View: &view.View{
 					Name:        "ocagent.io/latency",
 					Description: "The latency of the various methods",
-					Aggregation: view.Distribution(0, 100, 500, 1000, 2000, 4000, 8000, 16000),
+					Aggregation: view.Distribution(100, 500, 1000, 2000, 4000, 8000, 16000),
 					Measure:     mLatencyMs,
 				},
 				Rows: []*view.Row{
@@ -192,9 +192,9 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 							Min:            100,
 							Max:            500,
 							Mean:           125.9,
-							CountPerBucket: []int64{0, 0, 1, 0, 0, 0, 0, 0},
+							CountPerBucket: []int64{0, 1, 0, 0, 0, 0, 0},
 							ExemplarsPerBucket: []*exemplar.Exemplar{
-								nil, nil,
+								nil,
 								{
 									Value: 125.9, Timestamp: startTime.Add(time.Duration(1+i) * time.Second),
 								},
