@@ -91,15 +91,16 @@ func retrieveGCPMetadata() *gcpMetadata {
 		ctx := context.Background()
 		c, err := container.NewClusterManagerClient(ctx)
 		logError(err)
-
-		req := &containerpb.GetClusterRequest{
-			Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gcpMetadata.projectID, strings.TrimSpace(clusterLocation), gcpMetadata.clusterName),
-		}
-		resp, err := c.GetCluster(ctx, req)
-		logError(err)
-		if resp.GetMonitoringService() == "monitoring.googleapis.com/kubernetes" &&
-			resp.GetLoggingService() == "logging.googleapis.com/kubernetes" {
-			gcpMetadata.monitoringV2 = true
+		if c != nil {
+			req := &containerpb.GetClusterRequest{
+				Name: fmt.Sprintf("projects/%s/locations/%s/clusters/%s", gcpMetadata.projectID, strings.TrimSpace(clusterLocation), gcpMetadata.clusterName),
+			}
+			resp, err := c.GetCluster(ctx, req)
+			logError(err)
+			if resp != nil && resp.GetMonitoringService() == "monitoring.googleapis.com/kubernetes" &&
+				resp.GetLoggingService() == "logging.googleapis.com/kubernetes" {
+				gcpMetadata.monitoringV2 = true
+			}
 		}
 	}
 
