@@ -65,12 +65,15 @@ func (gke *GKEContainer) MonitoredResource() (resType string, labels map[string]
 		"zone":           gke.Zone,
 		"cluster_name":   gke.ClusterName,
 		"container_name": gke.ContainerName,
-		"namespace_id":   gke.NamespaceID,
-		"pod_id":         gke.PodID,
 	}
-	typ := "gke_container"
 	if gke.LoggingMonitoringV2Enabled {
 		typ = "k8s_container"
+		labels["pod_name"] = gke.PodID
+		labels["namespace_name"] = gke.NamespaceID
+	} else {
+		typ := "gke_container"
+		labels["pod_id"] = gke.PodID
+		labels["namespace_id"] = gke.NamespaceID
 	}
 	return typ, labels
 }
