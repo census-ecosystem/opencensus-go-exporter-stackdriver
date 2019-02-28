@@ -81,7 +81,7 @@ func TestGKEContainerMonitoredResourcesV2(t *testing.T) {
 		labels["project_id"] != GCPProjectIDStr ||
 		labels["cluster_name"] != GKEClusterNameStr ||
 		labels["container_name"] != GKEContainerNameStr ||
-		labels["zone"] != GCPZoneStr ||
+		labels["location"] != GCPZoneStr ||
 		labels["namespace_name"] != GKENamespaceStr ||
 		labels["pod_name"] != GKEPodIDStr {
 		t.Errorf("GKEContainerMonitoredResourceV2 Failed: %v", autoDetected)
