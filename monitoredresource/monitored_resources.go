@@ -61,7 +61,6 @@ type GKEContainer struct {
 func (gke *GKEContainer) MonitoredResource() (resType string, labels map[string]string) {
 	labels = map[string]string{
 		"project_id":     gke.ProjectID,
-		"instance_id":    gke.InstanceID,
 		"cluster_name":   gke.ClusterName,
 		"container_name": gke.ContainerName,
 	}
@@ -76,6 +75,7 @@ func (gke *GKEContainer) MonitoredResource() (resType string, labels map[string]
 		labels["pod_id"] = gke.PodID
 		labels["namespace_id"] = gke.NamespaceID
 		labels["zone"] = gke.Zone
+		labels["instance_id"] = gke.InstanceID
 	}
 	return typ, labels
 }
