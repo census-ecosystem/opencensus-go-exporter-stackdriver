@@ -77,7 +77,6 @@ func TestGKEContainerMonitoredResourcesV2(t *testing.T) {
 	}
 	resType, labels := autoDetected.MonitoredResource()
 	if resType != "k8s_container" ||
-		labels["instance_id"] != GCPInstanceIDStr ||
 		labels["project_id"] != GCPProjectIDStr ||
 		labels["cluster_name"] != GKEClusterNameStr ||
 		labels["container_name"] != GKEContainerNameStr ||
