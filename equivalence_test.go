@@ -276,7 +276,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 
 	ma.forEachRequest(func(emr *agentmetricspb.ExportMetricsServiceRequest) {
 		for _, metric := range emr.Metrics {
-			_ = se.ExportMetric(context.Background(), emr.Node, emr.Resource, metric)
+			_ = se.ExportMetricProto(context.Background(), emr.Node, emr.Resource, metric)
 		}
 	})
 	se.Flush()
