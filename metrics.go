@@ -363,7 +363,7 @@ func labelDescriptorsFromProto(defaults map[string]labelValue, protoLabelKeys []
 }
 
 func metricProseFromProto(metric *metricspb.Metric) (name, description, unit string, ok bool) {
-	mname := metric.GetName()
+	mname := metric.GetMetricDescriptor().GetName()
 	if mname != "" {
 		name = mname
 		return
