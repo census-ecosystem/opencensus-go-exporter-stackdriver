@@ -255,6 +255,10 @@ type Options struct {
 	// The MonitoredResource field is ignored if this field is set to a non-nil
 	// value.
 	GetMonitoredResource func(*view.View, []tag.Tag) ([]tag.Tag, monitoredresource.Interface)
+
+	// ReportingInterval sets the interval between reporting metrics.
+	// If it is set to zero then default value is used.
+	ReportingInterval time.Duration
 }
 
 const defaultTimeout = 5 * time.Second
@@ -354,6 +358,29 @@ func (e *Exporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, 
 // ExportMetrics exports OpenCensus Metrics to Stackdriver Monitoring
 func (e *Exporter) ExportMetrics(ctx context.Context, metrics []*metricdata.Metric) error {
 	return e.statsExporter.ExportMetrics(ctx, metrics)
+}
+
+// StartMetricsExporter starts exporter by creating an interval reader that reads metrics
+// from all registered producers at set interval and exports them.
+// Use StopMetricsExporter to stop exporting metrics.
+// Previously, it required registering exporter to export stats collected by opencensus.
+//    exporter := stackdriver.NewExporter(stackdriver.Option{})
+//    view.RegisterExporter(exporter)
+// Now, it requires to call StartMetricsExporter() to export stats and metrics collected by opencensus.
+//    exporter := stackdriver.NewExporter(stackdriver.Option{})
+//    exporter.StartMetricsExporter()
+//    defer exporter.StopMetricsExporter()
+//
+// Both approach should not be used simultaenously. Otherwise it may result into unknown behavior.
+// Previous approach continues to work as before but will not report newly define metrics such
+// as gauges.
+func (e *Exporter) StartMetricsExporter() error {
+	return e.statsExporter.startMetricsReader()
+}
+
+// StopMetricsExporter stops exporter from exporting metrics.
+func (e *Exporter) StopMetricsExporter() {
+	e.statsExporter.stopMetricsReader()
 }
 
 // ExportSpan exports a SpanData to Stackdriver Trace.

@@ -34,6 +34,7 @@ import (
 	"cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.opencensus.io/metric/metricdata"
+	"go.opencensus.io/metric/metricexport"
 	"google.golang.org/api/option"
 	"google.golang.org/api/support/bundler"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
@@ -73,6 +74,9 @@ type statsExporter struct {
 
 	c             *monitoring.MetricClient
 	defaultLabels map[string]labelValue
+	ir            *metricexport.IntervalReader
+
+	initReaderOnce sync.Once
 }
 
 var (
@@ -133,6 +137,20 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		e.metricsBundler.BundleCountThreshold = countThreshold
 	}
 	return e, nil
+}
+
+func (e *statsExporter) startMetricsReader() error {
+	e.initReaderOnce.Do(func() {
+		e.ir, _ = metricexport.NewIntervalReader(&metricexport.Reader{}, e)
+	})
+	e.ir.ReportingInterval = e.o.ReportingInterval
+	return e.ir.Start()
+}
+
+func (e *statsExporter) stopMetricsReader() {
+	if e.ir != nil {
+		e.ir.Stop()
+	}
 }
 
 func (e *statsExporter) getMonitoredResource(v *view.View, tags []tag.Tag) ([]tag.Tag, *monitoredrespb.MonitoredResource) {

@@ -9,7 +9,7 @@ require (
 	github.com/golang/protobuf v1.3.1
 	github.com/google/go-cmp v0.2.0
 	github.com/grpc-ecosystem/grpc-gateway v1.8.5 // indirect
-	go.opencensus.io v0.19.1
+	go.opencensus.io v0.20.0
 	golang.org/x/net v0.0.0-20190320064053-1272bf9dcd53
 	golang.org/x/oauth2 v0.0.0-20190319182350-c85d3e98c914
 	google.golang.org/api v0.2.0
