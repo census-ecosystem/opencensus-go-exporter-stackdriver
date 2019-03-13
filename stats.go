@@ -25,14 +25,15 @@ import (
 	"sync"
 	"time"
 
-	opencensus "go.opencensus.io"
+	"go.opencensus.io"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
 	"go.opencensus.io/trace"
 
-	monitoring "cloud.google.com/go/monitoring/apiv3"
+	"cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"go.opencensus.io/metric/metricdata"
 	"google.golang.org/api/option"
 	"google.golang.org/api/support/bundler"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
@@ -59,12 +60,16 @@ type statsExporter struct {
 
 	viewDataBundler     *bundler.Bundler
 	protoMetricsBundler *bundler.Bundler
+	metricsBundler      *bundler.Bundler
 
 	createdViewsMu sync.Mutex
 	createdViews   map[string]*metricpb.MetricDescriptor // Views already created remotely
 
 	protoMu                sync.Mutex
 	protoMetricDescriptors map[string]*metricpb.MetricDescriptor // Saves the metric descriptors that were already created remotely
+
+	metricMu          sync.Mutex
+	metricDescriptors map[string]*metricpb.MetricDescriptor // Saves the metric descriptors that were already created remotely
 
 	c             *monitoring.MetricClient
 	defaultLabels map[string]labelValue
@@ -94,6 +99,7 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		o:                      o,
 		createdViews:           make(map[string]*metricpb.MetricDescriptor),
 		protoMetricDescriptors: make(map[string]*metricpb.MetricDescriptor),
+		metricDescriptors:      make(map[string]*metricpb.MetricDescriptor),
 	}
 
 	if o.DefaultMonitoringLabels != nil {
@@ -112,13 +118,19 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		payloads := bundle.([]*metricProtoPayload)
 		e.handleMetricsProtoUpload(payloads)
 	})
+	e.metricsBundler = bundler.NewBundler((*metricdata.Metric)(nil), func(bundle interface{}) {
+		metrics := bundle.([]*metricdata.Metric)
+		e.handleMetricsUpload(metrics)
+	})
 	if delayThreshold := e.o.BundleDelayThreshold; delayThreshold > 0 {
 		e.viewDataBundler.DelayThreshold = delayThreshold
 		e.protoMetricsBundler.DelayThreshold = delayThreshold
+		e.metricsBundler.DelayThreshold = delayThreshold
 	}
 	if countThreshold := e.o.BundleCountThreshold; countThreshold > 0 {
 		e.viewDataBundler.BundleCountThreshold = countThreshold
 		e.protoMetricsBundler.BundleCountThreshold = countThreshold
+		e.metricsBundler.BundleCountThreshold = countThreshold
 	}
 	return e, nil
 }
@@ -180,6 +192,7 @@ func (e *statsExporter) handleUpload(vds ...*view.Data) {
 func (e *statsExporter) Flush() {
 	e.viewDataBundler.Flush()
 	e.protoMetricsBundler.Flush()
+	e.metricsBundler.Flush()
 }
 
 func (e *statsExporter) uploadStats(vds []*view.Data) error {
