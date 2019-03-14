@@ -345,9 +345,9 @@ func (e *Exporter) ExportView(vd *view.Data) {
 	e.statsExporter.ExportView(vd)
 }
 
-// ExportMetric exports OpenCensus Metrics to Stackdriver Monitoring.
-func (e *Exporter) ExportMetric(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) error {
-	return e.statsExporter.ExportMetric(ctx, node, rsc, metric)
+// ExportMetricProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
+func (e *Exporter) ExportMetricProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
+	return e.statsExporter.ExportMetricProto(ctx, node, rsc, metrics)
 }
 
 // ExportSpan exports a SpanData to Stackdriver Trace.

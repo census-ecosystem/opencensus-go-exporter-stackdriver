@@ -57,8 +57,7 @@ var userAgent = fmt.Sprintf("opencensus-go %s; stackdriver-exporter %s", opencen
 type statsExporter struct {
 	o Options
 
-	viewDataBundler     *bundler.Bundler
-	protoMetricsBundler *bundler.Bundler
+	viewDataBundler *bundler.Bundler
 
 	createdViewsMu sync.Mutex
 	createdViews   map[string]*metricpb.MetricDescriptor // Views already created remotely
@@ -108,17 +107,11 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		vds := bundle.([]*view.Data)
 		e.handleUpload(vds...)
 	})
-	e.protoMetricsBundler = bundler.NewBundler((*metricPayload)(nil), func(bundle interface{}) {
-		payloads := bundle.([]*metricPayload)
-		e.handleMetricsUpload(payloads)
-	})
 	if delayThreshold := e.o.BundleDelayThreshold; delayThreshold > 0 {
 		e.viewDataBundler.DelayThreshold = delayThreshold
-		e.protoMetricsBundler.DelayThreshold = delayThreshold
 	}
 	if countThreshold := e.o.BundleCountThreshold; countThreshold > 0 {
 		e.viewDataBundler.BundleCountThreshold = countThreshold
-		e.protoMetricsBundler.BundleCountThreshold = countThreshold
 	}
 	return e, nil
 }
@@ -179,7 +172,6 @@ func (e *statsExporter) handleUpload(vds ...*view.Data) {
 // want to lose data that hasn't yet been exported.
 func (e *statsExporter) Flush() {
 	e.viewDataBundler.Flush()
-	e.protoMetricsBundler.Flush()
 }
 
 func (e *statsExporter) uploadStats(vds []*view.Data) error {

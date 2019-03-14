@@ -49,23 +49,12 @@ type metricPayload struct {
 	metric   *metricspb.Metric
 }
 
-// ExportMetric exports OpenCensus Metrics to Stackdriver Monitoring.
-func (se *statsExporter) ExportMetric(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) error {
-	if metric == nil {
+// ExportMetricProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
+func (se *statsExporter) ExportMetricProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
+	if metrics == nil {
 		return errNilMetric
 	}
 
-	payload := &metricPayload{
-		metric:   metric,
-		resource: rsc,
-		node:     node,
-	}
-	se.protoMetricsBundler.Add(payload, 1)
-
-	return nil
-}
-
-func (se *statsExporter) handleMetricsUpload(payloads []*metricPayload) error {
 	ctx, cancel := se.o.newContextWithTimeout()
 	defer cancel()
 
@@ -76,17 +65,17 @@ func (se *statsExporter) handleMetricsUpload(payloads []*metricPayload) error {
 	)
 	defer span.End()
 
-	for _, payload := range payloads {
+	for _, metric := range metrics {
 		// Now create the metric descriptor remotely.
-		if err := se.createMetricDescriptor(ctx, payload.metric); err != nil {
+		if err := se.createMetricDescriptor(ctx, metric); err != nil {
 			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 			return err
 		}
 	}
 
 	var allTimeSeries []*monitoringpb.TimeSeries
-	for _, payload := range payloads {
-		tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, payload.metric)
+	for _, metric := range metrics {
+		tsl, err := se.protoMetricToTimeSeries(ctx, node, rsc, metric)
 		if err != nil {
 			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 			return err
