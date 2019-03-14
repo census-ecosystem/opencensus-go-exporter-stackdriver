@@ -49,8 +49,14 @@ type metricPayload struct {
 	metric   *metricspb.Metric
 }
 
-// ExportMetric exports OpenCensus Metrics to Stackdriver Monitoring.
-func (se *statsExporter) ExportMetric(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) error {
+// ExportMetric exports OpenCensus Metrics proto to Stackdriver Monitoring.
+// Deprecated in lieu of ExportMetricProto
+func (se *statsExporter) ExportMetric(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metricpb *metricspb.Metric) error {
+	return se.ExportMetricProto(ctx, node, rsc, metricpb)
+}
+
+// ExportMetricProto exports OpenCensus Metrics proto to Stackdriver Monitoring.
+func (se *statsExporter) ExportMetricProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) error {
 	if metric == nil {
 		return errNilMetric
 	}

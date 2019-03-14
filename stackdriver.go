@@ -345,9 +345,15 @@ func (e *Exporter) ExportView(vd *view.Data) {
 	e.statsExporter.ExportView(vd)
 }
 
+// ExportMetricProto exports OpenCensus Metrics to Stackdriver Monitoring.
+func (e *Exporter) ExportMetricProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) error {
+	return e.statsExporter.ExportMetricProto(ctx, node, rsc, metric)
+}
+
 // ExportMetric exports OpenCensus Metrics to Stackdriver Monitoring.
+// Deprecated in lieu of ExportMetriProto
 func (e *Exporter) ExportMetric(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) error {
-	return e.statsExporter.ExportMetric(ctx, node, rsc, metric)
+	return e.statsExporter.ExportMetricProto(ctx, node, rsc, metric)
 }
 
 // ExportSpan exports a SpanData to Stackdriver Trace.
