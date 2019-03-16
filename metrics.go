@@ -51,7 +51,7 @@ type metricPayload struct {
 
 // ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
 func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
-	if metrics == nil {
+	if len(metrics) == 0 {
 		return errNilMetric
 	}
 
