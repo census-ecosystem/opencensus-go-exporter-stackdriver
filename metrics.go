@@ -49,18 +49,20 @@ type metricPayload struct {
 	metric   *metricspb.Metric
 }
 
-// ExportMetricProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
-func (se *statsExporter) ExportMetricProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) error {
-	if metric == nil {
+// ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
+func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
+	if metrics == nil {
 		return errNilMetric
 	}
 
-	payload := &metricPayload{
-		metric:   metric,
-		resource: rsc,
-		node:     node,
+	for _, metric := range metrics {
+		payload := &metricPayload{
+			metric:   metric,
+			resource: rsc,
+			node:     node,
+		}
+		se.protoMetricsBundler.Add(payload, 1)
 	}
-	se.protoMetricsBundler.Add(payload, 1)
 
 	return nil
 }
