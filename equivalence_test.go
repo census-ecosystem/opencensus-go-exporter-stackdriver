@@ -39,8 +39,6 @@ import (
 )
 
 func TestStatsAndMetricsEquivalence(t *testing.T) {
-	t.Skip("Metric schema has changed. Fix this test later.")
-
 	ma, addr, stop := createMockAgent(t)
 	defer stop()
 
@@ -129,8 +127,6 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 // This test ensures that the final responses sent by direct stats(view.Data) exporting
 // are exactly equal to those from view.Data-->OpenCensus-Proto.Metrics exporting.
 func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
-	t.Skip("Metric schema has changed. Fix this test later.")
-
 	ma, addr, doneFn := createMockAgent(t)
 	defer doneFn()
 
