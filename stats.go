@@ -108,9 +108,9 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		vds := bundle.([]*view.Data)
 		e.handleUpload(vds...)
 	})
-	e.protoMetricsBundler = bundler.NewBundler((*metricPayload)(nil), func(bundle interface{}) {
-		payloads := bundle.([]*metricPayload)
-		e.handleMetricsUpload(payloads)
+	e.protoMetricsBundler = bundler.NewBundler((*metricProtoPayload)(nil), func(bundle interface{}) {
+		payloads := bundle.([]*metricProtoPayload)
+		e.handleMetricsProtoUpload(payloads)
 	})
 	if delayThreshold := e.o.BundleDelayThreshold; delayThreshold > 0 {
 		e.viewDataBundler.DelayThreshold = delayThreshold

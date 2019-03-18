@@ -43,7 +43,7 @@ import (
 
 var errNilMetric = errors.New("expecting a non-nil metric")
 
-type metricPayload struct {
+type metricProtoPayload struct {
 	node     *commonpb.Node
 	resource *resourcepb.Resource
 	metric   *metricspb.Metric
@@ -56,7 +56,7 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 	}
 
 	for _, metric := range metrics {
-		payload := &metricPayload{
+		payload := &metricProtoPayload{
 			metric:   metric,
 			resource: rsc,
 			node:     node,
@@ -67,7 +67,7 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 	return nil
 }
 
-func (se *statsExporter) handleMetricsUpload(payloads []*metricPayload) error {
+func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload) error {
 	ctx, cancel := se.o.newContextWithTimeout()
 	defer cancel()
 
