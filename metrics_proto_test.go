@@ -208,8 +208,6 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 }
 
 func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
-	t.Skip("Metric schema has changed. Fix this test later.")
-
 	tests := []struct {
 		in      *metricspb.Metric
 		want    *googlemetricpb.MetricDescriptor
@@ -219,15 +217,8 @@ func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
 	}{
 		{in: nil, wantErr: "non-nil metric"},
 		{
-			in: &metricspb.Metric{},
-			statsExporter: &statsExporter{
-				o: Options{ProjectID: "test"},
-			},
-			want: &googlemetricpb.MetricDescriptor{
-				Name:        "projects/test/metricDescriptors/custom.googleapis.com/opencensus",
-				Type:        "custom.googleapis.com/opencensus",
-				DisplayName: "OpenCensus",
-			},
+			in:      &metricspb.Metric{},
+			wantErr: "non-nil metric descriptor",
 		},
 		{
 			in: &metricspb.Metric{

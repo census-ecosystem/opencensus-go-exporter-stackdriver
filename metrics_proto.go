@@ -42,6 +42,7 @@ import (
 )
 
 var errNilMetric = errors.New("expecting a non-nil metric")
+var errNilMetricDescriptor = errors.New("expecting a non-nil metric descriptor")
 
 type metricProtoPayload struct {
 	node     *commonpb.Node
@@ -189,7 +190,10 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 		resource = metric.Resource
 	}
 
-	metricName, _, _, _ := metricProseFromProto(metric)
+	metricName, _, _, err := metricProseFromProto(metric)
+	if err != nil {
+		return nil, err
+	}
 	metricType, _ := se.metricTypeFromProto(metricName)
 	metricLabelKeys := metric.GetMetricDescriptor().GetLabelKeys()
 	metricKind, _ := protoMetricDescriptorTypeToMetricKind(metric)
@@ -322,7 +326,10 @@ func (se *statsExporter) protoToMonitoringMetricDescriptor(metric *metricspb.Met
 		return nil, errNilMetric
 	}
 
-	metricName, description, unit, _ := metricProseFromProto(metric)
+	metricName, description, unit, err := metricProseFromProto(metric)
+	if err != nil {
+		return nil, err
+	}
 	metricType, _ := se.metricTypeFromProto(metricName)
 	displayName := se.displayName(metricName)
 	metricKind, valueType := protoMetricDescriptorTypeToMetricKind(metric)
@@ -364,26 +371,23 @@ func labelDescriptorsFromProto(defaults map[string]labelValue, protoLabelKeys []
 	return labelDescriptors
 }
 
-func metricProseFromProto(metric *metricspb.Metric) (name, description, unit string, ok bool) {
-	mname := metric.GetMetricDescriptor().GetName()
-	if mname != "" {
-		name = mname
-		return
-	}
-
+func metricProseFromProto(metric *metricspb.Metric) (name, description, unit string, err error) {
 	md := metric.GetMetricDescriptor()
+	if md == nil {
+		return "", "", "", errNilMetricDescriptor
+	}
 
 	name = md.GetName()
 	unit = md.GetUnit()
 	description = md.GetDescription()
 
-	if md != nil && md.Type == metricspb.MetricDescriptor_CUMULATIVE_INT64 {
+	if md.Type == metricspb.MetricDescriptor_CUMULATIVE_INT64 {
 		// If the aggregation type is count, which counts the number of recorded measurements, the unit must be "1",
 		// because this view does not apply to the recorded values.
 		unit = stats.UnitDimensionless
 	}
 
-	return
+	return name, description, unit, nil
 }
 
 func (se *statsExporter) metricTypeFromProto(name string) (string, bool) {
