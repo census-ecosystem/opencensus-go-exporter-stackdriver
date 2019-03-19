@@ -44,7 +44,7 @@ var (
 // ExportMetrics exports OpenCensus Metrics to Stackdriver Monitoring.
 func (se *statsExporter) ExportMetrics(ctx context.Context, metrics []*metricdata.Metric) error {
 	if len(metrics) == 0 {
-		return errNilMetric
+		return nil
 	}
 
 	for _, metric := range metrics {
@@ -88,7 +88,9 @@ func (se *statsExporter) uploadMetrics(metrics []*metricdata.Metric) error {
 			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 			return err
 		}
-		allTimeSeries = append(allTimeSeries, tsl...)
+		if tsl != nil {
+			allTimeSeries = append(allTimeSeries, tsl...)
+		}
 	}
 
 	// Now batch timeseries up and then export.
@@ -126,7 +128,8 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 	metricKind, _ := metricDescriptorTypeToMetricKind(metric)
 
 	if metricKind == googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED {
-		return nil, errUnspecifiedMetricKind
+		// ignore these Timeserieses. TODO [rghetia] log errors.
+		return nil, nil
 	}
 
 	timeSeries := make([]*monitoringpb.TimeSeries, 0, len(metric.TimeSeries))
