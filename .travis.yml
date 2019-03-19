@@ -5,6 +5,10 @@ go:
 
 go_import_path: contrib.go.opencensus.io/exporter/stackdriver
 
+env:
+  global:
+    GO111MODULE=on
+
 before_script:
   - GO_FILES=$(find . -iname '*.go' | grep -v /vendor/)  # All the .go files, excluding vendor/ if any
   - PKGS=$(go list ./... | grep -v /vendor/)             # All the import paths, excluding vendor/ if any
