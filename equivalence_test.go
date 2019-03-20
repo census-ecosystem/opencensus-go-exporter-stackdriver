@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"contrib.go.opencensus.io/exporter/ocagent"
-	"go.opencensus.io/exemplar"
+	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"google.golang.org/api/option"
@@ -193,7 +193,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 							Max:            500,
 							Mean:           125.9,
 							CountPerBucket: []int64{0, 1, 0, 0, 0, 0, 0},
-							ExemplarsPerBucket: []*exemplar.Exemplar{
+							ExemplarsPerBucket: []*metricdata.Exemplar{
 								nil,
 								{
 									Value: 125.9, Timestamp: startTime.Add(time.Duration(1+i) * time.Second),
