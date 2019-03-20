@@ -48,7 +48,7 @@ func (se *statsExporter) ExportMetrics(ctx context.Context, metrics []*metricdat
 	}
 
 	for _, metric := range metrics {
-		se.protoMetricsBundler.Add(metric, 1)
+		se.metricsBundler.Add(metric, 1)
 		// TODO: [rghetia] handle errors.
 	}
 
@@ -76,8 +76,9 @@ func (se *statsExporter) uploadMetrics(metrics []*metricdata.Metric) error {
 	for _, metric := range metrics {
 		// Now create the metric descriptor remotely.
 		if err := se.createMetricDescriptorFromMetric(ctx, metric); err != nil {
-			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
-			return err
+			span.SetStatus(trace.Status{Code: trace.StatusCodeUnknown, Message: err.Error()})
+			//TODO: [rghetia] record error metrics.
+			continue
 		}
 	}
 
@@ -85,8 +86,9 @@ func (se *statsExporter) uploadMetrics(metrics []*metricdata.Metric) error {
 	for _, metric := range metrics {
 		tsl, err := se.metricToMpbTs(ctx, metric)
 		if err != nil {
-			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
-			return err
+			span.SetStatus(trace.Status{Code: trace.StatusCodeUnknown, Message: err.Error()})
+			//TODO: [rghetia] record error metrics.
+			continue
 		}
 		if tsl != nil {
 			allTimeSeries = append(allTimeSeries, tsl...)
@@ -104,7 +106,7 @@ func (se *statsExporter) uploadMetrics(metrics []*metricdata.Metric) error {
 		for _, ctsreq := range ctsreql {
 			if err := createTimeSeries(ctx, se.c, ctsreq); err != nil {
 				span.SetStatus(trace.Status{Code: trace.StatusCodeUnknown, Message: err.Error()})
-				// TODO(@rghetia): Don't fail fast here, perhaps batch errors?
+				// TODO(@rghetia): record error metrics
 				// return err
 			}
 		}
@@ -113,7 +115,7 @@ func (se *statsExporter) uploadMetrics(metrics []*metricdata.Metric) error {
 	return nil
 }
 
-// metricToMpbTs converts a metric into a Stackdriver Monitoring v3 API CreateTimeSeriesRequest
+// metricToMpbTs converts a metric into a list of Stackdriver Monitoring v3 API TimeSeries
 // but it doesn't invoke any remote API.
 func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.Metric) ([]*monitoringpb.TimeSeries, error) {
 	if metric == nil {
@@ -136,7 +138,8 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 	for _, ts := range metric.TimeSeries {
 		sdPoints, err := se.metricTsToMpbPoint(ts, metricKind)
 		if err != nil {
-			return nil, err
+			// TODO(@rghetia): record error metrics
+			continue
 		}
 
 		// Each TimeSeries has labelValues which MUST be correlated
@@ -316,6 +319,7 @@ func metricRscToMpbRsc(rs *resource.Resource) *monitoredrespb.MonitoredResource 
 	if rs.Labels != nil {
 		mrsp.Labels = make(map[string]string, len(rs.Labels))
 		for k, v := range rs.Labels {
+			// TODO: [rghetia] add mapping between OC Labels and SD Labels.
 			mrsp.Labels[k] = v
 		}
 	}
@@ -389,36 +393,34 @@ func metricPointToMpbValue(pt *metricdata.Point) (*monitoringpb.TypedValue, erro
 	case *metricdata.Distribution:
 		dv := v
 		var mv *monitoringpb.TypedValue_DistributionValue
-		if dv != nil {
-			var mean float64
-			if dv.Count > 0 {
-				mean = float64(dv.Sum) / float64(dv.Count)
-			}
-			mv = &monitoringpb.TypedValue_DistributionValue{
-				DistributionValue: &distributionpb.Distribution{
-					Count:                 dv.Count,
-					Mean:                  mean,
-					SumOfSquaredDeviation: dv.SumOfSquaredDeviation,
+		var mean float64
+		if dv.Count > 0 {
+			mean = float64(dv.Sum) / float64(dv.Count)
+		}
+		mv = &monitoringpb.TypedValue_DistributionValue{
+			DistributionValue: &distributionpb.Distribution{
+				Count:                 dv.Count,
+				Mean:                  mean,
+				SumOfSquaredDeviation: dv.SumOfSquaredDeviation,
+			},
+		}
+
+		insertZeroBound := false
+		if bopts := dv.BucketOptions; bopts != nil {
+			insertZeroBound = shouldInsertZeroBound(bopts.Bounds...)
+			mv.DistributionValue.BucketOptions = &distributionpb.Distribution_BucketOptions{
+				Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
+					ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
+						// The first bucket bound should be 0.0 because the Metrics first bucket is
+						// [0, first_bound) but Stackdriver monitoring bucket bounds begin with -infinity
+						// (first bucket is (-infinity, 0))
+						Bounds: addZeroBoundOnCondition(insertZeroBound, bopts.Bounds...),
+					},
 				},
 			}
-
-			insertZeroBound := false
-			if bopts := dv.BucketOptions; bopts != nil {
-				insertZeroBound = shouldInsertZeroBound(bopts.Bounds...)
-				mv.DistributionValue.BucketOptions = &distributionpb.Distribution_BucketOptions{
-					Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
-						ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
-							// The first bucket bound should be 0.0 because the Metrics first bucket is
-							// [0, first_bound) but Stackdriver monitoring bucket bounds begin with -infinity
-							// (first bucket is (-infinity, 0))
-							Bounds: addZeroBoundOnCondition(insertZeroBound, bopts.Bounds...),
-						},
-					},
-				}
-			}
-			mv.DistributionValue.BucketCounts = addZeroBucketCountOnCondition(insertZeroBound, metricBucketToBucketCounts(dv.Buckets)...)
-
 		}
+		mv.DistributionValue.BucketCounts = addZeroBucketCountOnCondition(insertZeroBound, metricBucketToBucketCounts(dv.Buckets)...)
+
 		tval = &monitoringpb.TypedValue{Value: mv}
 	}
 

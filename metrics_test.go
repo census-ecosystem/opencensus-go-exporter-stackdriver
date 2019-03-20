@@ -269,8 +269,6 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 }
 
 func TestMetricDescriptorToMonitoringMetricDescriptor(t *testing.T) {
-	t.Skip("Metric schema has changed. Fix this test later.")
-
 	tests := []struct {
 		in      *metricdata.Metric
 		want    *googlemetricpb.MetricDescriptor
@@ -280,9 +278,11 @@ func TestMetricDescriptorToMonitoringMetricDescriptor(t *testing.T) {
 		{
 			in: &metricdata.Metric{},
 			want: &googlemetricpb.MetricDescriptor{
-				Name:        "projects/test/metricDescriptors/custom.googleapis.com/opencensus",
+				Name:        "projects/foo/metricDescriptors/custom.googleapis.com/opencensus",
 				Type:        "custom.googleapis.com/opencensus",
 				DisplayName: "OpenCensus",
+				MetricKind:  googlemetricpb.MetricDescriptor_GAUGE,
+				ValueType:   googlemetricpb.MetricDescriptor_INT64,
 			},
 		},
 		{
@@ -295,7 +295,7 @@ func TestMetricDescriptorToMonitoringMetricDescriptor(t *testing.T) {
 				},
 			},
 			want: &googlemetricpb.MetricDescriptor{
-				Name:        "projects/test/metricDescriptors/custom.googleapis.com/opencensus/with_metric_descriptor",
+				Name:        "projects/foo/metricDescriptors/custom.googleapis.com/opencensus/with_metric_descriptor",
 				Type:        "custom.googleapis.com/opencensus/with_metric_descriptor",
 				DisplayName: "OpenCensus/with_metric_descriptor",
 				Description: "This is with metric descriptor",
@@ -332,8 +332,6 @@ func TestMetricDescriptorToMonitoringMetricDescriptor(t *testing.T) {
 }
 
 func TestMetricTypeToMonitoringMetricKind(t *testing.T) {
-	t.Skip("Metric schema has changed. Fix this test later.")
-
 	tests := []struct {
 		in            metricdata.Type
 		wantKind      googlemetricpb.MetricDescriptor_MetricKind
