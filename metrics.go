@@ -259,7 +259,7 @@ func metricLableKeysToLabels(defaults map[string]labelValue, labelKeys []string)
 	for _, key := range labelKeys {
 		labelDescriptors = append(labelDescriptors, &labelpb.LabelDescriptor{
 			Key:         sanitize(key),
-			Description: "",                            // TODO: [rghetia] when descriptor is available use that.
+			Description: "",                             // TODO: [rghetia] when descriptor is available use that.
 			ValueType:   labelpb.LabelDescriptor_STRING, // We only use string tags
 		})
 	}
