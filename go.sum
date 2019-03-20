@@ -8,6 +8,8 @@ contrib.go.opencensus.io/exporter/ocagent v0.4.7 h1:7NiGV38nUxXevUGX5rJdG6QBRRXR
 contrib.go.opencensus.io/exporter/ocagent v0.4.7/go.mod h1:+KkYrcvvEN0E5ls626sqMv8PdMx2931feKtzIwP01qI=
 contrib.go.opencensus.io/exporter/ocagent v0.4.8-0.20190319160651-559ddb1ac74c h1:r42Bz1f0psj8my3PRFk/T7d6sI+E7cm7touVR5xsjZQ=
 contrib.go.opencensus.io/exporter/ocagent v0.4.8-0.20190319160651-559ddb1ac74c/go.mod h1:+KkYrcvvEN0E5ls626sqMv8PdMx2931feKtzIwP01qI=
+contrib.go.opencensus.io/exporter/ocagent v0.4.8 h1:lXKyRBciToQaTncNnT+SnpBSW1YJ6oJAGv7MqAqxBT8=
+contrib.go.opencensus.io/exporter/ocagent v0.4.8/go.mod h1:+KkYrcvvEN0E5ls626sqMv8PdMx2931feKtzIwP01qI=
 contrib.go.opencensus.io/resource v0.0.0-20190131005048-21591786a5e0 h1:ICrSnXeuT4427bpR8X9I7GxiyT4X5qgLtFT7m1IjK2c=
 contrib.go.opencensus.io/resource v0.0.0-20190131005048-21591786a5e0/go.mod h1:F361eGI91LCmW1I/Saf+rX0+OFcigGlFvXwEGEnkRLA=
 dmitri.shuralyov.com/app/changes v0.0.0-20180602232624-0a106ad413e3/go.mod h1:Yl+fi1br7+Rr3LqpNJf1/uxUdtRUV+Tnj0o93V2B9MU=
