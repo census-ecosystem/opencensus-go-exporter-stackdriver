@@ -93,6 +93,7 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 		Nanos:   100000997,
 	}
 
+	// TODO:[rghetia] add test for built-in metrics.
 	tests := []struct {
 		in      *metricdata.Metric
 		want    []*monitoringpb.CreateTimeSeriesRequest
