@@ -70,6 +70,7 @@ import (
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	"go.opencensus.io/metric/metricdata"
 )
 
 // Options contains options for configuring the exporter.
@@ -348,6 +349,11 @@ func (e *Exporter) ExportView(vd *view.Data) {
 // ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
 func (e *Exporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
 	return e.statsExporter.ExportMetricsProto(ctx, node, rsc, metrics)
+}
+
+// ExportMetrics exports OpenCensus Metrics to Stackdriver Monitoring
+func (e *Exporter) ExportMetrics(ctx context.Context, metrics []*metricdata.Metric) error {
+	return e.statsExporter.ExportMetrics(ctx, metrics)
 }
 
 // ExportSpan exports a SpanData to Stackdriver Trace.
