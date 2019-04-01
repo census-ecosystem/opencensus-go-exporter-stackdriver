@@ -397,11 +397,17 @@ func TestCombineTimeSeriesAndDeduplication(t *testing.T) {
 				{
 					Metric: &googlemetricpb.Metric{
 						Type: "a/b/c",
+						Labels: map[string]string{
+							"k1": "v1",
+						},
 					},
 				},
 				{
 					Metric: &googlemetricpb.Metric{
 						Type: "a/b/c",
+						Labels: map[string]string{
+							"k1": "v2",
+						},
 					},
 				},
 				{
@@ -412,6 +418,9 @@ func TestCombineTimeSeriesAndDeduplication(t *testing.T) {
 				{
 					Metric: &googlemetricpb.Metric{
 						Type: "a/b/c",
+						Labels: map[string]string{
+							"k1": "v1",
+						},
 					},
 				},
 				{
@@ -427,6 +436,17 @@ func TestCombineTimeSeriesAndDeduplication(t *testing.T) {
 						{
 							Metric: &googlemetricpb.Metric{
 								Type: "a/b/c",
+								Labels: map[string]string{
+									"k1": "v1",
+								},
+							},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: "a/b/c",
+								Labels: map[string]string{
+									"k1": "v2",
+								},
 							},
 						},
 						{
@@ -447,16 +467,9 @@ func TestCombineTimeSeriesAndDeduplication(t *testing.T) {
 						{
 							Metric: &googlemetricpb.Metric{
 								Type: "a/b/c",
-							},
-						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath(se.o.ProjectID),
-					TimeSeries: []*monitoringpb.TimeSeries{
-						{
-							Metric: &googlemetricpb.Metric{
-								Type: "a/b/c",
+								Labels: map[string]string{
+									"k1": "v1",
+								},
 							},
 						},
 					},

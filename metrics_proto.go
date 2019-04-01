@@ -24,6 +24,8 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"sort"
+	"strings"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.opencensus.io/stats"
@@ -117,6 +119,20 @@ func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload
 	return nil
 }
 
+// metricSignature creates a unique signature consisting of a
+// metric's type and its lexicographically sorted label values
+// See https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/120
+func metricSignature(metric *googlemetricpb.Metric) string {
+	labels := metric.GetLabels()
+	labelValues := make([]string, 0, len(labels))
+
+	for _, labelValue := range labels {
+		labelValues = append(labelValues, labelValue)
+	}
+	sort.Strings(labelValues)
+	return fmt.Sprintf("%s:%s", metric.GetType(), strings.Join(labelValues, ","))
+}
+
 func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monitoringpb.TimeSeries) (ctsreql []*monitoringpb.CreateTimeSeriesRequest) {
 	if len(ts) == 0 {
 		return nil
@@ -139,10 +155,10 @@ func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monito
 	seenMetrics := make(map[string]struct{})
 
 	for _, tti := range ts {
-		signature := tti.Metric.GetType()
-		if _, alreadySeen := seenMetrics[signature]; !alreadySeen {
+		key := metricSignature(tti.Metric)
+		if _, alreadySeen := seenMetrics[key]; !alreadySeen {
 			uniqueTimeSeries = append(uniqueTimeSeries, tti)
-			seenMetrics[signature] = struct{}{}
+			seenMetrics[key] = struct{}{}
 		} else {
 			nonUniqueTimeSeries = append(nonUniqueTimeSeries, tti)
 		}
