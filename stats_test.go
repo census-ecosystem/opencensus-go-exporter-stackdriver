@@ -138,11 +138,6 @@ func TestExporter_makeReq(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath("proj-id"),
-					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
 								Type: "custom.googleapis.com/opencensus/example.com/views/testview",
@@ -218,11 +213,6 @@ func TestExporter_makeReq(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath("proj-id"),
-					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
 								Type: "external.googleapis.com/example.com/views/testview",
@@ -293,11 +283,6 @@ func TestExporter_makeReq(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath("proj-id"),
-					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
 								Type: "custom.googleapis.com/opencensus/example.com/views/testview",
@@ -364,11 +349,6 @@ func TestExporter_makeReq(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath("proj-id"),
-					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
 								Type: "custom.googleapis.com/opencensus/lasttestview",
@@ -542,21 +522,21 @@ func TestExporter_makeReq_batching(t *testing.T) {
 			name:      "4 vds; 3 limit",
 			iter:      2,
 			limit:     3,
-			wantReqs:  4,
+			wantReqs:  3,
 			wantTotal: 4,
 		},
 		{
 			name:      "4 vds; 4 limit",
 			iter:      2,
 			limit:     4,
-			wantReqs:  4,
+			wantReqs:  2,
 			wantTotal: 4,
 		},
 		{
 			name:      "4 vds; 5 limit",
 			iter:      2,
 			limit:     5,
-			wantReqs:  4,
+			wantReqs:  2,
 			wantTotal: 4,
 		},
 	}
@@ -996,11 +976,6 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath("proj-id"),
-					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
 								Type: "custom.googleapis.com/opencensus/testview",
@@ -1074,11 +1049,6 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath("proj-id"),
-					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
 								Type: "custom.googleapis.com/opencensus/testview",
@@ -1154,11 +1124,6 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath("proj-id"),
-					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
 								Type: "custom.googleapis.com/opencensus/testview",
@@ -1232,11 +1197,6 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath("proj-id"),
-					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
 								Type: "custom.googleapis.com/opencensus/testview",
@@ -1303,11 +1263,6 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 								},
 							},
 						},
-					},
-				},
-				{
-					Name: monitoring.MetricProjectPath("proj-id"),
-					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
 								Type: "custom.googleapis.com/opencensus/testview",
@@ -1414,7 +1369,7 @@ func TestExporter_customContext(t *testing.T) {
 	if ctx.Err() != context.DeadlineExceeded {
 		t.Errorf("expected context to time out; got %v", ctx.Err())
 	}
-	if timedOut != 3 {
+	if timedOut != 2 {
 		t.Errorf("expected two functions to time out; got %d", timedOut)
 	}
 }

@@ -39,6 +39,8 @@ import (
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	"sort"
+	"strings"
 )
 
 var errNilMetric = errors.New("expecting a non-nil metric")
@@ -117,6 +119,17 @@ func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload
 	return nil
 }
 
+func signature(metric *googlemetricpb.Metric) string {
+	labels := metric.GetLabels()
+	labelValues := make([]string, 0, len(labels))
+
+	for _, labelValue := range labels {
+		labelValues = append(labelValues, labelValue)
+	}
+	sort.Strings(labelValues)
+	return fmt.Sprintf("%s:%s", metric.GetType(), strings.Join(labelValues, ","))
+}
+
 func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monitoringpb.TimeSeries) (ctsreql []*monitoringpb.CreateTimeSeriesRequest) {
 	if len(ts) == 0 {
 		return nil
@@ -139,10 +152,10 @@ func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monito
 	seenMetrics := make(map[string]struct{})
 
 	for _, tti := range ts {
-		signature := tti.Metric.GetType()
-		if _, alreadySeen := seenMetrics[signature]; !alreadySeen {
+		key := signature(tti.Metric)
+		if _, alreadySeen := seenMetrics[key]; !alreadySeen {
 			uniqueTimeSeries = append(uniqueTimeSeries, tti)
-			seenMetrics[signature] = struct{}{}
+			seenMetrics[key] = struct{}{}
 		} else {
 			nonUniqueTimeSeries = append(nonUniqueTimeSeries, tti)
 		}
