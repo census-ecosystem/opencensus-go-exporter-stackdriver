@@ -16,10 +16,8 @@ package stackdriver
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -103,17 +101,16 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 		if err != nil {
 			t.Errorf("#%d: Stats.protoMetricDescriptorToMetricDescriptor: %v", i, err)
 		}
-		if !reflect.DeepEqual(sMD, pMD) {
-			t.Errorf("MetricDescriptor Mismatch\nStats MetricDescriptor:\n\t%v\nProto MetricDescriptor:\n\t%v\n", sMD, pMD)
+		if diff := cmpMDReq(pMD, sMD); diff != "" {
+			t.Fatalf("MetricDescriptor Mismatch -FromMetrics +FromStats: %s", diff)
 		}
 
 		vdl := []*view.Data{vd}
 		sctreql := se.makeReq(vdl, maxTimeSeriesPerUpload)
 		tsl, _ := se.protoMetricToTimeSeries(ctx, last.Node, last.Resource, last.Metrics[0])
 		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
-		if !reflect.DeepEqual(sctreql, pctreql) {
-			t.Errorf("#%d: TimeSeries Mismatch\nStats CreateTimeSeriesRequest:\n\t%v\nProto CreateTimeSeriesRequest:\n\t%v\n",
-				i, sctreql, pctreql)
+		if diff := cmpTSReqs(pctreql, sctreql); diff != "" {
+			t.Fatalf("TimeSeries Mismatch -FromMetrics +FromStats: %s", diff)
 		}
 	}
 }
@@ -277,18 +274,13 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 	})
 
 	// The results should be equal now
-	if !reflect.DeepEqual(stackdriverTimeSeriesFromMetrics, stackdriverTimeSeriesFromStats) {
-		blobFromMetrics := jsonBlob(stackdriverTimeSeriesFromMetrics)
-		blobFromStats := jsonBlob(stackdriverTimeSeriesFromStats)
-		t.Errorf("StackdriverTimeSeriesFromMetrics (%d):\n%s\n\nStackdriverTimeSeriesFromStats (%d):\n%s\n\n",
-			len(stackdriverTimeSeriesFromMetrics), blobFromMetrics,
-			len(stackdriverTimeSeriesFromStats), blobFromStats)
+	if diff := cmpTSReqs(stackdriverTimeSeriesFromMetrics, stackdriverTimeSeriesFromStats); diff != "" {
+		t.Fatalf("Unexpected CreateTimeSeriesRequests -FromMetrics +FromStats: %s", diff)
 	}
 
 	// Examining the metric descriptors too.
-	if !reflect.DeepEqual(stackdriverMetricDescriptorsFromMetrics, stackdriverMetricDescriptorsFromStats) {
-		t.Errorf("StackdriverMetricDescriptorsFromMetrics:\n%v\nStackdriverMetricDescriptors:\n%v\n\n",
-			stackdriverMetricDescriptorsFromMetrics, stackdriverMetricDescriptorsFromStats)
+	if diff := cmpMDReqs(stackdriverMetricDescriptorsFromMetrics, stackdriverMetricDescriptorsFromStats); diff != "" {
+		t.Fatalf("Unexpected CreateMetricDescriptorRequests -FromMetrics +FromStats: %s", diff)
 	}
 }
 
@@ -424,9 +416,4 @@ func (ma *metricsAgent) GetMonitoredResourceDescriptor(ctx context.Context, req 
 
 func (ma *metricsAgent) ListMonitoredResourceDescriptors(ctx context.Context, req *monitoringpb.ListMonitoredResourceDescriptorsRequest) (*monitoringpb.ListMonitoredResourceDescriptorsResponse, error) {
 	return new(monitoringpb.ListMonitoredResourceDescriptorsResponse), nil
-}
-
-func jsonBlob(v interface{}) []byte {
-	blob, _ := json.MarshalIndent(v, "", "   ")
-	return blob
 }
