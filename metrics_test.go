@@ -16,19 +16,19 @@ package stackdriver
 
 import (
 	"context"
-	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
+
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
+	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
 	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/resource"
-	"time"
 )
 
 var se = &statsExporter{
@@ -74,11 +74,8 @@ func TestMetricResourceToMonitoringResource(t *testing.T) {
 
 	for i, tt := range tests {
 		got := metricRscToMpbRsc(tt.in)
-		if !reflect.DeepEqual(got, tt.want) {
-			gj, wj := serializeAsJSON(got), serializeAsJSON(tt.want)
-			if gj != wj {
-				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)
-			}
+		if diff := cmpResource(got, tt.want); diff != "" {
+			t.Fatalf("Test %d failed. Unexpected Resource -got +want: %s", i, diff)
 		}
 	}
 }
@@ -136,7 +133,8 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &googlemetricpb.Metric{
-								Type: "custom.googleapis.com/opencensus/with_metric_descriptor",
+								Type:   "custom.googleapis.com/opencensus/with_metric_descriptor",
+								Labels: map[string]string{},
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "global",
@@ -207,7 +205,8 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &googlemetricpb.Metric{
-								Type: "custom.googleapis.com/opencensus/with_metric_descriptor",
+								Type:   "custom.googleapis.com/opencensus/with_metric_descriptor",
+								Labels: map[string]string{},
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "global",
@@ -258,13 +257,10 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 		}
 
 		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
-		if !reflect.DeepEqual(got, tt.want) {
-			// Our saving grace is serialization equality since some
-			// unexported fields could be present in the various values.
-			gj, wj := serializeAsJSON(got), serializeAsJSON(tt.want)
-			if gj != wj {
-				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)
-			}
+		// Our saving grace is serialization equality since some
+		// unexported fields could be present in the various values.
+		if diff := cmpTSReqs(got, tt.want); diff != "" {
+			t.Fatalf("Test %d failed. Unexpected CreateTimeSeriesRequests -got +want: %s", i, diff)
 		}
 	}
 }
@@ -281,6 +277,7 @@ func TestMetricDescriptorToMonitoringMetricDescriptor(t *testing.T) {
 			want: &googlemetricpb.MetricDescriptor{
 				Name:        "projects/foo/metricDescriptors/custom.googleapis.com/opencensus",
 				Type:        "custom.googleapis.com/opencensus",
+				Labels:      []*labelpb.LabelDescriptor{},
 				DisplayName: "OpenCensus",
 				MetricKind:  googlemetricpb.MetricDescriptor_GAUGE,
 				ValueType:   googlemetricpb.MetricDescriptor_INT64,
@@ -298,6 +295,7 @@ func TestMetricDescriptorToMonitoringMetricDescriptor(t *testing.T) {
 			want: &googlemetricpb.MetricDescriptor{
 				Name:        "projects/foo/metricDescriptors/custom.googleapis.com/opencensus/with_metric_descriptor",
 				Type:        "custom.googleapis.com/opencensus/with_metric_descriptor",
+				Labels:      []*labelpb.LabelDescriptor{},
 				DisplayName: "OpenCensus/with_metric_descriptor",
 				Description: "This is with metric descriptor",
 				Unit:        "By",
@@ -321,13 +319,10 @@ func TestMetricDescriptorToMonitoringMetricDescriptor(t *testing.T) {
 			continue
 		}
 
-		if !reflect.DeepEqual(got, tt.want) {
-			// Our saving grace is serialization equality since some
-			// unexported fields could be present in the various values.
-			gj, wj := serializeAsJSON(got), serializeAsJSON(tt.want)
-			if gj != wj {
-				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)
-			}
+		// Our saving grace is serialization equality since some
+		// unexported fields could be present in the various values.
+		if diff := cmpMD(got, tt.want); diff != "" {
+			t.Fatalf("Test %d failed. Unexpected MetricDescriptor -got +want: %s", i, diff)
 		}
 	}
 }
@@ -505,21 +500,10 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 			continue
 		}
 
-		if g, w := mpt, tt.want; !reflect.DeepEqual(g, w) {
-			// Our saving grace is serialization equality since some
-			// unexported fields could be present in the various values.
-			gj, wj := serializeAsJSON(g), serializeAsJSON(w)
-			if gj != wj {
-				t.Errorf("#%d: Unmatched JSON\nGot:\n\t%s\nWant:\n\t%s", i, gj, wj)
-			}
+		// Our saving grace is serialization equality since some
+		// unexported fields could be present in the various values.
+		if diff := cmpPoint(mpt, tt.want); diff != "" {
+			t.Fatalf("Test %d failed. Unexpected Point -got +want: %s", i, diff)
 		}
-	}
-}
-
-func timestampToTime(ts *timestamp.Timestamp) time.Time {
-	if ts == nil {
-		return time.Unix(0, 0).UTC()
-	} else {
-		return time.Unix(ts.Seconds, int64(ts.Nanos)).UTC()
 	}
 }
