@@ -68,10 +68,10 @@ func TestProtoResourceToMonitoringResource(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for i, tt := range tests {
 		got := protoResourceToMonitoredResource(tt.in)
 		if diff := cmpResource(got, tt.want); diff != "" {
-			t.Fatalf("Unexpected Resource -got +want: %s", diff)
+			t.Fatalf("Test %d failed. Unexpected Resource -got +want: %s", i, diff)
 		}
 	}
 }
@@ -196,7 +196,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 		// Our saving grace is serialization equality since some
 		// unexported fields could be present in the various values.
 		if diff := cmpTSReqs(got, tt.want); diff != "" {
-			t.Fatalf("Unexpected CreateTimeSeriesRequests -got +want: %s", diff)
+			t.Fatalf("Test %d failed. Unexpected CreateTimeSeriesRequests -got +want: %s", i, diff)
 		}
 	}
 }
@@ -257,7 +257,7 @@ func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
 		// Our saving grace is serialization equality since some
 		// unexported fields could be present in the various values.
 		if diff := cmpMD(got, tt.want); diff != "" {
-			t.Fatalf("Unexpected MetricDescriptor -got +want: %s", diff)
+			t.Fatalf("Test %d failed. Unexpected MetricDescriptor -got +want: %s", i, diff)
 		}
 	}
 }
@@ -369,7 +369,7 @@ func TestProtoMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 		// Our saving grace is serialization equality since some
 		// unexported fields could be present in the various values.
 		if diff := cmpPoint(mpt, tt.want); diff != "" {
-			t.Fatalf("Unexpected Point -got +want: %s", diff)
+			t.Fatalf("Test %d failed. Unexpected Point -got +want: %s", i, diff)
 		}
 	}
 }
@@ -467,10 +467,10 @@ func TestCombineTimeSeriesAndDeduplication(t *testing.T) {
 		},
 	}
 
-	for _, tt := range tests {
+	for i, tt := range tests {
 		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tt.in)
 		if diff := cmpTSReqs(got, tt.want); diff != "" {
-			t.Fatalf("Unexpected CreateTimeSeriesRequests -got +want: %s", diff)
+			t.Fatalf("Test %d failed. Unexpected CreateTimeSeriesRequests -got +want: %s", i, diff)
 		}
 	}
 }
