@@ -2,10 +2,10 @@ cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMT
 cloud.google.com/go v0.31.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0 h1:eOI3/cP2VTU6uZLDYAoic+eyzzB9YyGmJ7eIjl8rOPg=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
-cloud.google.com/go v0.37.1 h1:2kHhTjz+eKEI7tt3Fqf5j3APCq+z9tuY2CzeCIxTo+A=
-cloud.google.com/go v0.37.1/go.mod h1:SAbnLi6YTSPKSI0dTUEOVLCkyPfKXK8n4ibqiMoj4ok=
-contrib.go.opencensus.io/exporter/ocagent v0.4.9 h1:8ZbMXpyd04/3LILa/9Tzr8N4HzZNj6Vb2xsaSuR4nQI=
-contrib.go.opencensus.io/exporter/ocagent v0.4.9/go.mod h1:ueLzZcP7LPhPulEBukGn4aLh7Mx9YJwpVJ9nL2FYltw=
+cloud.google.com/go v0.37.2 h1:4y4L7BdHenTfZL0HervofNTHh9Ad6mNX72cQvl+5eH0=
+cloud.google.com/go v0.37.2/go.mod h1:H8IAquKe2L30IxoupDgqTaQvKSwF/c8prYHynGIWQbA=
+contrib.go.opencensus.io/exporter/ocagent v0.4.11 h1:Zwy9skaqR2igcEfSVYDuAsbpa33N0RPtnYTHEe2whPI=
+contrib.go.opencensus.io/exporter/ocagent v0.4.11/go.mod h1:7ihiYRbdcVfW4m4wlXi9WRPdv79C0fStcjNlyE6ek9s=
 contrib.go.opencensus.io/resource v0.0.0-20190131005048-21591786a5e0 h1:ICrSnXeuT4427bpR8X9I7GxiyT4X5qgLtFT7m1IjK2c=
 contrib.go.opencensus.io/resource v0.0.0-20190131005048-21591786a5e0/go.mod h1:F361eGI91LCmW1I/Saf+rX0+OFcigGlFvXwEGEnkRLA=
 git.apache.org/thrift.git v0.0.0-20180902110319-2566ecd5d999/go.mod h1:fPE2ZNJGynbRyZ4dJvy6G277gSllfV2HJqblrnkyeyg=
@@ -115,6 +115,7 @@ github.com/tarm/serial v0.0.0-20180830185346-98f6abe2eb07/go.mod h1:kDXzergiv9cb
 go.opencensus.io v0.18.0/go.mod h1:vKdFvxhtzZ9onBp9VKHK8z/sRpBMnKAsufL7wlDrCOA=
 go.opencensus.io v0.19.1 h1:gPYKQ/GAQYR2ksU+qXNmq3CrOZWT1kkryvW6O0v1acY=
 go.opencensus.io v0.19.1/go.mod h1:gug0GbSHa8Pafr0d2urOSgoXHZ6x/RUlaiT0d9pqb4A=
+go.opencensus.io v0.19.2/go.mod h1:NO/8qkisMZLZ1FCsKNqtJPwc8/TaclWyY0B6wcYNg9M=
 go.opencensus.io v0.20.0 h1:L/ARO58pdktB6dLmYI0zAyW1XnavEmGziFd0MKfxnck=
 go.opencensus.io v0.20.0/go.mod h1:NO/8qkisMZLZ1FCsKNqtJPwc8/TaclWyY0B6wcYNg9M=
 go4.org v0.0.0-20180809161055-417644f6feb5/go.mod h1:MkTOUMDaeVYJUOUsaDXIhWPZYa1yOyC1qaOBpL57BhE=
@@ -186,6 +187,8 @@ google.golang.org/api v0.0.0-20181220000619-583d854617af h1:iQMS7JKv/0w/iiWf1M49
 google.golang.org/api v0.0.0-20181220000619-583d854617af/go.mod h1:4mhQ8q/RsB7i+udVvVy5NUi08OU8ZlA0gRVgrF7VFY0=
 google.golang.org/api v0.2.0 h1:B5VXkdjt7K2Gm6fGBC9C9a1OAKJDT95cTqwet+2zib0=
 google.golang.org/api v0.2.0/go.mod h1:IfRCZScioGtypHNTlz3gFk67J8uePVW7uDTBzXuIkhU=
+google.golang.org/api v0.3.0 h1:UIJY20OEo3+tK5MBlcdx37kmdH6EnRjGkW78mc6+EeA=
+google.golang.org/api v0.3.0/go.mod h1:IuvZyQh8jgscv8qWfQ4ABd8m7hEudgBFM/EdhA3BnXw=
 google.golang.org/appengine v1.1.0/go.mod h1:EbEs0AVv82hx2wNQdGPgUI5lhzA/G0D9YwlJXL52JkM=
 google.golang.org/appengine v1.2.0/go.mod h1:xpcJRLb0r/rnEns0DIKYYv+WjYCduHsrkT7/EB5XEv4=
 google.golang.org/appengine v1.3.0 h1:FBSsiFRMz3LBeXIomRnVzrQwSDj4ibvcRexLG0LZGQk=
