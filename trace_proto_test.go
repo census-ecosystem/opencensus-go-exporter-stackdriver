@@ -75,7 +75,8 @@ func generateSpan() {
 			span2.Annotate(nil, big.NewRat(2, 4).String())
 			span2.AddAttributes(
 				trace.StringAttribute("key1", "value1"),
-				trace.StringAttribute("key2", "value2"))
+				trace.StringAttribute("key2", "value2"),
+				trace.StringAttribute(agentLabel, "custom-agent"))
 			span2.AddAttributes(
 				trace.Int64Attribute("key1", 100),
 				// TODO [rghetia]: uncomment the test case after go.opencensus.io/trace@v0.20.0 is released.
@@ -138,7 +139,7 @@ func createExpectedSpans() spans {
 					"key1": {Value: &tracepb.AttributeValue_IntValue{IntValue: 100}},
 					// TODO [rghetia]: uncomment the test case after go.opencensus.io/trace@v0.20.0 is released.
 					//"key3": {Value: &tracepb.AttributeValue_StringValue{StringValue: trunc("100.001", 256)}},
-					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: ua}},
+					agentLabel: {Value: &tracepb.AttributeValue_StringValue{StringValue: trunc("custom-agent", 256)}},
 				},
 			},
 			TimeEvents: &tracepb.Span_TimeEvents{
