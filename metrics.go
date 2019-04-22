@@ -122,7 +122,7 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 		return nil, errNilMetric
 	}
 
-	resource := metricRscToMpbRsc(metric.Resource)
+	resource := se.metricRscToMpbRsc(metric.Resource)
 
 	metricName := metric.Descriptor.Name
 	metricType, _ := se.metricTypeFromProto(metricName)
@@ -303,11 +303,15 @@ func metricDescriptorTypeToMetricKind(m *metricdata.Metric) (googlemetricpb.Metr
 	}
 }
 
-func metricRscToMpbRsc(rs *resource.Resource) *monitoredrespb.MonitoredResource {
+func (se *statsExporter) metricRscToMpbRsc(rs *resource.Resource) *monitoredrespb.MonitoredResource {
 	if rs == nil {
-		return &monitoredrespb.MonitoredResource{
-			Type: "global",
+		resource := se.o.Resource
+		if resource == nil {
+			resource = &monitoredrespb.MonitoredResource{
+				Type: "global",
+			}
 		}
+		return resource
 	}
 	typ := rs.Type
 	if typ == "" {
