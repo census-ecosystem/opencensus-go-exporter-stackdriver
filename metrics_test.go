@@ -73,7 +73,7 @@ func TestMetricResourceToMonitoringResource(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		got := metricRscToMpbRsc(tt.in)
+		got := se.metricRscToMpbRsc(tt.in)
 		if diff := cmpResource(got, tt.want); diff != "" {
 			t.Fatalf("Test %d failed. Unexpected Resource -got +want: %s", i, diff)
 		}
