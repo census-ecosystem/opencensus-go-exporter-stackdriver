@@ -122,7 +122,14 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 		return nil, errNilMetric
 	}
 
-	resource := metricRscToMpbRsc(metric.Resource)
+	// TODO: ExportView goes through getMonitoredResource() to elemenate certain tags and return mr retriever.
+	// not sure if such functionality is required here.
+	resource := se.o.Resource
+	if resource == nil {
+		resource = &monitoredrespb.MonitoredResource{
+			Type: "global",
+		}
+	}
 
 	metricName := metric.Descriptor.Name
 	metricType, _ := se.metricTypeFromProto(metricName)
