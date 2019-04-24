@@ -64,7 +64,7 @@ func TestDefaultMapResource(t *testing.T) {
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
-			got := DefaultMapResource(c.input)
+			got := defaultMapResource(c.input)
 			if diff := cmp.Diff(got, c.want); diff != "" {
 				t.Errorf("Values differ -got +want: %s", diff)
 			}
