@@ -46,6 +46,9 @@ var (
 const (
 	exemplarAttachmentTypeString  = "type.googleapis.com/google.protobuf.StringValue"
 	exemplarAttachmentTypeSpanCtx = "type.googleapis.com/google.monitoring.v3.SpanContext"
+
+	// TODO(songy23): add support for this.
+	// exemplarAttachmentTypeDroppedLabels = "type.googleapis.com/google.monitoring.v3.DroppedLabels"
 )
 
 // ExportMetrics exports OpenCensus Metrics to Stackdriver Monitoring.
@@ -464,12 +467,12 @@ func attachmentsToPbAttachments(attachments metricdata.Attachments, projectID st
 	var pbAttachments []*any.Any
 	for _, v := range attachments {
 		switch v.(type) {
-		case string:
-			pbAttachments = append(pbAttachments, toPbStringAttachment(v))
 		case trace.SpanContext:
 			spanCtx, _ := v.(trace.SpanContext)
 			pbAttachments = append(pbAttachments, toPbSpanCtxAttachment(spanCtx, projectID))
 		default:
+			// Treat everything else as plain string for now.
+			// TODO(songy23): add support for dropped label attachments.
 			pbAttachments = append(pbAttachments, toPbStringAttachment(v))
 		}
 	}
