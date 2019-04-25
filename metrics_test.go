@@ -16,9 +16,13 @@ package stackdriver
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/timestamp"
 
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
@@ -29,6 +33,7 @@ import (
 
 	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/resource"
+	"go.opencensus.io/trace"
 )
 
 var se = &statsExporter{
@@ -85,6 +90,7 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 		Seconds: 1543160298,
 		Nanos:   100000090,
 	}
+	startTime := time.Unix(1543160298, 100000090)
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
 		Nanos:   100000997,
@@ -116,7 +122,11 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 									Sum:                   11.9,
 									SumOfSquaredDeviation: 0,
 									Buckets: []metricdata.Bucket{
-										{Count: 1}, {}, {}, {},
+										{
+											Count:    1,
+											Exemplar: &metricdata.Exemplar{Value: 11.9, Timestamp: startTime, Attachments: map[string]interface{}{"key": "value"}},
+										},
+										{}, {}, {},
 									},
 									BucketOptions: &metricdata.BucketOptions{
 										Bounds: []float64{10, 20, 30, 40},
@@ -155,6 +165,18 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 													Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
 														ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
 															Bounds: []float64{0, 10, 20, 30, 40},
+														},
+													},
+												},
+												Exemplars: []*distributionpb.Distribution_Exemplar{
+													{
+														Value:     11.9,
+														Timestamp: startTimestamp,
+														Attachments: []*any.Any{
+															{
+																TypeUrl: exemplarAttachmentTypeString,
+																Value:   []byte("value"),
+															},
 														},
 													},
 												},
@@ -408,10 +430,20 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 		Seconds: 1543160298,
 		Nanos:   100000090,
 	}
+	startTime := time.Unix(1543160298, 100000090)
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
 		Nanos:   100000997,
 	}
+
+	traceID := trace.TraceID{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 4, 8, 16, 32, 64, 128}
+	spanID := trace.SpanID{1, 2, 4, 8, 16, 32, 64, 128}
+	spanCtx := trace.SpanContext{
+		TraceID:      traceID,
+		SpanID:       spanID,
+		TraceOptions: 1,
+	}
+	wantSpanCtxBytes, _ := proto.Marshal(&monitoringpb.SpanContext{SpanName: fmt.Sprintf("projects/foo/traces/%s/spans/%s", traceID.String(), spanID.String())})
 
 	tests := []struct {
 		in      *metricdata.Point
@@ -426,7 +458,13 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 					Sum:                   11.9,
 					SumOfSquaredDeviation: 0,
 					Buckets: []metricdata.Bucket{
-						{}, {Count: 1}, {}, {}, {},
+						{},
+						{
+							Count:    1,
+							Exemplar: &metricdata.Exemplar{Value: 11.9, Timestamp: startTime, Attachments: map[string]interface{}{"SpanContext": spanCtx}}},
+						{},
+						{},
+						{},
 					},
 					BucketOptions: &metricdata.BucketOptions{
 						Bounds: []float64{0, 10, 20, 30, 40},
@@ -449,6 +487,18 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 								Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
 									ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
 										Bounds: []float64{0, 10, 20, 30, 40},
+									},
+								},
+							},
+							Exemplars: []*distributionpb.Distribution_Exemplar{
+								{
+									Value:     11.9,
+									Timestamp: startTimestamp,
+									Attachments: []*any.Any{
+										{
+											TypeUrl: exemplarAttachmentTypeSpanCtx,
+											Value:   wantSpanCtxBytes,
+										},
 									},
 								},
 							},
@@ -490,7 +540,7 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		mpt, err := metricPointToMpbPoint(startTimestamp, tt.in)
+		mpt, err := metricPointToMpbPoint(startTimestamp, tt.in, "foo")
 		if tt.wantErr != "" {
 			continue
 		}
