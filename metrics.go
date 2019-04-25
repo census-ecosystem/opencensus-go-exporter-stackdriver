@@ -162,7 +162,7 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 	return timeSeries, nil
 }
 
-func metricLabelsToTsLabels(defaults map[string]labelValue, labelKeys []string, labelValues []metricdata.LabelValue) (map[string]string, error) {
+func metricLabelsToTsLabels(defaults map[string]labelValue, labelKeys []metricdata.LabelKey, labelValues []metricdata.LabelValue) (map[string]string, error) {
 	labels := make(map[string]string)
 	// Fill in the defaults firstly, irrespective of if the labelKeys and labelValues are mismatched.
 	for key, label := range defaults {
@@ -176,7 +176,7 @@ func metricLabelsToTsLabels(defaults map[string]labelValue, labelKeys []string, 
 
 	for i, labelKey := range labelKeys {
 		labelValue := labelValues[i]
-		labels[sanitize(labelKey)] = labelValue.Value
+		labels[sanitize(labelKey.Key)] = labelValue.Value
 	}
 
 	return labels, nil
@@ -246,7 +246,7 @@ func (se *statsExporter) metricToMpbMetricDescriptor(metric *metricdata.Metric) 
 	return sdm, nil
 }
 
-func metricLableKeysToLabels(defaults map[string]labelValue, labelKeys []string) []*labelpb.LabelDescriptor {
+func metricLableKeysToLabels(defaults map[string]labelValue, labelKeys []metricdata.LabelKey) []*labelpb.LabelDescriptor {
 	labelDescriptors := make([]*labelpb.LabelDescriptor, 0, len(defaults)+len(labelKeys))
 
 	// Fill in the defaults first.
@@ -261,8 +261,8 @@ func metricLableKeysToLabels(defaults map[string]labelValue, labelKeys []string)
 	// Now fill in those from the metric.
 	for _, key := range labelKeys {
 		labelDescriptors = append(labelDescriptors, &labelpb.LabelDescriptor{
-			Key:         sanitize(key),
-			Description: "",                             // TODO: [rghetia] when descriptor is available use that.
+			Key:         sanitize(key.Key),
+			Description: key.Description,
 			ValueType:   labelpb.LabelDescriptor_STRING, // We only use string tags
 		})
 	}
