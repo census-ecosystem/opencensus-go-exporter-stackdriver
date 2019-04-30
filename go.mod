@@ -1,7 +1,7 @@
 module contrib.go.opencensus.io/exporter/stackdriver
 
 require (
-	cloud.google.com/go v0.37.4
+	cloud.google.com/go v0.37.5-0.20190427004806-dc6803e73b23 // TODO: pin a released version
 	contrib.go.opencensus.io/exporter/ocagent v0.5.0
 	contrib.go.opencensus.io/resource v0.0.0-20190131005048-21591786a5e0
 	github.com/aws/aws-sdk-go v1.19.18
