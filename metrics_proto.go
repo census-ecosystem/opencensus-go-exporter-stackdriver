@@ -58,6 +58,10 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 		return errNilMetric
 	}
 
+	if se.defaultLabels == nil {
+		se.defaultLabels = getDefaultLabelsFromNode(node)
+	}
+
 	for _, metric := range metrics {
 		payload := &metricProtoPayload{
 			metric:   metric,
@@ -572,4 +576,14 @@ func protoResourceToMonitoredResource(rsp *resourcepb.Resource) *monitoredrespb.
 		}
 	}
 	return mrsp
+}
+
+func getDefaultLabelsFromNode(node *commonpb.Node) map[string]labelValue {
+	taskValue := fmt.Sprintf("%s-%d@%s", strings.ToLower(node.LibraryInfo.GetLanguage().String()), node.Identifier.Pid, node.Identifier.HostName)
+	return map[string]labelValue{
+		opencensusTaskKey: {
+			val:  taskValue,
+			desc: opencensusTaskDescription,
+		},
+	}
 }
