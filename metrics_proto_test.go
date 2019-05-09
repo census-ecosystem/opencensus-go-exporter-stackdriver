@@ -182,7 +182,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 		if se == nil {
 			se = new(statsExporter)
 		}
-		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, nil, tt.in)
+		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, nil, tt.in, nil)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
@@ -243,7 +243,7 @@ func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
 		if se == nil {
 			se = new(statsExporter)
 		}
-		got, err := se.protoToMonitoringMetricDescriptor(tt.in)
+		got, err := se.protoToMonitoringMetricDescriptor(tt.in, nil)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: \nGot %v\nWanted error substring %q", i, err, tt.wantErr)

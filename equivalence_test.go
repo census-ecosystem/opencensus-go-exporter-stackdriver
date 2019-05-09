@@ -97,7 +97,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 		if err != nil {
 			t.Errorf("#%d: Stats.viewToMetricDescriptor: %v", i, err)
 		}
-		pMD, err := se.protoMetricDescriptorToCreateMetricDescriptorRequest(ctx, last.Metrics[0])
+		pMD, err := se.protoMetricDescriptorToCreateMetricDescriptorRequest(ctx, last.Metrics[0], nil)
 		if err != nil {
 			t.Errorf("#%d: Stats.protoMetricDescriptorToMetricDescriptor: %v", i, err)
 		}
@@ -107,7 +107,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 
 		vdl := []*view.Data{vd}
 		sctreql := se.makeReq(vdl, maxTimeSeriesPerUpload)
-		tsl, _ := se.protoMetricToTimeSeries(ctx, last.Node, last.Resource, last.Metrics[0])
+		tsl, _ := se.protoMetricToTimeSeries(ctx, last.Node, last.Resource, last.Metrics[0], nil)
 		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
 		if diff := cmpTSReqs(pctreql, sctreql); diff != "" {
 			t.Fatalf("TimeSeries Mismatch -FromMetrics +FromStats: %s", diff)
