@@ -45,12 +45,17 @@ import (
 
 var errNilMetric = errors.New("expecting a non-nil metric")
 var errNilMetricDescriptor = errors.New("expecting a non-nil metric descriptor")
+var percentileLabelKey = &metricspb.LabelKey{
+	Key:         "percentile",
+	Description: "the value at a given percentile of a distribution",
+}
 
 type metricProtoPayload struct {
 	node             *commonpb.Node
 	resource         *resourcepb.Resource
 	metric           *metricspb.Metric
 	additionalLabels map[string]labelValue
+	convertedMetrics []*metricspb.Metric // Summary metrics.
 }
 
 // ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
@@ -78,6 +83,117 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 	return nil
 }
 
+func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*metricspb.Metric {
+	metrics := make([]*metricspb.Metric, 0)
+	percentileTss := make([]*metricspb.TimeSeries, 0)
+	countTss := make([]*metricspb.TimeSeries, 0)
+	sumTss := make([]*metricspb.TimeSeries, 0)
+
+	for _, ts := range summary.Timeseries {
+		lvs := ts.GetLabelValues()
+
+		startTime := ts.StartTimestamp
+		for _, pt := range ts.GetPoints() {
+			ptTimestamp := pt.GetTimestamp()
+			summaryValue := pt.GetSummaryValue()
+			if summaryValue.Sum != nil {
+				sumTs := &metricspb.TimeSeries{
+					LabelValues:    lvs,
+					StartTimestamp: startTime,
+					Points: []*metricspb.Point{
+						{
+							Value: &metricspb.Point_DoubleValue{
+								DoubleValue: summaryValue.Sum.Value,
+							},
+							Timestamp: ptTimestamp,
+						},
+					},
+				}
+				sumTss = append(sumTss, sumTs)
+			}
+
+			if summaryValue.Count != nil {
+				countTs := &metricspb.TimeSeries{
+					LabelValues:    lvs,
+					StartTimestamp: startTime,
+					Points: []*metricspb.Point{
+						{
+							Value: &metricspb.Point_Int64Value{
+								Int64Value: summaryValue.Count.Value,
+							},
+							Timestamp: ptTimestamp,
+						},
+					},
+				}
+				countTss = append(countTss, countTs)
+			}
+
+			snapshot := summaryValue.GetSnapshot()
+			for _, percentileValue := range snapshot.GetPercentileValues() {
+				lvsWithPercentile := lvs[0:]
+				lvsWithPercentile = append(lvsWithPercentile, &metricspb.LabelValue{
+					Value: fmt.Sprintf("%f", percentileValue.Percentile),
+				})
+				percentileTs := &metricspb.TimeSeries{
+					LabelValues:    lvsWithPercentile,
+					StartTimestamp: nil,
+					Points: []*metricspb.Point{
+						{
+							Value: &metricspb.Point_DoubleValue{
+								DoubleValue: percentileValue.Value,
+							},
+							Timestamp: ptTimestamp,
+						},
+					},
+				}
+				percentileTss = append(percentileTss, percentileTs)
+			}
+		}
+
+		if len(sumTss) > 0 {
+			metric := &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        fmt.Sprintf("%s_summary_sum", summary.GetMetricDescriptor().GetName()),
+					Description: summary.GetMetricDescriptor().GetDescription(),
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_DOUBLE,
+					Unit:        summary.GetMetricDescriptor().GetUnit(),
+					LabelKeys:   summary.GetMetricDescriptor().GetLabelKeys(),
+				},
+				Timeseries: sumTss,
+			}
+			metrics = append(metrics, metric)
+		}
+		if len(countTss) > 0 {
+			metric := &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        fmt.Sprintf("%s_summary_count", summary.GetMetricDescriptor().GetName()),
+					Description: summary.GetMetricDescriptor().GetDescription(),
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
+					Unit:        "1",
+					LabelKeys:   summary.GetMetricDescriptor().GetLabelKeys(),
+				},
+				Timeseries: countTss,
+			}
+			metrics = append(metrics, metric)
+		}
+		if len(percentileTss) > 0 {
+			lks := summary.GetMetricDescriptor().GetLabelKeys()[0:]
+			lks = append(lks, percentileLabelKey)
+			metric := &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        fmt.Sprintf("%s_summary_percentile", summary.GetMetricDescriptor().GetName()),
+					Description: summary.GetMetricDescriptor().GetDescription(),
+					Type:        metricspb.MetricDescriptor_GAUGE_DOUBLE,
+					Unit:        summary.GetMetricDescriptor().GetUnit(),
+					LabelKeys:   lks,
+				},
+				Timeseries: percentileTss,
+			}
+			metrics = append(metrics, metric)
+		}
+	}
+	return metrics
+}
 func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload) error {
 	ctx, cancel := se.o.newContextWithTimeout()
 	defer cancel()
@@ -91,20 +207,41 @@ func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload
 
 	for _, payload := range payloads {
 		// Now create the metric descriptor remotely.
-		if err := se.createMetricDescriptor(ctx, payload.metric, payload.additionalLabels); err != nil {
-			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
-			return err
+		if payload.metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
+			payload.convertedMetrics = se.convertSummaryMetrics(payload.metric)
+			for _, metric := range payload.convertedMetrics {
+				if err := se.createMetricDescriptor(ctx, metric, payload.additionalLabels); err != nil {
+					span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
+					return err
+				}
+			}
+		} else {
+			if err := se.createMetricDescriptor(ctx, payload.metric, payload.additionalLabels); err != nil {
+				span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
+				return err
+			}
 		}
 	}
 
 	var allTimeSeries []*monitoringpb.TimeSeries
 	for _, payload := range payloads {
-		tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, payload.metric, payload.additionalLabels)
-		if err != nil {
-			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
-			return err
+		if payload.metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
+			for _, metric := range payload.convertedMetrics {
+				tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, metric, payload.additionalLabels)
+				if err != nil {
+					span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
+					return err
+				}
+				allTimeSeries = append(allTimeSeries, tsl...)
+			}
+		} else {
+			tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, payload.metric, payload.additionalLabels)
+			if err != nil {
+				span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
+				return err
+			}
+			allTimeSeries = append(allTimeSeries, tsl...)
 		}
-		allTimeSeries = append(allTimeSeries, tsl...)
 	}
 
 	// Now batch timeseries up and then export.

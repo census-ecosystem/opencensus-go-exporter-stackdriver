@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	monitoring "cloud.google.com/go/monitoring/apiv3"
+	"cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
@@ -31,6 +31,8 @@ import (
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	"github.com/golang/protobuf/ptypes/wrappers"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestProtoResourceToMonitoringResource(t *testing.T) {
@@ -513,5 +515,171 @@ func TestNodeToDefaultLabels(t *testing.T) {
 		if !reflect.DeepEqual(got, tt.want) {
 			t.Fatalf("Test %d failed. Default labels mismatch. Want %v\nGot %v\n", i, tt.want, got)
 		}
+	}
+}
+
+func TestConvertSummaryMetrics(t *testing.T) {
+	startTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000090,
+	}
+	endTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000997,
+	}
+
+	tests := []struct {
+		in            *metricspb.Metric
+		want          []*metricspb.Metric
+		statsExporter *statsExporter
+	}{
+		{
+			in: &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "summary_metric_descriptor",
+					Description: "This is a test",
+					Unit:        "ms",
+					Type:        metricspb.MetricDescriptor_SUMMARY,
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimestamp,
+						Points: []*metricspb.Point{
+							{
+								Timestamp: endTimestamp,
+								Value: &metricspb.Point_SummaryValue{
+									SummaryValue: &metricspb.SummaryValue{
+										Count: &wrappers.Int64Value{Value: 10},
+										Sum:   &wrappers.DoubleValue{Value: 119.0},
+										Snapshot: &metricspb.SummaryValue_Snapshot{
+											PercentileValues: []*metricspb.SummaryValue_Snapshot_ValueAtPercentile{
+												makePercentileValue(5.6, 10.0),
+												makePercentileValue(9.6, 50.0),
+												makePercentileValue(12.6, 90.0),
+												makePercentileValue(19.6, 99.0),
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo"},
+			},
+			want: []*metricspb.Metric{
+				{
+					MetricDescriptor: &metricspb.MetricDescriptor{
+						Name:        "summary_metric_descriptor_summary_sum",
+						Description: "This is a test",
+						Unit:        "ms",
+						Type:        metricspb.MetricDescriptor_CUMULATIVE_DOUBLE,
+					},
+					Timeseries: []*metricspb.TimeSeries{
+						makeDoubleTs(119.0, "", startTimestamp, endTimestamp),
+					},
+				},
+				{
+					MetricDescriptor: &metricspb.MetricDescriptor{
+						Name:        "summary_metric_descriptor_summary_count",
+						Description: "This is a test",
+						Unit:        "1",
+						Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
+					},
+					Timeseries: []*metricspb.TimeSeries{
+						makeInt64Ts(10, "", startTimestamp, endTimestamp),
+					},
+				},
+				{
+					MetricDescriptor: &metricspb.MetricDescriptor{
+						Name:        "summary_metric_descriptor_summary_percentile",
+						Description: "This is a test",
+						Unit:        "ms",
+						Type:        metricspb.MetricDescriptor_GAUGE_DOUBLE,
+						LabelKeys: []*metricspb.LabelKey{
+							percentileLabelKey,
+						},
+					},
+					Timeseries: []*metricspb.TimeSeries{
+						makeDoubleTs(5.6, "10.000000", nil, endTimestamp),
+						makeDoubleTs(9.6, "50.000000", nil, endTimestamp),
+						makeDoubleTs(12.6, "90.000000", nil, endTimestamp),
+						makeDoubleTs(19.6, "99.000000", nil, endTimestamp),
+					},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		se := tt.statsExporter
+		if se == nil {
+			se = new(statsExporter)
+		}
+		got := se.convertSummaryMetrics(tt.in)
+		if !cmp.Equal(got, tt.want) {
+			t.Fatalf("conversion failed:\n  got=%v\n want=%v\n", got, tt.want)
+		}
+	}
+}
+
+func makeInt64Ts(val int64, label string, start, end *timestamp.Timestamp) *metricspb.TimeSeries {
+	ts := &metricspb.TimeSeries{
+		StartTimestamp: start,
+		Points:         makeInt64Point(val, end),
+	}
+	if label != "" {
+		ts.LabelValues = makeLabelValue(label)
+	}
+	return ts
+}
+
+func makeInt64Point(val int64, end *timestamp.Timestamp) []*metricspb.Point {
+	return []*metricspb.Point{
+		{
+			Timestamp: end,
+			Value: &metricspb.Point_Int64Value{
+				Int64Value: val,
+			},
+		},
+	}
+}
+
+func makeDoubleTs(val float64, label string, start, end *timestamp.Timestamp) *metricspb.TimeSeries {
+	ts := &metricspb.TimeSeries{
+		StartTimestamp: start,
+		Points:         makeDoublePoint(val, end),
+	}
+	if label != "" {
+		ts.LabelValues = makeLabelValue(label)
+	}
+	return ts
+}
+
+func makeDoublePoint(val float64, end *timestamp.Timestamp) []*metricspb.Point {
+	return []*metricspb.Point{
+		{
+			Timestamp: end,
+			Value: &metricspb.Point_DoubleValue{
+				DoubleValue: val,
+			},
+		},
+	}
+}
+
+func makeLabelValue(value string) []*metricspb.LabelValue {
+	return []*metricspb.LabelValue{
+		{
+			Value: value,
+		},
+	}
+}
+
+func makePercentileValue(val, percentile float64) *metricspb.SummaryValue_Snapshot_ValueAtPercentile {
+	return &metricspb.SummaryValue_Snapshot_ValueAtPercentile{
+		Value:      val,
+		Percentile: percentile,
 	}
 }
