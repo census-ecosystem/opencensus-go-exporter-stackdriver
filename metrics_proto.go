@@ -53,9 +53,8 @@ var percentileLabelKey = &metricspb.LabelKey{
 type metricProtoPayload struct {
 	node             *commonpb.Node
 	resource         *resourcepb.Resource
-	metric           *metricspb.Metric
+	metric           []*metricspb.Metric
 	additionalLabels map[string]labelValue
-	convertedMetrics []*metricspb.Metric // Summary metrics.
 }
 
 // ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
@@ -71,8 +70,14 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 	}
 
 	for _, metric := range metrics {
+		var metricsArr []*metricspb.Metric
+		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
+			metricsArr = se.convertSummaryMetrics(metric)
+		} else {
+			metricsArr = []*metricspb.Metric{metric}
+		}
 		payload := &metricProtoPayload{
-			metric:           metric,
+			metric:           metricsArr,
 			resource:         rsc,
 			node:             node,
 			additionalLabels: additionalLabels,
@@ -206,17 +211,9 @@ func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload
 	defer span.End()
 
 	for _, payload := range payloads {
-		// Now create the metric descriptor remotely.
-		if payload.metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
-			payload.convertedMetrics = se.convertSummaryMetrics(payload.metric)
-			for _, metric := range payload.convertedMetrics {
-				if err := se.createMetricDescriptor(ctx, metric, payload.additionalLabels); err != nil {
-					span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
-					return err
-				}
-			}
-		} else {
-			if err := se.createMetricDescriptor(ctx, payload.metric, payload.additionalLabels); err != nil {
+		for _, metric := range payload.metric {
+			// Now create the metric descriptor remotely.
+			if err := se.createMetricDescriptor(ctx, metric, payload.additionalLabels); err != nil {
 				span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 				return err
 			}
@@ -225,17 +222,8 @@ func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload
 
 	var allTimeSeries []*monitoringpb.TimeSeries
 	for _, payload := range payloads {
-		if payload.metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
-			for _, metric := range payload.convertedMetrics {
-				tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, metric, payload.additionalLabels)
-				if err != nil {
-					span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
-					return err
-				}
-				allTimeSeries = append(allTimeSeries, tsl...)
-			}
-		} else {
-			tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, payload.metric, payload.additionalLabels)
+		for _, metric := range payload.metric {
+			tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, metric, payload.additionalLabels)
 			if err != nil {
 				span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 				return err
