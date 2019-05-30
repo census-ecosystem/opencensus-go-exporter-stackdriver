@@ -35,12 +35,12 @@ import (
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
-	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	"go.opencensus.io/resource"
 )
 
 var errNilMetric = errors.New("expecting a non-nil metric")
@@ -328,6 +328,23 @@ func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monito
 	return ctsreql
 }
 
+func resourcepbToResource(rsc *resourcepb.Resource) *resource.Resource {
+	if rsc == nil {
+		return &resource.Resource{
+			Type: "global",
+		}
+	}
+	res := &resource.Resource{
+		Type:   rsc.Type,
+		Labels: make(map[string]string, len(rsc.Labels)),
+	}
+
+	for v, k := range rsc.Labels {
+		res.Labels[k] = v
+	}
+	return res
+}
+
 // protoMetricToTimeSeries converts a metric into a Stackdriver Monitoring v3 API CreateTimeSeriesRequest
 // but it doesn't invoke any remote API.
 func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric, additionalLabels map[string]labelValue) ([]*monitoringpb.TimeSeries, error) {
@@ -339,6 +356,8 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 	if metric.Resource != nil {
 		resource = metric.Resource
 	}
+
+	mappedRes := se.o.MapResource(resourcepbToResource(resource))
 
 	metricName, _, _, err := metricProseFromProto(metric)
 	if err != nil {
@@ -367,7 +386,7 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 				Type:   metricType,
 				Labels: labels,
 			},
-			Resource: protoResourceToMonitoredResource(resource),
+			Resource: mappedRes,
 			Points:   sdPoints,
 		})
 	}
@@ -684,28 +703,6 @@ func protoMetricDescriptorTypeToMetricKind(m *metricspb.Metric) (googlemetricpb.
 	default:
 		return googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED, googlemetricpb.MetricDescriptor_VALUE_TYPE_UNSPECIFIED
 	}
-}
-
-func protoResourceToMonitoredResource(rsp *resourcepb.Resource) *monitoredrespb.MonitoredResource {
-	if rsp == nil {
-		return &monitoredrespb.MonitoredResource{
-			Type: "global",
-		}
-	}
-	typ := rsp.Type
-	if typ == "" {
-		typ = "global"
-	}
-	mrsp := &monitoredrespb.MonitoredResource{
-		Type: typ,
-	}
-	if rsp.Labels != nil {
-		mrsp.Labels = make(map[string]string, len(rsp.Labels))
-		for k, v := range rsp.Labels {
-			mrsp.Labels[k] = v
-		}
-	}
-	return mrsp
 }
 
 func getDefaultLabelsFromNode(node *commonpb.Node) map[string]labelValue {

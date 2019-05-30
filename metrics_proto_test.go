@@ -30,55 +30,9 @@ import (
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
-	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/google/go-cmp/cmp"
 )
-
-func TestProtoResourceToMonitoringResource(t *testing.T) {
-	tests := []struct {
-		in   *resourcepb.Resource
-		want *monitoredrespb.MonitoredResource
-	}{
-		{in: nil, want: &monitoredrespb.MonitoredResource{Type: "global"}},
-		{in: &resourcepb.Resource{}, want: &monitoredrespb.MonitoredResource{Type: "global"}},
-		{
-			in: &resourcepb.Resource{
-				Type: "foo",
-			},
-			want: &monitoredrespb.MonitoredResource{
-				Type: "foo",
-			},
-		},
-		{
-			in: &resourcepb.Resource{
-				Type:   "foo",
-				Labels: map[string]string{},
-			},
-			want: &monitoredrespb.MonitoredResource{
-				Type:   "foo",
-				Labels: map[string]string{},
-			},
-		},
-		{
-			in: &resourcepb.Resource{
-				Type:   "foo",
-				Labels: map[string]string{"a": "A"},
-			},
-			want: &monitoredrespb.MonitoredResource{
-				Type:   "foo",
-				Labels: map[string]string{"a": "A"},
-			},
-		},
-	}
-
-	for i, tt := range tests {
-		got := protoResourceToMonitoredResource(tt.in)
-		if diff := cmpResource(got, tt.want); diff != "" {
-			t.Fatalf("Test %d failed. Unexpected Resource -got +want: %s", i, diff)
-		}
-	}
-}
 
 func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 	startTimestamp := &timestamp.Timestamp{
@@ -133,7 +87,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 				},
 			},
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo"},
+				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{

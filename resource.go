@@ -85,7 +85,10 @@ func transformResource(match, input map[string]string) (map[string]string, bool)
 func defaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResource {
 	match := genericResourceMap
 	result := &monitoredrespb.MonitoredResource{
-		Type: "generic_task",
+		Type: "global",
+	}
+	if res == nil || res.Labels == nil {
+		return result
 	}
 	if res.Type == resourcekeys.K8SType {
 		result.Type = "k8s_container"

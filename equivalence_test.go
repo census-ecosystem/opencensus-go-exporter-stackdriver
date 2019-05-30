@@ -90,7 +90,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 	// Now perform some exporting.
 	for i, vd := range vdl {
 		se := &statsExporter{
-			o: Options{ProjectID: "equivalence"},
+			o: Options{ProjectID: "equivalence", MapResource: defaultMapResource},
 		}
 
 		ctx := context.Background()
@@ -143,6 +143,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 		// so that batching is performed deterministically and flushing is
 		// fully controlled by us.
 		BundleDelayThreshold: 2 * time.Hour,
+		MapResource:          defaultMapResource,
 	}
 	se, err := newStatsExporter(exporterOptions)
 	if err != nil {
