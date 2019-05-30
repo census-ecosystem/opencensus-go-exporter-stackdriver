@@ -95,7 +95,7 @@ func TestDefaultMapResource(t *testing.T) {
 				Labels: map[string]string{
 					"project_id":  "proj1",
 					"instance_id": "inst1",
-					"region":      "region1",
+					"region":      "aws:region1",
 					"aws_account": "account1",
 				},
 			},

@@ -15,6 +15,8 @@
 package stackdriver // import "contrib.go.opencensus.io/exporter/stackdriver"
 
 import (
+	"fmt"
+
 	"go.opencensus.io/resource"
 	"go.opencensus.io/resource/resourcekeys"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
@@ -98,5 +100,10 @@ func defaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResourc
 		}
 	}
 	result.Labels, _ = transformResource(match, res.Labels)
+	if result.Type == "aws_ec2_instance" {
+		if v, ok := result.Labels["region"]; ok {
+			result.Labels["region"] = fmt.Sprintf("aws:%s", v)
+		}
+	}
 	return result
 }
