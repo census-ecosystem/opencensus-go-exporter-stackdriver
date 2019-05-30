@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"testing"
 
-	"contrib.go.opencensus.io/resource/resourcekeys"
 	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/resource"
+	"go.opencensus.io/resource/resourcekeys"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 )
 
@@ -33,12 +33,40 @@ func TestDefaultMapResource(t *testing.T) {
 		// first mapping that doesn't apply.
 		{
 			input: &resource.Resource{
-				Type: resourcekeys.GCPTypeGCEInstance,
+				Type: resourcekeys.K8SType,
 				Labels: map[string]string{
-					resourcekeys.GCPKeyGCEProjectID:  "proj1",
-					resourcekeys.GCPKeyGCEInstanceID: "inst1",
-					resourcekeys.GCPKeyGCEZone:       "zone1",
+					stackdriverProjectID:             "proj1",
+					resourcekeys.K8SKeyClusterName:   "cluster1",
+					resourcekeys.K8SKeyPodName:       "pod1",
+					resourcekeys.K8SKeyNamespaceName: "namespace1",
+					resourcekeys.ContainerKeyName:    "container-name1",
+					resourcekeys.CloudKeyAccountID:   "proj1",
+					resourcekeys.CloudKeyZone:        "zone1",
+					resourcekeys.CloudKeyRegion:      "",
 					"extra_key":                      "must be ignored",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "k8s_container",
+				Labels: map[string]string{
+					"project_id":     "proj1",
+					"location":       "zone1",
+					"cluster_name":   "cluster1",
+					"namespace_name": "namespace1",
+					"pod_name":       "pod1",
+					"container_name": "container-name1",
+				},
+			},
+		},
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.CloudType,
+				Labels: map[string]string{
+					stackdriverProjectID:          "proj1",
+					resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderGCP,
+					resourcekeys.HostKeyID:        "inst1",
+					resourcekeys.CloudKeyZone:     "zone1",
+					"extra_key":                   "must be ignored",
 				},
 			},
 			want: &monitoredrespb.MonitoredResource{
@@ -50,16 +78,45 @@ func TestDefaultMapResource(t *testing.T) {
 				},
 			},
 		},
-		// No match due to missing key.
 		{
 			input: &resource.Resource{
-				Type: resourcekeys.GCPTypeGCEInstance,
+				Type: resourcekeys.CloudType,
 				Labels: map[string]string{
-					resourcekeys.GCPKeyGCEProjectID:  "proj1",
-					resourcekeys.GCPKeyGCEInstanceID: "inst1",
+					stackdriverProjectID:           "proj1",
+					resourcekeys.CloudKeyProvider:  resourcekeys.CloudProviderAWS,
+					resourcekeys.HostKeyID:         "inst1",
+					resourcekeys.CloudKeyRegion:    "region1",
+					resourcekeys.CloudKeyAccountID: "account1",
+					"extra_key":                    "must be ignored",
 				},
 			},
-			want: nil,
+			want: &monitoredrespb.MonitoredResource{
+				Type: "aws_ec2_instance",
+				Labels: map[string]string{
+					"project_id":  "proj1",
+					"instance_id": "inst1",
+					"region":      "region1",
+					"aws_account": "account1",
+				},
+			},
+		},
+		// Partial Match
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.CloudType,
+				Labels: map[string]string{
+					stackdriverProjectID:          "proj1",
+					resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderGCP,
+					resourcekeys.HostKeyID:        "inst1",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "gce_instance",
+				Labels: map[string]string{
+					"project_id":  "proj1",
+					"instance_id": "inst1",
+				},
+			},
 		},
 	}
 	for i, c := range cases {
