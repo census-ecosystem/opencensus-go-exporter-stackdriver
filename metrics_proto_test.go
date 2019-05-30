@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"cloud.google.com/go/monitoring/apiv3"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
@@ -32,6 +33,7 @@ import (
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/google/go-cmp/cmp"
+	"go.opencensus.io/resource/resourcekeys"
 )
 
 func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
@@ -122,6 +124,187 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 													},
 												},
 											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for i, tt := range tests {
+		se := tt.statsExporter
+		if se == nil {
+			se = new(statsExporter)
+		}
+		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, nil, tt.in, nil)
+		if tt.wantErr != "" {
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("#%d: unexpected error: %v", i, err)
+			continue
+		}
+
+		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
+		// Our saving grace is serialization equality since some
+		// unexported fields could be present in the various values.
+		if diff := cmpTSReqs(got, tt.want); diff != "" {
+			t.Fatalf("Test %d failed. Unexpected CreateTimeSeriesRequests -got +want: %s", i, diff)
+		}
+	}
+}
+
+func TestProtoMetricWithDifferentResource(t *testing.T) {
+	startTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000090,
+	}
+	endTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000997,
+	}
+
+	tests := []struct {
+		in            *metricspb.Metric
+		want          []*monitoringpb.CreateTimeSeriesRequest
+		wantErr       string
+		statsExporter *statsExporter
+	}{
+		{
+			in: &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "with_k8s_resource",
+					Description: "This is a test",
+					Unit:        "By",
+				},
+				Resource: &resourcepb.Resource{
+					Type: resourcekeys.K8SType,
+					Labels: map[string]string{
+						resourcekeys.K8SKeyClusterName:   "cluster1",
+						resourcekeys.K8SKeyPodName:       "pod1",
+						resourcekeys.K8SKeyNamespaceName: "namespace1",
+						resourcekeys.ContainerKeyName:    "container-name1",
+						resourcekeys.CloudKeyZone:        "zone1",
+					},
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimestamp,
+						Points: []*metricspb.Point{
+							{
+								Timestamp: endTimestamp,
+								Value: &metricspb.Point_Int64Value{
+									Int64Value: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/foo",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type:   "custom.googleapis.com/opencensus/with_k8s_resource",
+								Labels: map[string]string{},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "k8s_container",
+								Labels: map[string]string{
+									"location":       "zone1",
+									"cluster_name":   "cluster1",
+									"namespace_name": "namespace1",
+									"pod_name":       "pod1",
+									"container_name": "container-name1",
+								},
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: startTimestamp,
+										EndTime:   endTimestamp,
+									},
+									Value: &monitoringpb.TypedValue{
+										Value: &monitoringpb.TypedValue_Int64Value{
+											Int64Value: 1,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			in: &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "with_gce_resource",
+					Description: "This is a test",
+					Unit:        "By",
+				},
+				Resource: &resourcepb.Resource{
+					Type: resourcekeys.CloudType,
+					Labels: map[string]string{
+						resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderGCP,
+						resourcekeys.HostKeyID:        "inst1",
+						resourcekeys.CloudKeyZone:     "zone1",
+					},
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimestamp,
+						Points: []*metricspb.Point{
+							{
+								Timestamp: endTimestamp,
+								Value: &metricspb.Point_Int64Value{
+									Int64Value: 1,
+								},
+							},
+						},
+					},
+				},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/foo",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type:   "custom.googleapis.com/opencensus/with_gce_resource",
+								Labels: map[string]string{},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "gce_instance",
+								Labels: map[string]string{
+									"instance_id": "inst1",
+									"zone":        "zone1",
+								},
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: startTimestamp,
+										EndTime:   endTimestamp,
+									},
+									Value: &monitoringpb.TypedValue{
+										Value: &monitoringpb.TypedValue_Int64Value{
+											Int64Value: 1,
 										},
 									},
 								},

@@ -339,7 +339,7 @@ func resourcepbToResource(rsc *resourcepb.Resource) *resource.Resource {
 		Labels: make(map[string]string, len(rsc.Labels)),
 	}
 
-	for v, k := range rsc.Labels {
+	for k, v := range rsc.Labels {
 		res.Labels[k] = v
 	}
 	return res
