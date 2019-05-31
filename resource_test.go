@@ -33,7 +33,7 @@ func TestDefaultMapResource(t *testing.T) {
 		// first mapping that doesn't apply.
 		{
 			input: &resource.Resource{
-				Type: resourcekeys.K8SType,
+				Type: resourcekeys.ContainerType,
 				Labels: map[string]string{
 					stackdriverProjectID:             "proj1",
 					resourcekeys.K8SKeyClusterName:   "cluster1",
