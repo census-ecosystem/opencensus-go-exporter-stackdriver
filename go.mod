@@ -2,7 +2,7 @@ module contrib.go.opencensus.io/exporter/stackdriver
 
 require (
 	cloud.google.com/go v0.38.0
-	contrib.go.opencensus.io/resource v0.1.0
+	contrib.go.opencensus.io/resource v0.1.1
 	github.com/aws/aws-sdk-go v1.19.18
 	github.com/census-instrumentation/opencensus-proto v0.2.0
 	github.com/golang/protobuf v1.3.1

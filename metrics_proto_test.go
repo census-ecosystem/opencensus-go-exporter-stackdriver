@@ -180,12 +180,12 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 		{
 			in: &metricspb.Metric{
 				MetricDescriptor: &metricspb.MetricDescriptor{
-					Name:        "with_k8s_resource",
+					Name:        "with_container_resource",
 					Description: "This is a test",
 					Unit:        "By",
 				},
 				Resource: &resourcepb.Resource{
-					Type: resourcekeys.K8SType,
+					Type: resourcekeys.ContainerType,
 					Labels: map[string]string{
 						resourcekeys.K8SKeyClusterName:   "cluster1",
 						resourcekeys.K8SKeyPodName:       "pod1",
@@ -217,7 +217,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &googlemetricpb.Metric{
-								Type:   "custom.googleapis.com/opencensus/with_k8s_resource",
+								Type:   "custom.googleapis.com/opencensus/with_container_resource",
 								Labels: map[string]string{},
 							},
 							Resource: &monitoredrespb.MonitoredResource{
