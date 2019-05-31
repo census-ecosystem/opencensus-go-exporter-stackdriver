@@ -118,6 +118,48 @@ func TestDefaultMapResource(t *testing.T) {
 				},
 			},
 		},
+		// Convert to Global.
+		{
+			input: &resource.Resource{
+				Type: "",
+				Labels: map[string]string{
+					stackdriverProjectID:            "proj1",
+					stackdriverLocation:             "zone1",
+					stackdriverGenericTaskNamespace: "namespace1",
+					stackdriverGenericTaskJob:       "job1",
+					stackdriverGenericTaskID:        "task_id1",
+					resourcekeys.HostKeyID:          "inst1",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "global",
+				Labels: map[string]string{
+					"project_id": "proj1",
+					"location":   "zone1",
+					"namespace":  "namespace1",
+					"job":        "job1",
+					"task_id":    "task_id1",
+				},
+			},
+		},
+		// nil to Global.
+		{
+			input: nil,
+			want: &monitoredrespb.MonitoredResource{
+				Type:   "global",
+				Labels: nil,
+			},
+		},
+		// no label to Global.
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.K8SType,
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type:   "global",
+				Labels: nil,
+			},
+		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {

@@ -72,20 +72,23 @@ var genericResourceMap = map[string]string{
 	"task_id":    stackdriverGenericTaskID,
 }
 
-func transformResource(match, input map[string]string) (map[string]string, bool) {
+func transformResource(match, input map[string]string) map[string]string {
 	output := make(map[string]string, len(input))
 	for dst, src := range match {
 		if v, ok := input[src]; ok {
 			output[dst] = v
 		}
 	}
-	return output, true
+	return output
 }
 
 func defaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResource {
 	match := genericResourceMap
 	result := &monitoredrespb.MonitoredResource{
-		Type: "generic_task",
+		Type: "global",
+	}
+	if res == nil || res.Labels == nil {
+		return result
 	}
 	if res.Type == resourcekeys.K8SType {
 		result.Type = "k8s_container"
@@ -99,7 +102,7 @@ func defaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResourc
 			match = awsResourceMap
 		}
 	}
-	result.Labels, _ = transformResource(match, res.Labels)
+	result.Labels = transformResource(match, res.Labels)
 	if result.Type == "aws_ec2_instance" {
 		if v, ok := result.Labels["region"]; ok {
 			result.Labels["region"] = fmt.Sprintf("aws:%s", v)
