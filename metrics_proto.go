@@ -169,6 +169,7 @@ func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*met
 					LabelKeys:   summary.GetMetricDescriptor().GetLabelKeys(),
 				},
 				Timeseries: sumTss,
+				Resource:   summary.Resource,
 			}
 			metrics = append(metrics, metric)
 		}
@@ -182,6 +183,7 @@ func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*met
 					LabelKeys:   summary.GetMetricDescriptor().GetLabelKeys(),
 				},
 				Timeseries: countTss,
+				Resource:   summary.Resource,
 			}
 			metrics = append(metrics, metric)
 		}
@@ -197,6 +199,7 @@ func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*met
 					LabelKeys:   lks,
 				},
 				Timeseries: percentileTss,
+				Resource:   summary.Resource,
 			}
 			metrics = append(metrics, metric)
 		}

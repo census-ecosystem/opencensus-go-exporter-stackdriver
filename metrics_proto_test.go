@@ -665,6 +665,14 @@ func TestConvertSummaryMetrics(t *testing.T) {
 		Nanos:   100000997,
 	}
 
+	res := &resourcepb.Resource{
+		Type: resourcekeys.ContainerType,
+		Labels: map[string]string{
+			resourcekeys.ContainerKeyName:  "container1",
+			resourcekeys.K8SKeyClusterName: "cluster1",
+		},
+	}
+
 	tests := []struct {
 		in            *metricspb.Metric
 		want          []*metricspb.Metric
@@ -702,6 +710,7 @@ func TestConvertSummaryMetrics(t *testing.T) {
 						},
 					},
 				},
+				Resource: res,
 			},
 			statsExporter: &statsExporter{
 				o: Options{ProjectID: "foo"},
@@ -717,6 +726,7 @@ func TestConvertSummaryMetrics(t *testing.T) {
 					Timeseries: []*metricspb.TimeSeries{
 						makeDoubleTs(119.0, "", startTimestamp, endTimestamp),
 					},
+					Resource: res,
 				},
 				{
 					MetricDescriptor: &metricspb.MetricDescriptor{
@@ -728,6 +738,7 @@ func TestConvertSummaryMetrics(t *testing.T) {
 					Timeseries: []*metricspb.TimeSeries{
 						makeInt64Ts(10, "", startTimestamp, endTimestamp),
 					},
+					Resource: res,
 				},
 				{
 					MetricDescriptor: &metricspb.MetricDescriptor{
@@ -745,6 +756,7 @@ func TestConvertSummaryMetrics(t *testing.T) {
 						makeDoubleTs(12.6, "90.000000", nil, endTimestamp),
 						makeDoubleTs(19.6, "99.000000", nil, endTimestamp),
 					},
+					Resource: res,
 				},
 			},
 		},
