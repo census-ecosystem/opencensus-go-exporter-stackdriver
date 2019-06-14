@@ -1,6 +1,6 @@
 # RESOURCES
 
-Stackdriver has defined [resource type](https://cloud.google.com/monitoring/api/resources) for monitoring and for each resource type there
+Stackdriver has defined [resource types](https://cloud.google.com/monitoring/api/resources) for monitoring and for each resource type there
 are mandatory resource labels. OpenCensus has defined [standard resource](https://github.com/census-instrumentation/opencensus-specs/blob/master/resource/StandardResources.md)
 types and labels. 
 This document describes the translation from OpenCensus resources to Stackdriver resources
@@ -11,6 +11,11 @@ performed by this exporter.
 ### k8s_container
 
 **condition:** resource.type == container
+
+*k8s_container takes a precedence, so GKE will be mapped to k8s_container and its
+associated resource labels but it will not contain any gcp_instance specific
+resource labels.*
+
 
 | Item                | OpenCensus         | Stackdriver    |
 |---------------------|--------------------|----------------|
@@ -26,7 +31,7 @@ performed by this exporter.
 ### gcp_instance
 **condition:** cloud.provider == gcp
 
-| Item                | OpenCensus         | Stackdrive     |
+| Item                | OpenCensus         | Stackdriver    |
 |---------------------|--------------------|----------------|
 | **resource type**   | cloud              | gcp_instance   |
 | **resource labels** |                    |                |
