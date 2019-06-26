@@ -291,21 +291,23 @@ func NewExporter(o Options) (*Exporter, error) {
 		o.ProjectID = creds.ProjectID
 	}
 	if o.Location == "" {
-		ctx := o.Context
-		if ctx == nil {
-			ctx = context.Background()
-		}
-		zone, err := metadataapi.Zone()
-		if err != nil {
-			// This error should be logged with a warning level.
-			err = fmt.Errorf("setting Stackdriver default location failed: %s", err)
-			if o.OnError != nil {
-				o.OnError(err)
-			} else {
-				log.Print(err)
+		if metadataapi.OnGCE() {
+			ctx := o.Context
+			if ctx == nil {
+				ctx = context.Background()
 			}
-		} else {
-			o.Location = zone
+			zone, err := metadataapi.Zone()
+			if err != nil {
+				// This error should be logged with a warning level.
+				err = fmt.Errorf("setting Stackdriver default location failed: %s", err)
+				if o.OnError != nil {
+					o.OnError(err)
+				} else {
+					log.Print(err)
+				}
+			} else {
+				o.Location = zone
+			}
 		}
 	}
 
