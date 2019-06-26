@@ -35,21 +35,38 @@ import (
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
-	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	"go.opencensus.io/resource"
 )
 
 var errNilMetric = errors.New("expecting a non-nil metric")
 var errNilMetricDescriptor = errors.New("expecting a non-nil metric descriptor")
+var percentileLabelKey = &metricspb.LabelKey{
+	Key:         "percentile",
+	Description: "the value at a given percentile of a distribution",
+}
 
 type metricProtoPayload struct {
-	node     *commonpb.Node
-	resource *resourcepb.Resource
-	metric   *metricspb.Metric
+	node             *commonpb.Node
+	resource         *resourcepb.Resource
+	metric           *metricspb.Metric
+	additionalLabels map[string]labelValue
+}
+
+func (se *statsExporter) addPayload(node *commonpb.Node, rsc *resourcepb.Resource, labels map[string]labelValue, metrics ...*metricspb.Metric) {
+	for _, metric := range metrics {
+		payload := &metricProtoPayload{
+			metric:           metric,
+			resource:         rsc,
+			node:             node,
+			additionalLabels: labels,
+		}
+		se.protoMetricsBundler.Add(payload, 1)
+	}
 }
 
 // ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
@@ -58,16 +75,136 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 		return errNilMetric
 	}
 
+	additionalLabels := se.defaultLabels
+	if additionalLabels == nil {
+		// additionalLabels must be stateless because each node is different
+		additionalLabels = getDefaultLabelsFromNode(node)
+	}
+
 	for _, metric := range metrics {
-		payload := &metricProtoPayload{
-			metric:   metric,
-			resource: rsc,
-			node:     node,
+		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
+			se.addPayload(node, rsc, additionalLabels, se.convertSummaryMetrics(metric)...)
+		} else {
+			se.addPayload(node, rsc, additionalLabels, metric)
 		}
-		se.protoMetricsBundler.Add(payload, 1)
 	}
 
 	return nil
+}
+
+func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*metricspb.Metric {
+	var metrics []*metricspb.Metric
+	var percentileTss []*metricspb.TimeSeries
+	var countTss []*metricspb.TimeSeries
+	var sumTss []*metricspb.TimeSeries
+
+	for _, ts := range summary.Timeseries {
+		lvs := ts.GetLabelValues()
+
+		startTime := ts.StartTimestamp
+		for _, pt := range ts.GetPoints() {
+			ptTimestamp := pt.GetTimestamp()
+			summaryValue := pt.GetSummaryValue()
+			if summaryValue.Sum != nil {
+				sumTs := &metricspb.TimeSeries{
+					LabelValues:    lvs,
+					StartTimestamp: startTime,
+					Points: []*metricspb.Point{
+						{
+							Value: &metricspb.Point_DoubleValue{
+								DoubleValue: summaryValue.Sum.Value,
+							},
+							Timestamp: ptTimestamp,
+						},
+					},
+				}
+				sumTss = append(sumTss, sumTs)
+			}
+
+			if summaryValue.Count != nil {
+				countTs := &metricspb.TimeSeries{
+					LabelValues:    lvs,
+					StartTimestamp: startTime,
+					Points: []*metricspb.Point{
+						{
+							Value: &metricspb.Point_Int64Value{
+								Int64Value: summaryValue.Count.Value,
+							},
+							Timestamp: ptTimestamp,
+						},
+					},
+				}
+				countTss = append(countTss, countTs)
+			}
+
+			snapshot := summaryValue.GetSnapshot()
+			for _, percentileValue := range snapshot.GetPercentileValues() {
+				lvsWithPercentile := lvs[0:]
+				lvsWithPercentile = append(lvsWithPercentile, &metricspb.LabelValue{
+					Value: fmt.Sprintf("%f", percentileValue.Percentile),
+				})
+				percentileTs := &metricspb.TimeSeries{
+					LabelValues:    lvsWithPercentile,
+					StartTimestamp: nil,
+					Points: []*metricspb.Point{
+						{
+							Value: &metricspb.Point_DoubleValue{
+								DoubleValue: percentileValue.Value,
+							},
+							Timestamp: ptTimestamp,
+						},
+					},
+				}
+				percentileTss = append(percentileTss, percentileTs)
+			}
+		}
+
+		if len(sumTss) > 0 {
+			metric := &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        fmt.Sprintf("%s_summary_sum", summary.GetMetricDescriptor().GetName()),
+					Description: summary.GetMetricDescriptor().GetDescription(),
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_DOUBLE,
+					Unit:        summary.GetMetricDescriptor().GetUnit(),
+					LabelKeys:   summary.GetMetricDescriptor().GetLabelKeys(),
+				},
+				Timeseries: sumTss,
+				Resource:   summary.Resource,
+			}
+			metrics = append(metrics, metric)
+		}
+		if len(countTss) > 0 {
+			metric := &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        fmt.Sprintf("%s_summary_count", summary.GetMetricDescriptor().GetName()),
+					Description: summary.GetMetricDescriptor().GetDescription(),
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
+					Unit:        "1",
+					LabelKeys:   summary.GetMetricDescriptor().GetLabelKeys(),
+				},
+				Timeseries: countTss,
+				Resource:   summary.Resource,
+			}
+			metrics = append(metrics, metric)
+		}
+		if len(percentileTss) > 0 {
+			lks := summary.GetMetricDescriptor().GetLabelKeys()[0:]
+			lks = append(lks, percentileLabelKey)
+			metric := &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        fmt.Sprintf("%s_summary_percentile", summary.GetMetricDescriptor().GetName()),
+					Description: summary.GetMetricDescriptor().GetDescription(),
+					Type:        metricspb.MetricDescriptor_GAUGE_DOUBLE,
+					Unit:        summary.GetMetricDescriptor().GetUnit(),
+					LabelKeys:   lks,
+				},
+				Timeseries: percentileTss,
+				Resource:   summary.Resource,
+			}
+			metrics = append(metrics, metric)
+		}
+	}
+	return metrics
 }
 
 func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload) error {
@@ -83,7 +220,7 @@ func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload
 
 	for _, payload := range payloads {
 		// Now create the metric descriptor remotely.
-		if err := se.createMetricDescriptor(ctx, payload.metric); err != nil {
+		if err := se.createMetricDescriptor(ctx, payload.metric, payload.additionalLabels); err != nil {
 			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 			return err
 		}
@@ -91,7 +228,7 @@ func (se *statsExporter) handleMetricsProtoUpload(payloads []*metricProtoPayload
 
 	var allTimeSeries []*monitoringpb.TimeSeries
 	for _, payload := range payloads {
-		tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, payload.metric)
+		tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, payload.metric, payload.additionalLabels)
 		if err != nil {
 			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 			return err
@@ -194,9 +331,26 @@ func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monito
 	return ctsreql
 }
 
+func resourcepbToResource(rsc *resourcepb.Resource) *resource.Resource {
+	if rsc == nil {
+		return &resource.Resource{
+			Type: "global",
+		}
+	}
+	res := &resource.Resource{
+		Type:   rsc.Type,
+		Labels: make(map[string]string, len(rsc.Labels)),
+	}
+
+	for k, v := range rsc.Labels {
+		res.Labels[k] = v
+	}
+	return res
+}
+
 // protoMetricToTimeSeries converts a metric into a Stackdriver Monitoring v3 API CreateTimeSeriesRequest
 // but it doesn't invoke any remote API.
-func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric) ([]*monitoringpb.TimeSeries, error) {
+func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric, additionalLabels map[string]labelValue) ([]*monitoringpb.TimeSeries, error) {
 	if metric == nil {
 		return nil, errNilMetric
 	}
@@ -205,6 +359,8 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 	if metric.Resource != nil {
 		resource = metric.Resource
 	}
+
+	mappedRes := se.o.MapResource(resourcepbToResource(resource))
 
 	metricName, _, _, err := metricProseFromProto(metric)
 	if err != nil {
@@ -223,7 +379,7 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 
 		// Each TimeSeries has labelValues which MUST be correlated
 		// with that from the MetricDescriptor
-		labels, err := labelsPerTimeSeries(se.defaultLabels, metricLabelKeys, protoTimeSeries.GetLabelValues())
+		labels, err := labelsPerTimeSeries(additionalLabels, metricLabelKeys, protoTimeSeries.GetLabelValues())
 		if err != nil {
 			// TODO: (@odeke-em) perhaps log this error from labels extraction, if non-nil.
 			continue
@@ -233,7 +389,7 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 				Type:   metricType,
 				Labels: labels,
 			},
-			Resource: protoResourceToMonitoredResource(resource),
+			Resource: mappedRes,
 			Points:   sdPoints,
 		})
 	}
@@ -261,10 +417,10 @@ func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []*metricspb.
 	return labels, nil
 }
 
-func (se *statsExporter) protoMetricDescriptorToCreateMetricDescriptorRequest(ctx context.Context, metric *metricspb.Metric) (*monitoringpb.CreateMetricDescriptorRequest, error) {
+func (se *statsExporter) protoMetricDescriptorToCreateMetricDescriptorRequest(ctx context.Context, metric *metricspb.Metric, additionalLabels map[string]labelValue) (*monitoringpb.CreateMetricDescriptorRequest, error) {
 	// Otherwise, we encountered a cache-miss and
 	// should create the metric descriptor remotely.
-	inMD, err := se.protoToMonitoringMetricDescriptor(metric)
+	inMD, err := se.protoToMonitoringMetricDescriptor(metric, additionalLabels)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +435,7 @@ func (se *statsExporter) protoMetricDescriptorToCreateMetricDescriptorRequest(ct
 
 // createMetricDescriptor creates a metric descriptor from the OpenCensus proto metric
 // and then creates it remotely using Stackdriver's API.
-func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *metricspb.Metric) error {
+func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *metricspb.Metric, additionalLabels map[string]labelValue) error {
 	se.protoMu.Lock()
 	defer se.protoMu.Unlock()
 
@@ -290,7 +446,7 @@ func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *met
 
 	// Otherwise, we encountered a cache-miss and
 	// should create the metric descriptor remotely.
-	inMD, err := se.protoToMonitoringMetricDescriptor(metric)
+	inMD, err := se.protoToMonitoringMetricDescriptor(metric, additionalLabels)
 	if err != nil {
 		return err
 	}
@@ -337,7 +493,7 @@ func (se *statsExporter) protoTimeSeriesToMonitoringPoints(ts *metricspb.TimeSer
 	return sptl, nil
 }
 
-func (se *statsExporter) protoToMonitoringMetricDescriptor(metric *metricspb.Metric) (*googlemetricpb.MetricDescriptor, error) {
+func (se *statsExporter) protoToMonitoringMetricDescriptor(metric *metricspb.Metric, additionalLabels map[string]labelValue) (*googlemetricpb.MetricDescriptor, error) {
 	if metric == nil {
 		return nil, errNilMetric
 	}
@@ -358,7 +514,7 @@ func (se *statsExporter) protoToMonitoringMetricDescriptor(metric *metricspb.Met
 		Type:        metricType,
 		MetricKind:  metricKind,
 		ValueType:   valueType,
-		Labels:      labelDescriptorsFromProto(se.defaultLabels, metric.GetMetricDescriptor().GetLabelKeys()),
+		Labels:      labelDescriptorsFromProto(additionalLabels, metric.GetMetricDescriptor().GetLabelKeys()),
 	}
 
 	return sdm, nil
@@ -552,24 +708,12 @@ func protoMetricDescriptorTypeToMetricKind(m *metricspb.Metric) (googlemetricpb.
 	}
 }
 
-func protoResourceToMonitoredResource(rsp *resourcepb.Resource) *monitoredrespb.MonitoredResource {
-	if rsp == nil {
-		return &monitoredrespb.MonitoredResource{
-			Type: "global",
-		}
+func getDefaultLabelsFromNode(node *commonpb.Node) map[string]labelValue {
+	taskValue := fmt.Sprintf("%s-%d@%s", strings.ToLower(node.LibraryInfo.GetLanguage().String()), node.Identifier.Pid, node.Identifier.HostName)
+	return map[string]labelValue{
+		opencensusTaskKey: {
+			val:  taskValue,
+			desc: opencensusTaskDescription,
+		},
 	}
-	typ := rsp.Type
-	if typ == "" {
-		typ = "global"
-	}
-	mrsp := &monitoredrespb.MonitoredResource{
-		Type: typ,
-	}
-	if rsp.Labels != nil {
-		mrsp.Labels = make(map[string]string, len(rsp.Labels))
-		for k, v := range rsp.Labels {
-			mrsp.Labels[k] = v
-		}
-	}
-	return mrsp
 }

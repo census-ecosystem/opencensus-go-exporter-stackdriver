@@ -16,80 +16,81 @@ package stackdriver
 
 import (
 	"context"
-	"errors"
 	"net"
 	"sync"
 	"testing"
 	"time"
 
-	"contrib.go.opencensus.io/exporter/ocagent"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 
-	agentmetricspb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/metrics/v1"
+	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
+
 	"github.com/golang/protobuf/ptypes/empty"
+	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 )
 
 func TestStatsAndMetricsEquivalence(t *testing.T) {
-	ma, addr, stop := createMockAgent(t)
+	_, _, stop := createFakeServer(t)
 	defer stop()
 
-	oce, err := ocagent.NewExporter(ocagent.WithInsecure(),
-		ocagent.WithAddress(addr),
-		ocagent.WithReconnectionPeriod(1*time.Millisecond))
-	if err != nil {
-		t.Fatalf("Failed to create the ocagent exporter: %v", err)
-	}
-	time.Sleep(5 * time.Millisecond)
-
-	startTime := time.Date(2018, 11, 25, 15, 38, 18, 997, time.UTC)
+	startTime := time.Unix(1000, 0)
+	startTimePb := &timestamp.Timestamp{Seconds: 1000}
 	mLatencyMs := stats.Float64("latency", "The latency for various methods", "ms")
+	v := &view.View{
+		Name:        "ocagent.io/latency",
+		Description: "The latency of the various methods",
+		Aggregation: view.Count(),
+		Measure:     mLatencyMs,
+	}
+	metricDescriptor := &metricspb.MetricDescriptor{
+		Name:        "ocagent.io/latency",
+		Description: "The latency of the various methods",
+		Unit:        "ms",
+		Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
+	}
 
-	// Generate the view.Data.
+	// Generate some view.Data and metrics.
 	var vdl []*view.Data
+	var metricPbs []*metricspb.Metric
 	for i := 0; i < 100; i++ {
-		vdl = append(vdl, &view.Data{
+		vd := &view.Data{
 			Start: startTime,
 			End:   startTime.Add(time.Duration(1+i) * time.Second),
-			View: &view.View{
-				Name:        "ocagent.io/latency",
-				Description: "The latency of the various methods",
-				Aggregation: view.Count(),
-				Measure:     mLatencyMs,
-			},
+			View:  v,
 			Rows: []*view.Row{
 				{
 					Data: &view.CountData{Value: int64(4 * (i + 2))},
 				},
 			},
-		})
+		}
+		metricPb := &metricspb.Metric{
+			MetricDescriptor: metricDescriptor,
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimePb,
+					Points: []*metricspb.Point{
+						{
+							Timestamp: &timestamp.Timestamp{Seconds: int64(1001 + i)},
+							Value:     &metricspb.Point_Int64Value{Int64Value: int64(4 * (i + 2))},
+						},
+					},
+				},
+			},
+		}
+		vdl = append(vdl, vd)
+		metricPbs = append(metricPbs, metricPb)
 	}
 
 	// Now perform some exporting.
 	for i, vd := range vdl {
-		oce.ExportView(vd)
-		oce.Flush()
-
-		time.Sleep(30 * time.Millisecond)
-		oce.Flush()
-
-		var last *agentmetricspb.ExportMetricsServiceRequest
-		ma.forEachRequest(func(emr *agentmetricspb.ExportMetricsServiceRequest) {
-			last = emr
-		})
-
-		if last == nil || len(last.Metrics) == 0 {
-			t.Errorf("#%d: Failed to retrieve any metrics", i)
-			continue
-		}
-
 		se := &statsExporter{
-			o: Options{ProjectID: "equivalence"},
+			o: Options{ProjectID: "equivalence", MapResource: defaultMapResource},
 		}
 
 		ctx := context.Background()
@@ -97,7 +98,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 		if err != nil {
 			t.Errorf("#%d: Stats.viewToMetricDescriptor: %v", i, err)
 		}
-		pMD, err := se.protoMetricDescriptorToCreateMetricDescriptorRequest(ctx, last.Metrics[0])
+		pMD, err := se.protoMetricDescriptorToCreateMetricDescriptorRequest(ctx, metricPbs[i], nil)
 		if err != nil {
 			t.Errorf("#%d: Stats.protoMetricDescriptorToMetricDescriptor: %v", i, err)
 		}
@@ -107,7 +108,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 
 		vdl := []*view.Data{vd}
 		sctreql := se.makeReq(vdl, maxTimeSeriesPerUpload)
-		tsl, _ := se.protoMetricToTimeSeries(ctx, last.Node, last.Resource, last.Metrics[0])
+		tsl, _ := se.protoMetricToTimeSeries(ctx, nil, nil, metricPbs[i], nil)
 		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
 		if diff := cmpTSReqs(pctreql, sctreql); diff != "" {
 			t.Fatalf("TimeSeries Mismatch -FromMetrics +FromStats: %s", diff)
@@ -123,7 +124,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 // This test ensures that the final responses sent by direct stats(view.Data) exporting
 // are exactly equal to those from view.Data-->OpenCensus-Proto.Metrics exporting.
 func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
-	ma, addr, doneFn := createMockAgent(t)
+	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
 
 	// Now create a gRPC connection to the agent.
@@ -142,15 +143,17 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 		// so that batching is performed deterministically and flushing is
 		// fully controlled by us.
 		BundleDelayThreshold: 2 * time.Hour,
+		MapResource:          defaultMapResource,
 	}
 	se, err := newStatsExporter(exporterOptions)
 	if err != nil {
 		t.Fatalf("Failed to create the statsExporter: %v", err)
 	}
 
-	startTime := time.Date(2019, 1, 16, 15, 04, 23, 73, time.UTC)
+	startTime := time.Unix(1000, 0)
+	startTimePb := &timestamp.Timestamp{Seconds: 1000}
 	mLatencyMs := stats.Float64("latency", "The latency for various methods", "ms")
-	mConnections := stats.Float64("connections", "The count of various connections at a point in time", "1")
+	mConnections := stats.Int64("connections", "The count of various connections at a point in time", "1")
 	mTimeMs := stats.Float64("time", "Counts time in milliseconds", "ms")
 
 	// Generate the view.Data.
@@ -229,47 +232,122 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 
 	// Examining the stackdriver metrics that are available.
 	var stackdriverTimeSeriesFromStats []*monitoringpb.CreateTimeSeriesRequest
-	ma.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
+	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
 		stackdriverTimeSeriesFromStats = append(stackdriverTimeSeriesFromStats, sdt)
 	})
 	var stackdriverMetricDescriptorsFromStats []*monitoringpb.CreateMetricDescriptorRequest
-	ma.forEachStackdriverMetricDescriptor(func(sdmd *monitoringpb.CreateMetricDescriptorRequest) {
+	server.forEachStackdriverMetricDescriptor(func(sdmd *monitoringpb.CreateMetricDescriptorRequest) {
 		stackdriverMetricDescriptorsFromStats = append(stackdriverMetricDescriptorsFromStats, sdmd)
 	})
 
 	// Reset the stackdriverTimeSeries to enable fresh collection
 	// and then comparison with the results from metrics uploads.
-	ma.resetStackdriverTimeSeries()
-	ma.resetStackdriverMetricDescriptors()
+	server.resetStackdriverTimeSeries()
+	server.resetStackdriverMetricDescriptors()
 
-	// Now for the metrics sent by the metrics exporter.
-	oce, err := ocagent.NewExporter(ocagent.WithInsecure(),
-		ocagent.WithAddress(addr),
-		ocagent.WithReconnectionPeriod(1*time.Millisecond))
-	if err != nil {
-		t.Fatalf("Failed to create the ocagent exporter: %v", err)
+	// Generate the proto Metrics.
+	var metricPbs []*metricspb.Metric
+	for i := 0; i < 10; i++ {
+		metricPbs = append(metricPbs,
+			&metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "ocagent.io/calls",
+					Description: "The number of the various calls",
+					Unit:        "1",
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimePb,
+						Points: []*metricspb.Point{
+							{
+								Timestamp: &timestamp.Timestamp{Seconds: int64(1001 + i)},
+								Value:     &metricspb.Point_Int64Value{Int64Value: int64(4 * (i + 2))},
+							},
+						},
+					},
+				},
+			},
+			&metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "ocagent.io/latency",
+					Description: "The latency of the various methods",
+					Unit:        "ms",
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_DISTRIBUTION,
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimePb,
+						Points: []*metricspb.Point{
+							{
+								Timestamp: &timestamp.Timestamp{Seconds: int64(1002 + i)},
+								Value: &metricspb.Point_DistributionValue{
+									DistributionValue: &metricspb.DistributionValue{
+										Count: 1,
+										Sum:   125.9,
+										BucketOptions: &metricspb.DistributionValue_BucketOptions{
+											Type: &metricspb.DistributionValue_BucketOptions_Explicit_{
+												Explicit: &metricspb.DistributionValue_BucketOptions_Explicit{Bounds: []float64{100, 500, 1000, 2000, 4000, 8000, 16000}},
+											},
+										},
+										Buckets: []*metricspb.DistributionValue_Bucket{{Count: 0}, {Count: 1}, {Count: 0}, {Count: 0}, {Count: 0}, {Count: 0}, {Count: 0}},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			&metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "ocagent.io/connections",
+					Description: "The count of various connections instantaneously",
+					Unit:        "1",
+					Type:        metricspb.MetricDescriptor_GAUGE_INT64,
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimePb,
+						Points: []*metricspb.Point{
+							{
+								Timestamp: &timestamp.Timestamp{Seconds: int64(1003 + i)},
+								Value:     &metricspb.Point_Int64Value{Int64Value: 99},
+							},
+						},
+					},
+				},
+			},
+			&metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "ocagent.io/uptime",
+					Description: "The total uptime at any instance",
+					Unit:        "ms",
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_DOUBLE,
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimePb,
+						Points: []*metricspb.Point{
+							{
+								Timestamp: &timestamp.Timestamp{Seconds: int64(1001 + i)},
+								Value:     &metricspb.Point_DoubleValue{DoubleValue: 199903.97},
+							},
+						},
+					},
+				},
+			})
 	}
-	time.Sleep(5 * time.Millisecond)
 
-	for _, vd := range vdl {
-		// Perform the view.Data --> metricspb.Metric transformation.
-		oce.ExportView(vd)
-		oce.Flush()
-		time.Sleep(2 * time.Millisecond)
-	}
-	oce.Flush()
-
-	ma.forEachRequest(func(emr *agentmetricspb.ExportMetricsServiceRequest) {
-		_ = se.ExportMetricsProto(context.Background(), emr.Node, emr.Resource, emr.Metrics)
-	})
+	// Export the proto Metrics to the Stackdriver backend.
+	se.ExportMetricsProto(context.Background(), nil, nil, metricPbs)
 	se.Flush()
 
 	var stackdriverTimeSeriesFromMetrics []*monitoringpb.CreateTimeSeriesRequest
-	ma.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
+	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
 		stackdriverTimeSeriesFromMetrics = append(stackdriverTimeSeriesFromMetrics, sdt)
 	})
 	var stackdriverMetricDescriptorsFromMetrics []*monitoringpb.CreateMetricDescriptorRequest
-	ma.forEachStackdriverMetricDescriptor(func(sdmd *monitoringpb.CreateMetricDescriptorRequest) {
+	server.forEachStackdriverMetricDescriptor(func(sdmd *monitoringpb.CreateMetricDescriptorRequest) {
 		stackdriverMetricDescriptorsFromMetrics = append(stackdriverMetricDescriptorsFromMetrics, sdmd)
 	})
 
@@ -284,22 +362,20 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 	}
 }
 
-type metricsAgent struct {
+type fakeMetricsServer struct {
 	mu                           sync.RWMutex
-	metrics                      []*agentmetricspb.ExportMetricsServiceRequest
 	stackdriverTimeSeries        []*monitoringpb.CreateTimeSeriesRequest
 	stackdriverMetricDescriptors []*monitoringpb.CreateMetricDescriptorRequest
 }
 
-func createMockAgent(t *testing.T) (*metricsAgent, string, func()) {
+func createFakeServer(t *testing.T) (*fakeMetricsServer, string, func()) {
 	ln, err := net.Listen("tcp", ":0")
 	if err != nil {
 		t.Fatalf("Failed to bind to an available address: %v", err)
 	}
-	ma := new(metricsAgent)
+	server := new(fakeMetricsServer)
 	srv := grpc.NewServer()
-	agentmetricspb.RegisterMetricsServiceServer(srv, ma)
-	monitoringpb.RegisterMetricServiceServer(srv, ma)
+	monitoringpb.RegisterMetricServiceServer(srv, server)
 	go func() {
 		_ = srv.Serve(ln)
 	}()
@@ -308,112 +384,75 @@ func createMockAgent(t *testing.T) (*metricsAgent, string, func()) {
 		_ = ln.Close()
 	}
 	_, agentPortStr, _ := net.SplitHostPort(ln.Addr().String())
-	return ma, ":" + agentPortStr, stop
+	return server, ":" + agentPortStr, stop
 }
 
-func (ma *metricsAgent) Export(mes agentmetricspb.MetricsService_ExportServer) error {
-	// Expecting the first message to contain the Node information
-	firstMetric, err := mes.Recv()
-	if err != nil {
-		return err
-	}
+func (server *fakeMetricsServer) forEachStackdriverTimeSeries(fn func(sdt *monitoringpb.CreateTimeSeriesRequest)) {
+	server.mu.RLock()
+	defer server.mu.RUnlock()
 
-	if firstMetric == nil || firstMetric.Node == nil {
-		return errors.New("Expecting a non-nil Node in the first message")
-	}
-
-	ma.addMetric(firstMetric)
-
-	for {
-		msg, err := mes.Recv()
-		if err != nil {
-			return err
-		}
-		ma.addMetric(msg)
-	}
-}
-
-func (ma *metricsAgent) addMetric(metric *agentmetricspb.ExportMetricsServiceRequest) {
-	ma.mu.Lock()
-	ma.metrics = append(ma.metrics, metric)
-	ma.mu.Unlock()
-}
-
-func (ma *metricsAgent) forEachRequest(fn func(*agentmetricspb.ExportMetricsServiceRequest)) {
-	ma.mu.RLock()
-	defer ma.mu.RUnlock()
-
-	for _, req := range ma.metrics {
-		fn(req)
-	}
-}
-
-func (ma *metricsAgent) forEachStackdriverTimeSeries(fn func(sdt *monitoringpb.CreateTimeSeriesRequest)) {
-	ma.mu.RLock()
-	defer ma.mu.RUnlock()
-
-	for _, sdt := range ma.stackdriverTimeSeries {
+	for _, sdt := range server.stackdriverTimeSeries {
 		fn(sdt)
 	}
 }
 
-func (ma *metricsAgent) forEachStackdriverMetricDescriptor(fn func(sdmd *monitoringpb.CreateMetricDescriptorRequest)) {
-	ma.mu.RLock()
-	defer ma.mu.RUnlock()
+func (server *fakeMetricsServer) forEachStackdriverMetricDescriptor(fn func(sdmd *monitoringpb.CreateMetricDescriptorRequest)) {
+	server.mu.RLock()
+	defer server.mu.RUnlock()
 
-	for _, sdmd := range ma.stackdriverMetricDescriptors {
+	for _, sdmd := range server.stackdriverMetricDescriptors {
 		fn(sdmd)
 	}
 }
 
-func (ma *metricsAgent) resetStackdriverTimeSeries() {
-	ma.mu.Lock()
-	ma.stackdriverTimeSeries = ma.stackdriverTimeSeries[:0]
-	ma.mu.Unlock()
+func (server *fakeMetricsServer) resetStackdriverTimeSeries() {
+	server.mu.Lock()
+	server.stackdriverTimeSeries = server.stackdriverTimeSeries[:0]
+	server.mu.Unlock()
 }
 
-func (ma *metricsAgent) resetStackdriverMetricDescriptors() {
-	ma.mu.Lock()
-	ma.stackdriverMetricDescriptors = ma.stackdriverMetricDescriptors[:0]
-	ma.mu.Unlock()
+func (server *fakeMetricsServer) resetStackdriverMetricDescriptors() {
+	server.mu.Lock()
+	server.stackdriverMetricDescriptors = server.stackdriverMetricDescriptors[:0]
+	server.mu.Unlock()
 }
 
-var _ monitoringpb.MetricServiceServer = (*metricsAgent)(nil)
+var _ monitoringpb.MetricServiceServer = (*fakeMetricsServer)(nil)
 
-func (ma *metricsAgent) GetMetricDescriptor(ctx context.Context, req *monitoringpb.GetMetricDescriptorRequest) (*googlemetricpb.MetricDescriptor, error) {
+func (server *fakeMetricsServer) GetMetricDescriptor(ctx context.Context, req *monitoringpb.GetMetricDescriptorRequest) (*googlemetricpb.MetricDescriptor, error) {
 	return new(googlemetricpb.MetricDescriptor), nil
 }
 
-func (ma *metricsAgent) CreateMetricDescriptor(ctx context.Context, req *monitoringpb.CreateMetricDescriptorRequest) (*googlemetricpb.MetricDescriptor, error) {
-	ma.mu.Lock()
-	ma.stackdriverMetricDescriptors = append(ma.stackdriverMetricDescriptors, req)
-	ma.mu.Unlock()
+func (server *fakeMetricsServer) CreateMetricDescriptor(ctx context.Context, req *monitoringpb.CreateMetricDescriptorRequest) (*googlemetricpb.MetricDescriptor, error) {
+	server.mu.Lock()
+	server.stackdriverMetricDescriptors = append(server.stackdriverMetricDescriptors, req)
+	server.mu.Unlock()
 	return req.MetricDescriptor, nil
 }
 
-func (ma *metricsAgent) CreateTimeSeries(ctx context.Context, req *monitoringpb.CreateTimeSeriesRequest) (*empty.Empty, error) {
-	ma.mu.Lock()
-	ma.stackdriverTimeSeries = append(ma.stackdriverTimeSeries, req)
-	ma.mu.Unlock()
+func (server *fakeMetricsServer) CreateTimeSeries(ctx context.Context, req *monitoringpb.CreateTimeSeriesRequest) (*empty.Empty, error) {
+	server.mu.Lock()
+	server.stackdriverTimeSeries = append(server.stackdriverTimeSeries, req)
+	server.mu.Unlock()
 	return new(empty.Empty), nil
 }
 
-func (ma *metricsAgent) ListTimeSeries(ctx context.Context, req *monitoringpb.ListTimeSeriesRequest) (*monitoringpb.ListTimeSeriesResponse, error) {
+func (server *fakeMetricsServer) ListTimeSeries(ctx context.Context, req *monitoringpb.ListTimeSeriesRequest) (*monitoringpb.ListTimeSeriesResponse, error) {
 	return new(monitoringpb.ListTimeSeriesResponse), nil
 }
 
-func (ma *metricsAgent) DeleteMetricDescriptor(ctx context.Context, req *monitoringpb.DeleteMetricDescriptorRequest) (*empty.Empty, error) {
+func (server *fakeMetricsServer) DeleteMetricDescriptor(ctx context.Context, req *monitoringpb.DeleteMetricDescriptorRequest) (*empty.Empty, error) {
 	return new(empty.Empty), nil
 }
 
-func (ma *metricsAgent) ListMetricDescriptors(ctx context.Context, req *monitoringpb.ListMetricDescriptorsRequest) (*monitoringpb.ListMetricDescriptorsResponse, error) {
+func (server *fakeMetricsServer) ListMetricDescriptors(ctx context.Context, req *monitoringpb.ListMetricDescriptorsRequest) (*monitoringpb.ListMetricDescriptorsResponse, error) {
 	return new(monitoringpb.ListMetricDescriptorsResponse), nil
 }
 
-func (ma *metricsAgent) GetMonitoredResourceDescriptor(ctx context.Context, req *monitoringpb.GetMonitoredResourceDescriptorRequest) (*monitoredrespb.MonitoredResourceDescriptor, error) {
+func (server *fakeMetricsServer) GetMonitoredResourceDescriptor(ctx context.Context, req *monitoringpb.GetMonitoredResourceDescriptorRequest) (*monitoredrespb.MonitoredResourceDescriptor, error) {
 	return new(monitoredrespb.MonitoredResourceDescriptor), nil
 }
 
-func (ma *metricsAgent) ListMonitoredResourceDescriptors(ctx context.Context, req *monitoringpb.ListMonitoredResourceDescriptorsRequest) (*monitoringpb.ListMonitoredResourceDescriptorsResponse, error) {
+func (server *fakeMetricsServer) ListMonitoredResourceDescriptors(ctx context.Context, req *monitoringpb.ListMonitoredResourceDescriptorsRequest) (*monitoringpb.ListMonitoredResourceDescriptorsResponse, error) {
 	return new(monitoringpb.ListMonitoredResourceDescriptorsResponse), nil
 }

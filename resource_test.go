@@ -18,9 +18,9 @@ import (
 	"fmt"
 	"testing"
 
-	"contrib.go.opencensus.io/resource/resourcekeys"
 	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/resource"
+	"go.opencensus.io/resource/resourcekeys"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 )
 
@@ -33,12 +33,40 @@ func TestDefaultMapResource(t *testing.T) {
 		// first mapping that doesn't apply.
 		{
 			input: &resource.Resource{
-				Type: resourcekeys.GCPTypeGCEInstance,
+				Type: resourcekeys.ContainerType,
 				Labels: map[string]string{
-					resourcekeys.GCPKeyGCEProjectID:  "proj1",
-					resourcekeys.GCPKeyGCEInstanceID: "inst1",
-					resourcekeys.GCPKeyGCEZone:       "zone1",
+					stackdriverProjectID:             "proj1",
+					resourcekeys.K8SKeyClusterName:   "cluster1",
+					resourcekeys.K8SKeyPodName:       "pod1",
+					resourcekeys.K8SKeyNamespaceName: "namespace1",
+					resourcekeys.ContainerKeyName:    "container-name1",
+					resourcekeys.CloudKeyAccountID:   "proj1",
+					resourcekeys.CloudKeyZone:        "zone1",
+					resourcekeys.CloudKeyRegion:      "",
 					"extra_key":                      "must be ignored",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "k8s_container",
+				Labels: map[string]string{
+					"project_id":     "proj1",
+					"location":       "zone1",
+					"cluster_name":   "cluster1",
+					"namespace_name": "namespace1",
+					"pod_name":       "pod1",
+					"container_name": "container-name1",
+				},
+			},
+		},
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.CloudType,
+				Labels: map[string]string{
+					stackdriverProjectID:          "proj1",
+					resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderGCP,
+					resourcekeys.HostKeyID:        "inst1",
+					resourcekeys.CloudKeyZone:     "zone1",
+					"extra_key":                   "must be ignored",
 				},
 			},
 			want: &monitoredrespb.MonitoredResource{
@@ -50,21 +78,92 @@ func TestDefaultMapResource(t *testing.T) {
 				},
 			},
 		},
-		// No match due to missing key.
 		{
 			input: &resource.Resource{
-				Type: resourcekeys.GCPTypeGCEInstance,
+				Type: resourcekeys.CloudType,
 				Labels: map[string]string{
-					resourcekeys.GCPKeyGCEProjectID:  "proj1",
-					resourcekeys.GCPKeyGCEInstanceID: "inst1",
+					stackdriverProjectID:           "proj1",
+					resourcekeys.CloudKeyProvider:  resourcekeys.CloudProviderAWS,
+					resourcekeys.HostKeyID:         "inst1",
+					resourcekeys.CloudKeyRegion:    "region1",
+					resourcekeys.CloudKeyAccountID: "account1",
+					"extra_key":                    "must be ignored",
 				},
 			},
-			want: nil,
+			want: &monitoredrespb.MonitoredResource{
+				Type: "aws_ec2_instance",
+				Labels: map[string]string{
+					"project_id":  "proj1",
+					"instance_id": "inst1",
+					"region":      "aws:region1",
+					"aws_account": "account1",
+				},
+			},
+		},
+		// Partial Match
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.CloudType,
+				Labels: map[string]string{
+					stackdriverProjectID:          "proj1",
+					resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderGCP,
+					resourcekeys.HostKeyID:        "inst1",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "gce_instance",
+				Labels: map[string]string{
+					"project_id":  "proj1",
+					"instance_id": "inst1",
+				},
+			},
+		},
+		// Convert to Global.
+		{
+			input: &resource.Resource{
+				Type: "",
+				Labels: map[string]string{
+					stackdriverProjectID:            "proj1",
+					stackdriverLocation:             "zone1",
+					stackdriverGenericTaskNamespace: "namespace1",
+					stackdriverGenericTaskJob:       "job1",
+					stackdriverGenericTaskID:        "task_id1",
+					resourcekeys.HostKeyID:          "inst1",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "global",
+				Labels: map[string]string{
+					"project_id": "proj1",
+					"location":   "zone1",
+					"namespace":  "namespace1",
+					"job":        "job1",
+					"task_id":    "task_id1",
+				},
+			},
+		},
+		// nil to Global.
+		{
+			input: nil,
+			want: &monitoredrespb.MonitoredResource{
+				Type:   "global",
+				Labels: nil,
+			},
+		},
+		// no label to Global.
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.K8SType,
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type:   "global",
+				Labels: nil,
+			},
 		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
-			got := DefaultMapResource(c.input)
+			got := defaultMapResource(c.input)
 			if diff := cmp.Diff(got, c.want); diff != "" {
 				t.Errorf("Values differ -got +want: %s", diff)
 			}

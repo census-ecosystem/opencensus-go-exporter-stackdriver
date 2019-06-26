@@ -62,6 +62,9 @@ func (s *testServer) Multiple(stream Foo_MultipleServer) error {
 	}
 }
 
+// NewTestClient is used for internal testing only. It creates a
+// grpc server and client. It returns client and cleanup function
+// to close the connection and gracefully stop the server.
 func NewTestClient(l *testing.T) (client FooClient, cleanup func()) {
 	// initialize server
 	listener, err := net.Listen("tcp", "localhost:0")
