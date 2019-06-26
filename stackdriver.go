@@ -297,9 +297,14 @@ func NewExporter(o Options) (*Exporter, error) {
 		}
 		zone, err := metadataapi.Zone()
 		if err != nil {
-			log.Printf("Setting Stackdriver default location failed: %s", err)
+			// This error should be logged with a warning level.
+			err = fmt.Errorf("setting Stackdriver default location failed: %s", err)
+			if o.OnError != nil {
+				o.OnError(err)
+			} else {
+				log.Print(err)
+			}
 		} else {
-			log.Printf("Setting Stackdriver default location to %q", zone)
 			o.Location = zone
 		}
 	}
