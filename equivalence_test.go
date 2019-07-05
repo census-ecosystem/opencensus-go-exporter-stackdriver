@@ -363,6 +363,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 }
 
 type fakeMetricsServer struct {
+	monitoringpb.MetricServiceServer
 	mu                           sync.RWMutex
 	stackdriverTimeSeries        []*monitoringpb.CreateTimeSeriesRequest
 	stackdriverMetricDescriptors []*monitoringpb.CreateMetricDescriptorRequest
