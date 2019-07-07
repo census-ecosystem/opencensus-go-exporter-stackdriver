@@ -17,7 +17,6 @@
 package propagation // import "contrib.go.opencensus.io/exporter/stackdriver/propagation"
 
 import (
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"net/http"
@@ -56,11 +55,11 @@ func (f *HTTPFormat) SpanContextFromRequest(req *http.Request) (sc trace.SpanCon
 	}
 	tid, h := h[:slash], h[slash+1:]
 
-	buf, err := hex.DecodeString(tid)
+	traceBuf, err := hex.DecodeString(tid)
 	if err != nil {
 		return trace.SpanContext{}, false
 	}
-	copy(sc.TraceID[:], buf)
+	copy(sc.TraceID[:], traceBuf)
 
 	// Parse the span id field.
 	spanstr := h
@@ -68,11 +67,11 @@ func (f *HTTPFormat) SpanContextFromRequest(req *http.Request) (sc trace.SpanCon
 	if semicolon != -1 {
 		spanstr, h = h[:semicolon], h[semicolon+1:]
 	}
-	sid, err := strconv.ParseUint(spanstr, 10, 64)
+	spanBuf, err := hex.DecodeString(spanstr)
 	if err != nil {
 		return trace.SpanContext{}, false
 	}
-	binary.BigEndian.PutUint64(sc.SpanID[:], sid)
+	copy(sc.SpanID[:], spanBuf)
 
 	// Parse the options field, options field is optional.
 	if !strings.HasPrefix(h, "o=") {
@@ -88,7 +87,6 @@ func (f *HTTPFormat) SpanContextFromRequest(req *http.Request) (sc trace.SpanCon
 
 // SpanContextToRequest modifies the given request to include a Stackdriver Trace header.
 func (f *HTTPFormat) SpanContextToRequest(sc trace.SpanContext, req *http.Request) {
-	sid := binary.BigEndian.Uint64(sc.SpanID[:])
-	header := fmt.Sprintf("%s/%d;o=%d", hex.EncodeToString(sc.TraceID[:]), sid, int64(sc.TraceOptions))
+	header := fmt.Sprintf("%s/%s;o=%d", hex.EncodeToString(sc.TraceID[:]), hex.EncodeToString(sc.SpanID[:]), int64(sc.TraceOptions))
 	req.Header.Set(httpHeader, header)
 }
