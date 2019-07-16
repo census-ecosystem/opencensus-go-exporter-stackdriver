@@ -31,7 +31,6 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
-	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 )
 
@@ -363,6 +362,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 }
 
 type fakeMetricsServer struct {
+	monitoringpb.MetricServiceServer
 	mu                           sync.RWMutex
 	stackdriverTimeSeries        []*monitoringpb.CreateTimeSeriesRequest
 	stackdriverMetricDescriptors []*monitoringpb.CreateMetricDescriptorRequest
@@ -417,12 +417,6 @@ func (server *fakeMetricsServer) resetStackdriverMetricDescriptors() {
 	server.mu.Unlock()
 }
 
-var _ monitoringpb.MetricServiceServer = (*fakeMetricsServer)(nil)
-
-func (server *fakeMetricsServer) GetMetricDescriptor(ctx context.Context, req *monitoringpb.GetMetricDescriptorRequest) (*googlemetricpb.MetricDescriptor, error) {
-	return new(googlemetricpb.MetricDescriptor), nil
-}
-
 func (server *fakeMetricsServer) CreateMetricDescriptor(ctx context.Context, req *monitoringpb.CreateMetricDescriptorRequest) (*googlemetricpb.MetricDescriptor, error) {
 	server.mu.Lock()
 	server.stackdriverMetricDescriptors = append(server.stackdriverMetricDescriptors, req)
@@ -435,24 +429,4 @@ func (server *fakeMetricsServer) CreateTimeSeries(ctx context.Context, req *moni
 	server.stackdriverTimeSeries = append(server.stackdriverTimeSeries, req)
 	server.mu.Unlock()
 	return new(empty.Empty), nil
-}
-
-func (server *fakeMetricsServer) ListTimeSeries(ctx context.Context, req *monitoringpb.ListTimeSeriesRequest) (*monitoringpb.ListTimeSeriesResponse, error) {
-	return new(monitoringpb.ListTimeSeriesResponse), nil
-}
-
-func (server *fakeMetricsServer) DeleteMetricDescriptor(ctx context.Context, req *monitoringpb.DeleteMetricDescriptorRequest) (*empty.Empty, error) {
-	return new(empty.Empty), nil
-}
-
-func (server *fakeMetricsServer) ListMetricDescriptors(ctx context.Context, req *monitoringpb.ListMetricDescriptorsRequest) (*monitoringpb.ListMetricDescriptorsResponse, error) {
-	return new(monitoringpb.ListMetricDescriptorsResponse), nil
-}
-
-func (server *fakeMetricsServer) GetMonitoredResourceDescriptor(ctx context.Context, req *monitoringpb.GetMonitoredResourceDescriptorRequest) (*monitoredrespb.MonitoredResourceDescriptor, error) {
-	return new(monitoredrespb.MonitoredResourceDescriptor), nil
-}
-
-func (server *fakeMetricsServer) ListMonitoredResourceDescriptors(ctx context.Context, req *monitoringpb.ListMonitoredResourceDescriptorsRequest) (*monitoringpb.ListMonitoredResourceDescriptorsResponse, error) {
-	return new(monitoringpb.ListMonitoredResourceDescriptorsResponse), nil
 }
