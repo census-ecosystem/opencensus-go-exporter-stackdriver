@@ -60,6 +60,28 @@ func TestDefaultMapResource(t *testing.T) {
 		},
 		{
 			input: &resource.Resource{
+				Type: resourcekeys.K8SType,
+				Labels: map[string]string{
+					stackdriverProjectID:             "proj1",
+					resourcekeys.K8SKeyClusterName:   "cluster1",
+					resourcekeys.K8SKeyPodName:       "pod1",
+					resourcekeys.K8SKeyNamespaceName: "namespace1",
+					resourcekeys.CloudKeyZone:        "zone1",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "k8s_pod",
+				Labels: map[string]string{
+					"project_id":     "proj1",
+					"location":       "zone1",
+					"cluster_name":   "cluster1",
+					"namespace_name": "namespace1",
+					"pod_name":       "pod1",
+				},
+			},
+		},
+		{
+			input: &resource.Resource{
 				Type: resourcekeys.CloudType,
 				Labels: map[string]string{
 					stackdriverProjectID:          "proj1",
