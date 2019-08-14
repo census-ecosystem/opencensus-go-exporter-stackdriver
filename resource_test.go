@@ -82,6 +82,40 @@ func TestDefaultMapResource(t *testing.T) {
 		},
 		{
 			input: &resource.Resource{
+				Type: resourcekeys.HostType,
+				Labels: map[string]string{
+					stackdriverProjectID:           "proj1",
+					resourcekeys.K8SKeyClusterName: "cluster1",
+					resourcekeys.CloudKeyZone:      "zone1",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "k8s_node",
+				Labels: map[string]string{
+					"project_id":   "proj1",
+					"location":     "zone1",
+					"cluster_name": "cluster1",
+				},
+			},
+		},
+		// Don't match to k8s node if either cluster name or host type are not present
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.HostType,
+				Labels: map[string]string{
+					stackdriverProjectID:      "proj1",
+					resourcekeys.CloudKeyZone: "zone1",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "global",
+				Labels: map[string]string{
+					"project_id": "proj1",
+				},
+			},
+		},
+		{
+			input: &resource.Resource{
 				Type: resourcekeys.CloudType,
 				Labels: map[string]string{
 					stackdriverProjectID:          "proj1",

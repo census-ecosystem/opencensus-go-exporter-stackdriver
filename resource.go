@@ -48,6 +48,7 @@ var k8sResourceMap = map[string]string{
 	"namespace_name": resourcekeys.K8SKeyNamespaceName,
 	"pod_name":       resourcekeys.K8SKeyPodName,
 	"container_name": resourcekeys.ContainerKeyName,
+	"node_name":      resourcekeys.HostKeyName,
 }
 
 var gcpResourceMap = map[string]string{
@@ -97,6 +98,9 @@ func defaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResourc
 		match = k8sResourceMap
 	case res.Type == resourcekeys.K8SType:
 		result.Type = "k8s_pod"
+		match = k8sResourceMap
+	case res.Type == resourcekeys.HostType && res.Labels[resourcekeys.K8SKeyClusterName] != "":
+		result.Type = "k8s_node"
 		match = k8sResourceMap
 	case res.Labels[resourcekeys.CloudKeyProvider] == resourcekeys.CloudProviderGCP:
 		result.Type = "gce_instance"
