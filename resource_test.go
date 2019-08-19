@@ -87,6 +87,7 @@ func TestDefaultMapResource(t *testing.T) {
 					stackdriverProjectID:           "proj1",
 					resourcekeys.K8SKeyClusterName: "cluster1",
 					resourcekeys.CloudKeyZone:      "zone1",
+					resourcekeys.HostKeyName:       "node1",
 				},
 			},
 			want: &monitoredrespb.MonitoredResource{
@@ -95,6 +96,7 @@ func TestDefaultMapResource(t *testing.T) {
 					"project_id":   "proj1",
 					"location":     "zone1",
 					"cluster_name": "cluster1",
+					"node_name":    "node1",
 				},
 			},
 		},
