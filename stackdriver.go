@@ -362,6 +362,14 @@ func (e *Exporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, 
 	return e.statsExporter.ExportMetricsProto(ctx, node, rsc, metrics)
 }
 
+// ExportMetricsProtoSync exports OpenCensus Metrics Proto to Stackdriver Monitoring synchronously,
+// without de-duping or adding proto metrics to the bundler.
+//
+// Deprecated: experimental API for internal use at OpenTelemetry-Service only.
+func (e *Exporter) ExportMetricsProtoSync(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
+	return e.statsExporter.ExportMetricsProtoSync(ctx, node, rsc, metrics)
+}
+
 // ExportMetrics exports OpenCensus Metrics to Stackdriver Monitoring
 func (e *Exporter) ExportMetrics(ctx context.Context, metrics []*metricdata.Metric) error {
 	return e.statsExporter.ExportMetrics(ctx, metrics)
