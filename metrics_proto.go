@@ -134,7 +134,7 @@ func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commo
 				Name:       monitoring.MetricProjectPath(se.o.ProjectID),
 				TimeSeries: allTss[0:maxTimeSeriesPerUpload],
 			})
-			allTss = allTss[maxTimeSeriesPerUpload:len(allTss)]
+			allTss = allTss[maxTimeSeriesPerUpload:]
 		}
 	}
 
