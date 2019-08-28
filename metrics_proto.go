@@ -35,6 +35,7 @@ import (
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
+	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
@@ -49,6 +50,7 @@ var percentileLabelKey = &metricspb.LabelKey{
 	Key:         "percentile",
 	Description: "the value at a given percentile of a distribution",
 }
+var globalResource = &resource.Resource{Type: "global"}
 
 type metricProtoPayload struct {
 	node             *commonpb.Node
@@ -99,6 +101,9 @@ func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commo
 		return errNilMetric
 	}
 
+	// Caches the resources seen so far
+	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
+
 	additionalLabels := se.defaultLabels
 	if additionalLabels == nil {
 		// additionalLabels must be stateless because each node is different
@@ -112,17 +117,18 @@ func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commo
 	var allTss []*monitoringpb.TimeSeries
 	var allErrs []error
 	for _, metric := range metrics {
+		mappedRsc := se.getResource(rsc, metric, seenResources)
 		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
 			summaryMtcs := se.convertSummaryMetrics(metric)
 			for _, summaryMtc := range summaryMtcs {
-				if tss, err := se.protoMetricToTimeSeries(ctx, node, rsc, summaryMtc, additionalLabels); err == nil {
+				if tss, err := se.protoMetricToTimeSeries(ctx, node, mappedRsc, summaryMtc, additionalLabels); err == nil {
 					allTss = append(tss, tss...)
 				} else {
 					allErrs = append(allErrs, err)
 				}
 			}
 		} else {
-			if tss, err := se.protoMetricToTimeSeries(ctx, node, rsc, metric, additionalLabels); err == nil {
+			if tss, err := se.protoMetricToTimeSeries(ctx, node, mappedRsc, metric, additionalLabels); err == nil {
 				allTss = append(allTss, tss...)
 			} else {
 				allErrs = append(allErrs, err)
@@ -289,6 +295,9 @@ func (se *statsExporter) uploadMetricsProto(payloads []*metricProtoPayload) erro
 	)
 	defer span.End()
 
+	// Caches the resources seen so far
+	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
+
 	for _, payload := range payloads {
 		// Now create the metric descriptor remotely.
 		if err := se.createMetricDescriptor(ctx, payload.metric, payload.additionalLabels); err != nil {
@@ -299,7 +308,8 @@ func (se *statsExporter) uploadMetricsProto(payloads []*metricProtoPayload) erro
 
 	var allTimeSeries []*monitoringpb.TimeSeries
 	for _, payload := range payloads {
-		tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, payload.resource, payload.metric, payload.additionalLabels)
+		mappedRsc := se.getResource(payload.resource, payload.metric, seenResources)
+		tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, mappedRsc, payload.metric, payload.additionalLabels)
 		if err != nil {
 			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 			return err
@@ -402,6 +412,19 @@ func (se *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monito
 	return ctsreql
 }
 
+func (se *statsExporter) getResource(rsc *resourcepb.Resource, metric *metricspb.Metric, seenRscs map[*resourcepb.Resource]*monitoredrespb.MonitoredResource) *monitoredrespb.MonitoredResource {
+	var resource = rsc
+	if metric.Resource != nil {
+		resource = metric.Resource
+	}
+	mappedRsc, ok := seenRscs[resource]
+	if !ok {
+		mappedRsc = se.o.MapResource(resourcepbToResource(resource))
+		seenRscs[resource] = mappedRsc
+	}
+	return mappedRsc
+}
+
 func resourcepbToResource(rsc *resourcepb.Resource) *resource.Resource {
 	if rsc == nil {
 		return &resource.Resource{
@@ -421,17 +444,10 @@ func resourcepbToResource(rsc *resourcepb.Resource) *resource.Resource {
 
 // protoMetricToTimeSeries converts a metric into a Stackdriver Monitoring v3 API CreateTimeSeriesRequest
 // but it doesn't invoke any remote API.
-func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metric *metricspb.Metric, additionalLabels map[string]labelValue) ([]*monitoringpb.TimeSeries, error) {
+func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *commonpb.Node, mappedRsc *monitoredrespb.MonitoredResource, metric *metricspb.Metric, additionalLabels map[string]labelValue) ([]*monitoringpb.TimeSeries, error) {
 	if metric == nil {
 		return nil, errNilMetric
 	}
-
-	var resource = rsc
-	if metric.Resource != nil {
-		resource = metric.Resource
-	}
-
-	mappedRes := se.o.MapResource(resourcepbToResource(resource))
 
 	metricName, _, _, err := metricProseFromProto(metric)
 	if err != nil {
@@ -460,7 +476,7 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 				Type:   metricType,
 				Labels: labels,
 			},
-			Resource: mappedRes,
+			Resource: mappedRsc,
 			Points:   sdPoints,
 		})
 	}

@@ -27,10 +27,12 @@ import (
 	"google.golang.org/grpc"
 
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 
 	"github.com/golang/protobuf/ptypes/empty"
 	timestamp "github.com/golang/protobuf/ptypes/timestamp"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
+	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 )
 
@@ -53,6 +55,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 		Unit:        "ms",
 		Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 	}
+	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
 
 	// Generate some view.Data and metrics.
 	var vdl []*view.Data
@@ -107,7 +110,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 
 		vdl := []*view.Data{vd}
 		sctreql := se.makeReq(vdl, maxTimeSeriesPerUpload)
-		tsl, _ := se.protoMetricToTimeSeries(ctx, nil, nil, metricPbs[i], nil)
+		tsl, _ := se.protoMetricToTimeSeries(ctx, nil, se.getResource(nil, metricPbs[i], seenResources), metricPbs[i], nil)
 		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
 		if diff := cmpTSReqs(pctreql, sctreql); diff != "" {
 			t.Fatalf("TimeSeries Mismatch -FromMetrics +FromStats: %s", diff)

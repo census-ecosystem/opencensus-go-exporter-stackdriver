@@ -135,12 +135,14 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 		},
 	}
 
+	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
+
 	for i, tt := range tests {
 		se := tt.statsExporter
 		if se == nil {
 			se = new(statsExporter)
 		}
-		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, nil, tt.in, nil)
+		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, se.getResource(nil, tt.in, seenResources), tt.in, nil)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
@@ -170,6 +172,8 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 		Seconds: 1543160298,
 		Nanos:   100000997,
 	}
+
+	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
 
 	tests := []struct {
 		in            *metricspb.Metric
@@ -321,7 +325,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 		if se == nil {
 			se = new(statsExporter)
 		}
-		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, nil, tt.in, nil)
+		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, se.getResource(nil, tt.in, seenResources), tt.in, nil)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
@@ -339,6 +343,10 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 		if diff := cmpTSReqs(got, tt.want); diff != "" {
 			t.Fatalf("Test %d failed. Unexpected CreateTimeSeriesRequests -got +want: %s", i, diff)
 		}
+	}
+
+	if len(seenResources) != 2 {
+		t.Errorf("Should cache 2 resources, got %d", len(seenResources))
 	}
 }
 
