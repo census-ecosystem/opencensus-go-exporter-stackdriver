@@ -427,9 +427,7 @@ func (se *statsExporter) getResource(rsc *resourcepb.Resource, metric *metricspb
 
 func resourcepbToResource(rsc *resourcepb.Resource) *resource.Resource {
 	if rsc == nil {
-		return &resource.Resource{
-			Type: "global",
-		}
+		return globalResource
 	}
 	res := &resource.Resource{
 		Type:   rsc.Type,
