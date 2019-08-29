@@ -48,9 +48,9 @@ var percentileLabelKey = &metricspb.LabelKey{
 var globalResource = &resource.Resource{Type: "global"}
 var domains = []string{"googleapis.com", "kubernetes.io", "istio.io"}
 
-// ExportMetricsProtoSync exports OpenCensus Metrics Proto to Stackdriver Monitoring synchronously,
+// ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring synchronously,
 // without de-duping or adding proto metrics to the bundler.
-func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
+func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
 	if len(metrics) == 0 {
 		return errNilMetricOrMetricDescriptor
 	}
