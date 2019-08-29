@@ -76,17 +76,11 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 		return errNilMetricOrMetricDescriptor
 	}
 
-	additionalLabels := se.defaultLabels
-	if _, ok := additionalLabels[opencensusTaskKey]; ok {
-		// "opencensus_task" will be added by default, discard it for Agent/Collector if it's there
-		delete(additionalLabels, opencensusTaskKey)
-	}
-
 	for _, metric := range metrics {
 		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
-			se.addPayload(node, rsc, additionalLabels, se.convertSummaryMetrics(metric)...)
+			se.addPayload(node, rsc, se.defaultLabels, se.convertSummaryMetrics(metric)...)
 		} else {
-			se.addPayload(node, rsc, additionalLabels, metric)
+			se.addPayload(node, rsc, se.defaultLabels, metric)
 		}
 	}
 
@@ -103,12 +97,6 @@ func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commo
 	// Caches the resources seen so far
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
 
-	additionalLabels := se.defaultLabels
-	if _, ok := additionalLabels[opencensusTaskKey]; ok {
-		// "opencensus_task" will be added by default, discard it for Agent/Collector if it's there
-		delete(additionalLabels, opencensusTaskKey)
-	}
-
 	ctx, cancel := se.o.newContextWithTimeout()
 	defer cancel()
 
@@ -124,14 +112,14 @@ func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commo
 		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
 			summaryMtcs := se.convertSummaryMetrics(metric)
 			for _, summaryMtc := range summaryMtcs {
-				if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, summaryMtc, additionalLabels); err == nil {
+				if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, summaryMtc, se.defaultLabels); err == nil {
 					allTss = append(tss, tss...)
 				} else {
 					allErrs = append(allErrs, err)
 				}
 			}
 		} else {
-			if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, metric, additionalLabels); err == nil {
+			if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, metric, se.defaultLabels); err == nil {
 				allTss = append(allTss, tss...)
 			} else {
 				allErrs = append(allErrs, err)
