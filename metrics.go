@@ -135,7 +135,7 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 	resource := se.metricRscToMpbRsc(metric.Resource)
 
 	metricName := metric.Descriptor.Name
-	metricType, _ := se.metricTypeFromProto(metricName)
+	metricType := se.metricTypeFromProto(metricName)
 	metricLabelKeys := metric.Descriptor.LabelKeys
 	metricKind, _ := metricDescriptorTypeToMetricKind(metric)
 
@@ -238,7 +238,7 @@ func (se *statsExporter) metricToMpbMetricDescriptor(metric *metricdata.Metric) 
 		return nil, errNilMetricOrMetricDescriptor
 	}
 
-	metricType, _ := se.metricTypeFromProto(metric.Descriptor.Name)
+	metricType := se.metricTypeFromProto(metric.Descriptor.Name)
 	displayName := se.displayName(metric.Descriptor.Name)
 	metricKind, valueType := metricDescriptorTypeToMetricKind(metric)
 
