@@ -61,7 +61,6 @@ import (
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/resource"
 	"go.opencensus.io/stats/view"
-	"go.opencensus.io/tag"
 	"go.opencensus.io/trace"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
@@ -240,21 +239,6 @@ type Options struct {
 
 	// Timeout for all API calls. If not set, defaults to 5 seconds.
 	Timeout time.Duration
-
-	// GetMonitoredResource may be provided to supply the details of the
-	// monitored resource dynamically based on the tags associated with each
-	// data point. Most users will not need to set this, but should instead
-	// set the MonitoredResource field.
-	//
-	// GetMonitoredResource may add or remove tags by returning a new set of
-	// tags. It is safe for the function to mutate its argument and return it.
-	//
-	// See the documentation on the MonitoredResource field for guidance on the
-	// interaction between monitored resources and labels.
-	//
-	// The MonitoredResource field is ignored if this field is set to a non-nil
-	// value.
-	GetMonitoredResource func(*view.View, []tag.Tag) ([]tag.Tag, monitoredresource.Interface)
 
 	// ReportingInterval sets the interval between reporting metrics.
 	// If it is set to zero then default value is used.
