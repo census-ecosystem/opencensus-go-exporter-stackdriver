@@ -129,7 +129,7 @@ func (se *statsExporter) uploadMetrics(metrics []*metricdata.Metric) error {
 // but it doesn't invoke any remote API.
 func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.Metric) ([]*monitoringpb.TimeSeries, error) {
 	if metric == nil {
-		return nil, errNilMetric
+		return nil, errNilMetricOrMetricDescriptor
 	}
 
 	resource := se.metricRscToMpbRsc(metric.Resource)
@@ -235,7 +235,7 @@ func (se *statsExporter) createMetricDescriptorFromMetric(ctx context.Context, m
 
 func (se *statsExporter) metricToMpbMetricDescriptor(metric *metricdata.Metric) (*googlemetricpb.MetricDescriptor, error) {
 	if metric == nil {
-		return nil, errNilMetric
+		return nil, errNilMetricOrMetricDescriptor
 	}
 
 	metricType, _ := se.metricTypeFromProto(metric.Descriptor.Name)

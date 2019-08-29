@@ -28,7 +28,6 @@ import (
 	"strings"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
-	"go.opencensus.io/stats"
 	"go.opencensus.io/trace"
 
 	monitoring "cloud.google.com/go/monitoring/apiv3"
@@ -44,8 +43,7 @@ import (
 	"go.opencensus.io/resource"
 )
 
-var errNilMetric = errors.New("expecting a non-nil metric")
-var errNilMetricDescriptor = errors.New("expecting a non-nil metric descriptor")
+var errNilMetricOrMetricDescriptor = errors.New("non-nil metric or metric descriptor")
 var percentileLabelKey = &metricspb.LabelKey{
 	Key:         "percentile",
 	Description: "the value at a given percentile of a distribution",
@@ -74,7 +72,7 @@ func (se *statsExporter) addPayload(node *commonpb.Node, rsc *resourcepb.Resourc
 // ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring.
 func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
 	if len(metrics) == 0 {
-		return errNilMetric
+		return errNilMetricOrMetricDescriptor
 	}
 
 	additionalLabels := se.defaultLabels
@@ -98,7 +96,7 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 // without de-duping or adding proto metrics to the bundler.
 func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
 	if len(metrics) == 0 {
-		return errNilMetric
+		return errNilMetricOrMetricDescriptor
 	}
 
 	// Caches the resources seen so far
@@ -117,18 +115,22 @@ func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commo
 	var allTss []*monitoringpb.TimeSeries
 	var allErrs []error
 	for _, metric := range metrics {
+		if len(metric.GetTimeseries()) == 0 {
+			// No TimeSeries to export, skip this metric.
+			continue
+		}
 		mappedRsc := se.getResource(rsc, metric, seenResources)
 		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
 			summaryMtcs := se.convertSummaryMetrics(metric)
 			for _, summaryMtc := range summaryMtcs {
-				if tss, err := se.protoMetricToTimeSeries(ctx, node, mappedRsc, summaryMtc, additionalLabels); err == nil {
+				if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, summaryMtc, additionalLabels); err == nil {
 					allTss = append(tss, tss...)
 				} else {
 					allErrs = append(allErrs, err)
 				}
 			}
 		} else {
-			if tss, err := se.protoMetricToTimeSeries(ctx, node, mappedRsc, metric, additionalLabels); err == nil {
+			if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, metric, additionalLabels); err == nil {
 				allTss = append(allTss, tss...)
 			} else {
 				allErrs = append(allErrs, err)
@@ -309,7 +311,7 @@ func (se *statsExporter) uploadMetricsProto(payloads []*metricProtoPayload) erro
 	var allTimeSeries []*monitoringpb.TimeSeries
 	for _, payload := range payloads {
 		mappedRsc := se.getResource(payload.resource, payload.metric, seenResources)
-		tsl, err := se.protoMetricToTimeSeries(ctx, payload.node, mappedRsc, payload.metric, payload.additionalLabels)
+		tsl, err := se.protoMetricToTimeSeries(ctx, mappedRsc, payload.metric, payload.additionalLabels)
 		if err != nil {
 			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 			return err
@@ -442,15 +444,12 @@ func resourcepbToResource(rsc *resourcepb.Resource) *resource.Resource {
 
 // protoMetricToTimeSeries converts a metric into a Stackdriver Monitoring v3 API CreateTimeSeriesRequest
 // but it doesn't invoke any remote API.
-func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *commonpb.Node, mappedRsc *monitoredrespb.MonitoredResource, metric *metricspb.Metric, additionalLabels map[string]labelValue) ([]*monitoringpb.TimeSeries, error) {
-	if metric == nil {
-		return nil, errNilMetric
+func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, mappedRsc *monitoredrespb.MonitoredResource, metric *metricspb.Metric, additionalLabels map[string]labelValue) ([]*monitoringpb.TimeSeries, error) {
+	if metric == nil || metric.MetricDescriptor == nil {
+		return nil, errNilMetricOrMetricDescriptor
 	}
 
-	metricName, _, _, err := metricProseFromProto(metric)
-	if err != nil {
-		return nil, err
-	}
+	metricName := metric.GetMetricDescriptor().GetName()
 	metricType, _ := se.metricTypeFromProto(metricName)
 	metricLabelKeys := metric.GetMetricDescriptor().GetLabelKeys()
 	metricKind, valueType := protoMetricDescriptorTypeToMetricKind(metric)
@@ -587,14 +586,14 @@ func (se *statsExporter) protoTimeSeriesToMonitoringPoints(ts *metricspb.TimeSer
 }
 
 func (se *statsExporter) protoToMonitoringMetricDescriptor(metric *metricspb.Metric, additionalLabels map[string]labelValue) (*googlemetricpb.MetricDescriptor, error) {
-	if metric == nil {
-		return nil, errNilMetric
+	if metric == nil || metric.MetricDescriptor == nil {
+		return nil, errNilMetricOrMetricDescriptor
 	}
 
-	metricName, description, unit, err := metricProseFromProto(metric)
-	if err != nil {
-		return nil, err
-	}
+	md := metric.GetMetricDescriptor()
+	metricName := md.GetName()
+	unit := md.GetUnit()
+	description := md.GetDescription()
 	metricType, _ := se.metricTypeFromProto(metricName)
 	displayName := se.displayName(metricName)
 	metricKind, valueType := protoMetricDescriptorTypeToMetricKind(metric)
@@ -634,25 +633,6 @@ func labelDescriptorsFromProto(defaults map[string]labelValue, protoLabelKeys []
 		})
 	}
 	return labelDescriptors
-}
-
-func metricProseFromProto(metric *metricspb.Metric) (name, description, unit string, err error) {
-	md := metric.GetMetricDescriptor()
-	if md == nil {
-		return "", "", "", errNilMetricDescriptor
-	}
-
-	name = md.GetName()
-	unit = md.GetUnit()
-	description = md.GetDescription()
-
-	if md.Type == metricspb.MetricDescriptor_CUMULATIVE_INT64 {
-		// If the aggregation type is count, which counts the number of recorded measurements, the unit must be "1",
-		// because this view does not apply to the recorded values.
-		unit = stats.UnitDimensionless
-	}
-
-	return name, description, unit, nil
 }
 
 func (se *statsExporter) metricTypeFromProto(name string) (string, bool) {

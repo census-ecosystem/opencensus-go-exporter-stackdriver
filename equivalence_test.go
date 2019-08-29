@@ -52,7 +52,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 	metricDescriptor := &metricspb.MetricDescriptor{
 		Name:        "ocagent.io/latency",
 		Description: "The latency of the various methods",
-		Unit:        "ms",
+		Unit:        "1",
 		Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 	}
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
@@ -110,7 +110,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 
 		vdl := []*view.Data{vd}
 		sctreql := se.makeReq(vdl, maxTimeSeriesPerUpload)
-		tsl, _ := se.protoMetricToTimeSeries(ctx, nil, se.getResource(nil, metricPbs[i], seenResources), metricPbs[i], nil)
+		tsl, _ := se.protoMetricToTimeSeries(ctx, se.getResource(nil, metricPbs[i], seenResources), metricPbs[i], nil)
 		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
 		if diff := cmpTSReqs(pctreql, sctreql); diff != "" {
 			t.Fatalf("TimeSeries Mismatch -FromMetrics +FromStats: %s", diff)
