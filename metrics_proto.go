@@ -627,9 +627,6 @@ func labelDescriptorsFromProto(defaults map[string]labelValue, protoLabelKeys []
 func (se *statsExporter) metricTypeFromProto(name string) string {
 	prefix := se.o.MetricPrefix
 	if prefix != "" {
-		if !strings.HasSuffix(prefix, "/") {
-			prefix = prefix + "/"
-		}
 		name = prefix + name
 	}
 	if !hasDomain(name) {

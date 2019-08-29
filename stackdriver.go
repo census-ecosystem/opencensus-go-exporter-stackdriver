@@ -54,6 +54,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	metadataapi "cloud.google.com/go/compute/metadata"
@@ -335,6 +336,9 @@ func NewExporter(o Options) (*Exporter, error) {
 		res.Labels[stackdriverGenericTaskID] = getTaskValue()
 
 		o.Resource = o.MapResource(res)
+	}
+	if o.MetricPrefix != "" && !strings.HasSuffix(o.MetricPrefix, "/") {
+		o.MetricPrefix = o.MetricPrefix + "/"
 	}
 
 	se, err := newStatsExporter(o)

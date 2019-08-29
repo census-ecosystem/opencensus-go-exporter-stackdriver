@@ -751,35 +751,32 @@ func TestConvertSummaryMetrics(t *testing.T) {
 
 func TestMetricPrefix(t *testing.T) {
 	tests := []struct {
+		name          string
 		in            string
 		want          string
 		statsExporter *statsExporter
 	}{
 		{
-			in: "kubernetes.io/container/memory/limit_bytes",
+			name: "No prefix and metric name has a kubernetes domain",
+			in:   "kubernetes.io/container/memory/limit_bytes",
 			statsExporter: &statsExporter{
 				o: Options{ProjectID: "foo"},
 			},
 			want: "kubernetes.io/container/memory/limit_bytes",
 		},
 		{
-			in: "my_metric",
+			name: "Has a prefix but prefix doesn't have a domain",
+			in:   "my_metric",
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MetricPrefix: "prefix"},
+				o: Options{ProjectID: "foo", MetricPrefix: "prefix/"},
 			},
 			want: "custom.googleapis.com/opencensus/prefix/my_metric",
 		},
 		{
-			in: "my_metric",
+			name: "Has a prefix and prefix has a domain",
+			in:   "my_metric",
 			statsExporter: &statsExporter{
 				o: Options{ProjectID: "foo", MetricPrefix: "appengine.googleapis.com/"},
-			},
-			want: "appengine.googleapis.com/my_metric",
-		},
-		{
-			in: "my_metric",
-			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MetricPrefix: "appengine.googleapis.com"},
 			},
 			want: "appengine.googleapis.com/my_metric",
 		},
@@ -788,7 +785,7 @@ func TestMetricPrefix(t *testing.T) {
 	for _, tt := range tests {
 		got := tt.statsExporter.metricTypeFromProto(tt.in)
 		if !cmp.Equal(got, tt.want) {
-			t.Fatalf("mismatch metric names:\n  got=%v\n want=%v\n", got, tt.want)
+			t.Fatalf("mismatch metric names for test %v:\n  got=%v\n want=%v\n", tt.name, got, tt.want)
 		}
 	}
 }
