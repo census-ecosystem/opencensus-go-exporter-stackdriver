@@ -49,6 +49,7 @@ var percentileLabelKey = &metricspb.LabelKey{
 	Description: "the value at a given percentile of a distribution",
 }
 var globalResource = &resource.Resource{Type: "global"}
+var domains = []string{"googleapis.com", "kubernetes.io", "istio.io"}
 
 type metricProtoPayload struct {
 	node             *commonpb.Node
@@ -75,17 +76,11 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 		return errNilMetricOrMetricDescriptor
 	}
 
-	additionalLabels := se.defaultLabels
-	if additionalLabels == nil {
-		// additionalLabels must be stateless because each node is different
-		additionalLabels = getDefaultLabelsFromNode(node)
-	}
-
 	for _, metric := range metrics {
 		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
-			se.addPayload(node, rsc, additionalLabels, se.convertSummaryMetrics(metric)...)
+			se.addPayload(node, rsc, se.defaultLabels, se.convertSummaryMetrics(metric)...)
 		} else {
-			se.addPayload(node, rsc, additionalLabels, metric)
+			se.addPayload(node, rsc, se.defaultLabels, metric)
 		}
 	}
 
@@ -102,12 +97,6 @@ func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commo
 	// Caches the resources seen so far
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
 
-	additionalLabels := se.defaultLabels
-	if additionalLabels == nil {
-		// additionalLabels must be stateless because each node is different
-		additionalLabels = getDefaultLabelsFromNode(node)
-	}
-
 	ctx, cancel := se.o.newContextWithTimeout()
 	defer cancel()
 
@@ -123,14 +112,14 @@ func (se *statsExporter) ExportMetricsProtoSync(ctx context.Context, node *commo
 		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
 			summaryMtcs := se.convertSummaryMetrics(metric)
 			for _, summaryMtc := range summaryMtcs {
-				if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, summaryMtc, additionalLabels); err == nil {
+				if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, summaryMtc, se.defaultLabels); err == nil {
 					allTss = append(tss, tss...)
 				} else {
 					allErrs = append(allErrs, err)
 				}
 			}
 		} else {
-			if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, metric, additionalLabels); err == nil {
+			if tss, err := se.protoMetricToTimeSeries(ctx, mappedRsc, metric, se.defaultLabels); err == nil {
 				allTss = append(allTss, tss...)
 			} else {
 				allErrs = append(allErrs, err)
@@ -450,7 +439,7 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, mappedRsc 
 	}
 
 	metricName := metric.GetMetricDescriptor().GetName()
-	metricType, _ := se.metricTypeFromProto(metricName)
+	metricType := se.metricTypeFromProto(metricName)
 	metricLabelKeys := metric.GetMetricDescriptor().GetLabelKeys()
 	metricKind, valueType := protoMetricDescriptorTypeToMetricKind(metric)
 	labelKeys := make([]string, len(metricLabelKeys))
@@ -594,7 +583,7 @@ func (se *statsExporter) protoToMonitoringMetricDescriptor(metric *metricspb.Met
 	metricName := md.GetName()
 	unit := md.GetUnit()
 	description := md.GetDescription()
-	metricType, _ := se.metricTypeFromProto(metricName)
+	metricType := se.metricTypeFromProto(metricName)
 	displayName := se.displayName(metricName)
 	metricKind, valueType := protoMetricDescriptorTypeToMetricKind(metric)
 
@@ -635,10 +624,26 @@ func labelDescriptorsFromProto(defaults map[string]labelValue, protoLabelKeys []
 	return labelDescriptors
 }
 
-func (se *statsExporter) metricTypeFromProto(name string) (string, bool) {
-	// TODO: (@odeke-em) support non-"custom.googleapis.com" metrics names.
-	name = path.Join("custom.googleapis.com", "opencensus", name)
-	return name, true
+func (se *statsExporter) metricTypeFromProto(name string) string {
+	prefix := se.o.MetricPrefix
+	if prefix != "" {
+		name = prefix + name
+	}
+	if !hasDomain(name) {
+		// Still needed because the name may or may not have a "/" at the beginning.
+		name = path.Join(defaultDomain, name)
+	}
+	return name
+}
+
+// hasDomain checks if the metric name already has a domain in it.
+func hasDomain(name string) bool {
+	for _, domain := range domains {
+		if strings.Contains(name, domain) {
+			return true
+		}
+	}
+	return false
 }
 
 func fromProtoPoint(startTime *timestamp.Timestamp, pt *metricspb.Point) (*monitoringpb.Point, error) {
@@ -773,16 +778,6 @@ func protoMetricDescriptorTypeToMetricKind(m *metricspb.Metric) (googlemetricpb.
 
 	default:
 		return googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED, googlemetricpb.MetricDescriptor_VALUE_TYPE_UNSPECIFIED
-	}
-}
-
-func getDefaultLabelsFromNode(node *commonpb.Node) map[string]labelValue {
-	taskValue := fmt.Sprintf("%s-%d@%s", strings.ToLower(node.LibraryInfo.GetLanguage().String()), node.Identifier.Pid, node.Identifier.HostName)
-	return map[string]labelValue{
-		sanitize(opencensusTaskKey): {
-			val:  taskValue,
-			desc: opencensusTaskDescription,
-		},
 	}
 }
 
