@@ -42,7 +42,7 @@ func cmpResource(got, want *monitoredrespb.MonitoredResource) string {
 }
 
 func cmpTSReqs(got, want []*monitoringpb.CreateTimeSeriesRequest) string {
-	return cmp.Diff(got, want, cmpopts.IgnoreUnexported(monitoringpb.CreateTimeSeriesRequest{}))
+	return cmp.Diff(got, want, cmpopts.IgnoreUnexported(monitoringpb.CreateTimeSeriesRequest{}), cmpopts.IgnoreTypes(googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED, googlemetricpb.MetricDescriptor_VALUE_TYPE_UNSPECIFIED))
 }
 
 func cmpMD(got, want *googlemetricpb.MetricDescriptor) string {

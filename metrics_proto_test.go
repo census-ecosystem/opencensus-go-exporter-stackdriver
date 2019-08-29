@@ -20,7 +20,7 @@ import (
 	"strings"
 	"testing"
 
-	"cloud.google.com/go/monitoring/apiv3"
+	monitoring "cloud.google.com/go/monitoring/apiv3"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
@@ -103,6 +103,8 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "global",
 							},
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_DISTRIBUTION,
 							Points: []*monitoringpb.Point{
 								{
 									Interval: &monitoringpb.TimeInterval{
@@ -187,6 +189,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 					Name:        "with_container_resource",
 					Description: "This is a test",
 					Unit:        "By",
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 				},
 				Resource: &resourcepb.Resource{
 					Type: resourcekeys.ContainerType,
@@ -234,6 +237,8 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 									"container_name": "container-name1",
 								},
 							},
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_INT64,
 							Points: []*monitoringpb.Point{
 								{
 									Interval: &monitoringpb.TimeInterval{
@@ -258,6 +263,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 					Name:        "with_gce_resource",
 					Description: "This is a test",
 					Unit:        "By",
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 				},
 				Resource: &resourcepb.Resource{
 					Type: resourcekeys.CloudType,
@@ -300,6 +306,8 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 									"zone":        "zone1",
 								},
 							},
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_INT64,
 							Points: []*monitoringpb.Point{
 								{
 									Interval: &monitoringpb.TimeInterval{
