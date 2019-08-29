@@ -25,13 +25,13 @@ import (
 	"sync"
 	"time"
 
-	"go.opencensus.io"
+	opencensus "go.opencensus.io"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
 	"go.opencensus.io/trace"
 
-	"cloud.google.com/go/monitoring/apiv3"
+	monitoring "cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/metric/metricexport"
@@ -108,12 +108,19 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		metricDescriptors:      make(map[string]*metricpb.MetricDescriptor),
 	}
 
+	var defaultLablesNotSanitized map[string]labelValue
 	if o.DefaultMonitoringLabels != nil {
-		e.defaultLabels = o.DefaultMonitoringLabels.m
+		defaultLablesNotSanitized = o.DefaultMonitoringLabels.m
 	} else {
-		e.defaultLabels = map[string]labelValue{
+		defaultLablesNotSanitized = map[string]labelValue{
 			opencensusTaskKey: {val: getTaskValue(), desc: opencensusTaskDescription},
 		}
+	}
+
+	e.defaultLabels = make(map[string]labelValue)
+	// Fill in the defaults firstly, irrespective of if the labelKeys and labelValues are mismatched.
+	for key, label := range defaultLablesNotSanitized {
+		e.defaultLabels[sanitize(key)] = label
 	}
 
 	e.viewDataBundler = bundler.NewBundler((*view.Data)(nil), func(bundle interface{}) {

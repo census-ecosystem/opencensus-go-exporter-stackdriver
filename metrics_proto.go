@@ -31,7 +31,7 @@ import (
 	"go.opencensus.io/stats"
 	"go.opencensus.io/trace"
 
-	"cloud.google.com/go/monitoring/apiv3"
+	monitoring "cloud.google.com/go/monitoring/apiv3"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
@@ -454,6 +454,10 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 	metricType, _ := se.metricTypeFromProto(metricName)
 	metricLabelKeys := metric.GetMetricDescriptor().GetLabelKeys()
 	metricKind, valueType := protoMetricDescriptorTypeToMetricKind(metric)
+	labelKeys := make([]string, len(metricLabelKeys))
+	for _, key := range metricLabelKeys {
+		labelKeys = append(labelKeys, sanitize(key.GetKey()))
+	}
 
 	timeSeries := make([]*monitoringpb.TimeSeries, 0, len(metric.Timeseries))
 	for _, protoTimeSeries := range metric.Timeseries {
@@ -464,7 +468,7 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 
 		// Each TimeSeries has labelValues which MUST be correlated
 		// with that from the MetricDescriptor
-		labels, err := labelsPerTimeSeries(additionalLabels, metricLabelKeys, protoTimeSeries.GetLabelValues())
+		labels, err := labelsPerTimeSeries(additionalLabels, labelKeys, protoTimeSeries.GetLabelValues())
 		if err != nil {
 			// TODO: (@odeke-em) perhaps log this error from labels extraction, if non-nil.
 			continue
@@ -484,11 +488,11 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 	return timeSeries, nil
 }
 
-func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []*metricspb.LabelKey, labelValues []*metricspb.LabelValue) (map[string]string, error) {
+func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []string, labelValues []*metricspb.LabelValue) (map[string]string, error) {
 	labels := make(map[string]string)
 	// Fill in the defaults firstly, irrespective of if the labelKeys and labelValues are mismatched.
 	for key, label := range defaults {
-		labels[sanitize(key)] = label.val
+		labels[key] = label.val
 	}
 
 	// Perform this sanity check now.
@@ -498,7 +502,10 @@ func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []*metricspb.
 
 	for i, labelKey := range labelKeys {
 		labelValue := labelValues[i]
-		labels[sanitize(labelKey.GetKey())] = labelValue.GetValue()
+		if labelValue.GetHasValue() {
+			continue
+		}
+		labels[labelKey] = labelValue.GetValue()
 	}
 
 	return labels, nil
@@ -563,7 +570,6 @@ func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *met
 
 func (se *statsExporter) protoTimeSeriesToMonitoringPoints(ts *metricspb.TimeSeries, metricKind googlemetricpb.MetricDescriptor_MetricKind) (sptl []*monitoringpb.Point, err error) {
 	for _, pt := range ts.Points {
-
 		// If we have a last value aggregation point i.e. MetricDescriptor_GAUGE
 		// StartTime should be nil.
 		startTime := ts.StartTimestamp
@@ -798,7 +804,7 @@ func protoMetricDescriptorTypeToMetricKind(m *metricspb.Metric) (googlemetricpb.
 func getDefaultLabelsFromNode(node *commonpb.Node) map[string]labelValue {
 	taskValue := fmt.Sprintf("%s-%d@%s", strings.ToLower(node.LibraryInfo.GetLanguage().String()), node.Identifier.Pid, node.Identifier.HostName)
 	return map[string]labelValue{
-		opencensusTaskKey: {
+		sanitize(opencensusTaskKey): {
 			val:  taskValue,
 			desc: opencensusTaskDescription,
 		},
