@@ -442,23 +442,18 @@ func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *met
 		return err
 	}
 
-	var md *googlemetricpb.MetricDescriptor
 	if builtinMetric(inMD.Type) {
-		gmrdesc := &monitoringpb.GetMetricDescriptorRequest{
-			Name: inMD.Name,
-		}
-		md, err = getMetricDescriptor(ctx, se.c, gmrdesc)
+		se.protoMetricDescriptors[name] = true
 	} else {
 		cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
 			Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
 			MetricDescriptor: inMD,
 		}
-		md, err = createMetricDescriptor(ctx, se.c, cmrdesc)
-	}
-
-	if err == nil {
-		// Now record the metric as having been created.
-		se.protoMetricDescriptors[name] = md
+		_, err = createMetricDescriptor(ctx, se.c, cmrdesc)
+		if err == nil {
+			// Now record the metric as having been created.
+			se.protoMetricDescriptors[name] = true
+		}
 	}
 
 	return err

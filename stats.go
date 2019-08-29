@@ -66,10 +66,10 @@ type statsExporter struct {
 	createdViews   map[string]*metricpb.MetricDescriptor // Views already created remotely
 
 	protoMu                sync.Mutex
-	protoMetricDescriptors map[string]*metricpb.MetricDescriptor // Saves the metric descriptors that were already created remotely
+	protoMetricDescriptors map[string]bool // Saves the metric descriptors that were already created remotely
 
 	metricMu          sync.Mutex
-	metricDescriptors map[string]*metricpb.MetricDescriptor // Saves the metric descriptors that were already created remotely
+	metricDescriptors map[string]bool // Saves the metric descriptors that were already created remotely
 
 	c             *monitoring.MetricClient
 	defaultLabels map[string]labelValue
@@ -103,8 +103,8 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		c:                      client,
 		o:                      o,
 		createdViews:           make(map[string]*metricpb.MetricDescriptor),
-		protoMetricDescriptors: make(map[string]*metricpb.MetricDescriptor),
-		metricDescriptors:      make(map[string]*metricpb.MetricDescriptor),
+		protoMetricDescriptors: make(map[string]bool),
+		metricDescriptors:      make(map[string]bool),
 	}
 
 	var defaultLablesNotSanitized map[string]labelValue
