@@ -163,10 +163,6 @@ func (e *statsExporter) stopMetricsReader() {
 }
 
 func (e *statsExporter) getMonitoredResource(v *view.View, tags []tag.Tag) ([]tag.Tag, *monitoredrespb.MonitoredResource) {
-	if get := e.o.GetMonitoredResource; get != nil {
-		newTags, mr := get(v, tags)
-		return newTags, convertMonitoredResourceToPB(mr)
-	}
 	resource := e.o.Resource
 	if resource == nil {
 		resource = &monitoredrespb.MonitoredResource{
