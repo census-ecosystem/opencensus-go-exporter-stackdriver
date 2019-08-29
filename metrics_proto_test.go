@@ -144,7 +144,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 		if se == nil {
 			se = new(statsExporter)
 		}
-		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, se.getResource(nil, tt.in, seenResources), tt.in, nil)
+		tsl, err := se.protoMetricToTimeSeries(context.Background(), se.getResource(nil, tt.in, seenResources), tt.in, nil)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
@@ -333,7 +333,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 		if se == nil {
 			se = new(statsExporter)
 		}
-		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, se.getResource(nil, tt.in, seenResources), tt.in, nil)
+		tsl, err := se.protoMetricToTimeSeries(context.Background(), se.getResource(nil, tt.in, seenResources), tt.in, nil)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
@@ -366,10 +366,10 @@ func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
 
 		statsExporter *statsExporter
 	}{
-		{in: nil, wantErr: "non-nil metric"},
+		{in: nil, wantErr: "non-nil metric or metric descriptor"},
 		{
 			in:      &metricspb.Metric{},
-			wantErr: "non-nil metric descriptor",
+			wantErr: "non-nil metric or metric descriptor",
 		},
 		{
 			in: &metricspb.Metric{
