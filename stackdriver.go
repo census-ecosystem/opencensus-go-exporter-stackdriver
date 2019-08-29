@@ -54,6 +54,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"strings"
 	"time"
 
 	metadataapi "cloud.google.com/go/compute/metadata"
@@ -247,6 +248,8 @@ type Options struct {
 
 const defaultTimeout = 5 * time.Second
 
+var defaultDomain = path.Join("custom.googleapis.com", "opencensus")
+
 // Exporter is a stats and trace exporter that uploads data to Stackdriver.
 //
 // You can create a single Exporter and register it as both a trace exporter
@@ -319,6 +322,9 @@ func NewExporter(o Options) (*Exporter, error) {
 		res.Labels[stackdriverGenericTaskID] = getTaskValue()
 
 		o.Resource = o.MapResource(res)
+	}
+	if o.MetricPrefix != "" && !strings.HasSuffix(o.MetricPrefix, "/") {
+		o.MetricPrefix = o.MetricPrefix + "/"
 	}
 
 	se, err := newStatsExporter(o)
