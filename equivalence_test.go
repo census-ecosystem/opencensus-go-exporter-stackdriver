@@ -160,71 +160,69 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 
 	// Generate the view.Data.
 	var vdl []*view.Data
-	for i := 0; i < 10; i++ {
-		vdl = append(vdl,
-			&view.Data{
-				Start: startTime,
-				End:   startTime.Add(time.Duration(1+i) * time.Second),
-				View: &view.View{
-					Name:        "ocagent.io/calls",
-					Description: "The number of the various calls",
-					Aggregation: view.Count(),
-					Measure:     mLatencyMs,
+	vdl = append(vdl,
+		&view.Data{
+			Start: startTime,
+			End:   startTime.Add(time.Duration(1) * time.Second),
+			View: &view.View{
+				Name:        "ocagent.io/calls",
+				Description: "The number of the various calls",
+				Aggregation: view.Count(),
+				Measure:     mLatencyMs,
+			},
+			Rows: []*view.Row{
+				{
+					Data: &view.CountData{Value: int64(8)},
 				},
-				Rows: []*view.Row{
-					{
-						Data: &view.CountData{Value: int64(4 * (i + 2))},
+			},
+		},
+		&view.Data{
+			Start: startTime,
+			End:   startTime.Add(time.Duration(2) * time.Second),
+			View: &view.View{
+				Name:        "ocagent.io/latency",
+				Description: "The latency of the various methods",
+				Aggregation: view.Distribution(100, 500, 1000, 2000, 4000, 8000, 16000),
+				Measure:     mLatencyMs,
+			},
+			Rows: []*view.Row{
+				{
+					Data: &view.DistributionData{
+						Count:          1,
+						Min:            100,
+						Max:            500,
+						Mean:           125.9,
+						CountPerBucket: []int64{0, 1, 0, 0, 0, 0, 0},
 					},
 				},
 			},
-			&view.Data{
-				Start: startTime,
-				End:   startTime.Add(time.Duration(2+i) * time.Second),
-				View: &view.View{
-					Name:        "ocagent.io/latency",
-					Description: "The latency of the various methods",
-					Aggregation: view.Distribution(100, 500, 1000, 2000, 4000, 8000, 16000),
-					Measure:     mLatencyMs,
-				},
-				Rows: []*view.Row{
-					{
-						Data: &view.DistributionData{
-							Count:          1,
-							Min:            100,
-							Max:            500,
-							Mean:           125.9,
-							CountPerBucket: []int64{0, 1, 0, 0, 0, 0, 0},
-						},
-					},
-				},
+		},
+		&view.Data{
+			Start: startTime,
+			End:   startTime.Add(time.Duration(3) * time.Second),
+			View: &view.View{
+				Name:        "ocagent.io/connections",
+				Description: "The count of various connections instantaneously",
+				Aggregation: view.LastValue(),
+				Measure:     mConnections,
 			},
-			&view.Data{
-				Start: startTime,
-				End:   startTime.Add(time.Duration(3+i) * time.Second),
-				View: &view.View{
-					Name:        "ocagent.io/connections",
-					Description: "The count of various connections instantaneously",
-					Aggregation: view.LastValue(),
-					Measure:     mConnections,
-				},
-				Rows: []*view.Row{
-					{Data: &view.LastValueData{Value: 99}},
-				},
+			Rows: []*view.Row{
+				{Data: &view.LastValueData{Value: 99}},
 			},
-			&view.Data{
-				Start: startTime,
-				End:   startTime.Add(time.Duration(1+i) * time.Second),
-				View: &view.View{
-					Name:        "ocagent.io/uptime",
-					Description: "The total uptime at any instance",
-					Aggregation: view.Sum(),
-					Measure:     mTimeMs,
-				},
-				Rows: []*view.Row{
-					{Data: &view.SumData{Value: 199903.97}},
-				},
-			})
-	}
+		},
+		&view.Data{
+			Start: startTime,
+			End:   startTime.Add(time.Duration(1) * time.Second),
+			View: &view.View{
+				Name:        "ocagent.io/uptime",
+				Description: "The total uptime at any instance",
+				Aggregation: view.Sum(),
+				Measure:     mTimeMs,
+			},
+			Rows: []*view.Row{
+				{Data: &view.SumData{Value: 199903.97}},
+			},
+		})
 
 	for _, vd := range vdl {
 		// Export the view.Data to the Stackdriver backend.
@@ -249,105 +247,104 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 
 	// Generate the proto Metrics.
 	var metricPbs []*metricspb.Metric
-	for i := 0; i < 10; i++ {
-		metricPbs = append(metricPbs,
-			&metricspb.Metric{
-				MetricDescriptor: &metricspb.MetricDescriptor{
-					Name:        "ocagent.io/calls",
-					Description: "The number of the various calls",
-					Unit:        "1",
-					Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
-				},
-				Timeseries: []*metricspb.TimeSeries{
-					{
-						StartTimestamp: startTimePb,
-						Points: []*metricspb.Point{
-							{
-								Timestamp: &timestamp.Timestamp{Seconds: int64(1001 + i)},
-								Value:     &metricspb.Point_Int64Value{Int64Value: int64(4 * (i + 2))},
-							},
+	metricPbs = append(metricPbs,
+		&metricspb.Metric{
+			MetricDescriptor: &metricspb.MetricDescriptor{
+				Name:        "ocagent.io/calls",
+				Description: "The number of the various calls",
+				Unit:        "1",
+				Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
+			},
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimePb,
+					Points: []*metricspb.Point{
+						{
+							Timestamp: &timestamp.Timestamp{Seconds: int64(1001)},
+							Value:     &metricspb.Point_Int64Value{Int64Value: int64(8)},
 						},
 					},
 				},
 			},
-			&metricspb.Metric{
-				MetricDescriptor: &metricspb.MetricDescriptor{
-					Name:        "ocagent.io/latency",
-					Description: "The latency of the various methods",
-					Unit:        "ms",
-					Type:        metricspb.MetricDescriptor_CUMULATIVE_DISTRIBUTION,
-				},
-				Timeseries: []*metricspb.TimeSeries{
-					{
-						StartTimestamp: startTimePb,
-						Points: []*metricspb.Point{
-							{
-								Timestamp: &timestamp.Timestamp{Seconds: int64(1002 + i)},
-								Value: &metricspb.Point_DistributionValue{
-									DistributionValue: &metricspb.DistributionValue{
-										Count: 1,
-										Sum:   125.9,
-										BucketOptions: &metricspb.DistributionValue_BucketOptions{
-											Type: &metricspb.DistributionValue_BucketOptions_Explicit_{
-												Explicit: &metricspb.DistributionValue_BucketOptions_Explicit{Bounds: []float64{100, 500, 1000, 2000, 4000, 8000, 16000}},
-											},
+		},
+		&metricspb.Metric{
+			MetricDescriptor: &metricspb.MetricDescriptor{
+				Name:        "ocagent.io/latency",
+				Description: "The latency of the various methods",
+				Unit:        "ms",
+				Type:        metricspb.MetricDescriptor_CUMULATIVE_DISTRIBUTION,
+			},
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimePb,
+					Points: []*metricspb.Point{
+						{
+							Timestamp: &timestamp.Timestamp{Seconds: int64(1002)},
+							Value: &metricspb.Point_DistributionValue{
+								DistributionValue: &metricspb.DistributionValue{
+									Count: 1,
+									Sum:   125.9,
+									BucketOptions: &metricspb.DistributionValue_BucketOptions{
+										Type: &metricspb.DistributionValue_BucketOptions_Explicit_{
+											Explicit: &metricspb.DistributionValue_BucketOptions_Explicit{Bounds: []float64{100, 500, 1000, 2000, 4000, 8000, 16000}},
 										},
-										Buckets: []*metricspb.DistributionValue_Bucket{{Count: 0}, {Count: 1}, {Count: 0}, {Count: 0}, {Count: 0}, {Count: 0}, {Count: 0}},
 									},
+									Buckets: []*metricspb.DistributionValue_Bucket{{Count: 0}, {Count: 1}, {Count: 0}, {Count: 0}, {Count: 0}, {Count: 0}, {Count: 0}},
 								},
 							},
 						},
 					},
 				},
 			},
-			&metricspb.Metric{
-				MetricDescriptor: &metricspb.MetricDescriptor{
-					Name:        "ocagent.io/connections",
-					Description: "The count of various connections instantaneously",
-					Unit:        "1",
-					Type:        metricspb.MetricDescriptor_GAUGE_INT64,
-				},
-				Timeseries: []*metricspb.TimeSeries{
-					{
-						StartTimestamp: startTimePb,
-						Points: []*metricspb.Point{
-							{
-								Timestamp: &timestamp.Timestamp{Seconds: int64(1003 + i)},
-								Value:     &metricspb.Point_Int64Value{Int64Value: 99},
-							},
+		},
+		&metricspb.Metric{
+			MetricDescriptor: &metricspb.MetricDescriptor{
+				Name:        "ocagent.io/connections",
+				Description: "The count of various connections instantaneously",
+				Unit:        "1",
+				Type:        metricspb.MetricDescriptor_GAUGE_INT64,
+			},
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimePb,
+					Points: []*metricspb.Point{
+						{
+							Timestamp: &timestamp.Timestamp{Seconds: int64(1003)},
+							Value:     &metricspb.Point_Int64Value{Int64Value: 99},
 						},
 					},
 				},
 			},
-			&metricspb.Metric{
-				MetricDescriptor: &metricspb.MetricDescriptor{
-					Name:        "ocagent.io/uptime",
-					Description: "The total uptime at any instance",
-					Unit:        "ms",
-					Type:        metricspb.MetricDescriptor_CUMULATIVE_DOUBLE,
-				},
-				Timeseries: []*metricspb.TimeSeries{
-					{
-						StartTimestamp: startTimePb,
-						Points: []*metricspb.Point{
-							{
-								Timestamp: &timestamp.Timestamp{Seconds: int64(1001 + i)},
-								Value:     &metricspb.Point_DoubleValue{DoubleValue: 199903.97},
-							},
+		},
+		&metricspb.Metric{
+			MetricDescriptor: &metricspb.MetricDescriptor{
+				Name:        "ocagent.io/uptime",
+				Description: "The total uptime at any instance",
+				Unit:        "ms",
+				Type:        metricspb.MetricDescriptor_CUMULATIVE_DOUBLE,
+			},
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimePb,
+					Points: []*metricspb.Point{
+						{
+							Timestamp: &timestamp.Timestamp{Seconds: int64(1001)},
+							Value:     &metricspb.Point_DoubleValue{DoubleValue: 199903.97},
 						},
 					},
 				},
-			})
-	}
+			},
+		})
 
 	// Export the proto Metrics to the Stackdriver backend.
-	se.ExportMetricsProto(context.Background(), nil, nil, metricPbs)
+	se.ExportMetricsProtoSync(context.Background(), nil, nil, metricPbs)
 	se.Flush()
 
 	var stackdriverTimeSeriesFromMetrics []*monitoringpb.CreateTimeSeriesRequest
 	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
 		stackdriverTimeSeriesFromMetrics = append(stackdriverTimeSeriesFromMetrics, sdt)
 	})
+
 	var stackdriverMetricDescriptorsFromMetrics []*monitoringpb.CreateMetricDescriptorRequest
 	server.forEachStackdriverMetricDescriptor(func(sdmd *monitoringpb.CreateMetricDescriptorRequest) {
 		stackdriverMetricDescriptorsFromMetrics = append(stackdriverMetricDescriptorsFromMetrics, sdmd)

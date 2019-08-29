@@ -59,18 +59,17 @@ var userAgent = fmt.Sprintf("opencensus-go %s; stackdriver-exporter %s", opencen
 type statsExporter struct {
 	o Options
 
-	viewDataBundler     *bundler.Bundler
-	protoMetricsBundler *bundler.Bundler
-	metricsBundler      *bundler.Bundler
+	viewDataBundler *bundler.Bundler
+	metricsBundler  *bundler.Bundler
 
 	createdViewsMu sync.Mutex
 	createdViews   map[string]*metricpb.MetricDescriptor // Views already created remotely
 
 	protoMu                sync.Mutex
-	protoMetricDescriptors map[string]*metricpb.MetricDescriptor // Saves the metric descriptors that were already created remotely
+	protoMetricDescriptors map[string]bool // Saves the metric descriptors that were already created remotely
 
 	metricMu          sync.Mutex
-	metricDescriptors map[string]*metricpb.MetricDescriptor // Saves the metric descriptors that were already created remotely
+	metricDescriptors map[string]bool // Saves the metric descriptors that were already created remotely
 
 	c             *monitoring.MetricClient
 	defaultLabels map[string]labelValue
@@ -104,8 +103,8 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		c:                      client,
 		o:                      o,
 		createdViews:           make(map[string]*metricpb.MetricDescriptor),
-		protoMetricDescriptors: make(map[string]*metricpb.MetricDescriptor),
-		metricDescriptors:      make(map[string]*metricpb.MetricDescriptor),
+		protoMetricDescriptors: make(map[string]bool),
+		metricDescriptors:      make(map[string]bool),
 	}
 
 	var defaultLablesNotSanitized map[string]labelValue
@@ -127,22 +126,16 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		vds := bundle.([]*view.Data)
 		e.handleUpload(vds...)
 	})
-	e.protoMetricsBundler = bundler.NewBundler((*metricProtoPayload)(nil), func(bundle interface{}) {
-		payloads := bundle.([]*metricProtoPayload)
-		e.handleMetricsProtoUpload(payloads)
-	})
 	e.metricsBundler = bundler.NewBundler((*metricdata.Metric)(nil), func(bundle interface{}) {
 		metrics := bundle.([]*metricdata.Metric)
 		e.handleMetricsUpload(metrics)
 	})
 	if delayThreshold := e.o.BundleDelayThreshold; delayThreshold > 0 {
 		e.viewDataBundler.DelayThreshold = delayThreshold
-		e.protoMetricsBundler.DelayThreshold = delayThreshold
 		e.metricsBundler.DelayThreshold = delayThreshold
 	}
 	if countThreshold := e.o.BundleCountThreshold; countThreshold > 0 {
 		e.viewDataBundler.BundleCountThreshold = countThreshold
-		e.protoMetricsBundler.BundleCountThreshold = countThreshold
 		e.metricsBundler.BundleCountThreshold = countThreshold
 	}
 	return e, nil
@@ -213,7 +206,6 @@ func (e *statsExporter) handleUpload(vds ...*view.Data) {
 // want to lose data that hasn't yet been exported.
 func (e *statsExporter) Flush() {
 	e.viewDataBundler.Flush()
-	e.protoMetricsBundler.Flush()
 	e.metricsBundler.Flush()
 }
 
