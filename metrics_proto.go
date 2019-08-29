@@ -630,7 +630,8 @@ func (se *statsExporter) metricTypeFromProto(name string) string {
 		name = prefix + name
 	}
 	if !hasDomain(name) {
-		name = path.Join("custom.googleapis.com", "opencensus", name)
+		// Still needed because the name may or may not have a "/" at the beginning.
+		name = path.Join(defaultDomain, name)
 	}
 	return name
 }
