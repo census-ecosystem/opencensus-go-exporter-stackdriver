@@ -453,7 +453,7 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 	}
 	metricType, _ := se.metricTypeFromProto(metricName)
 	metricLabelKeys := metric.GetMetricDescriptor().GetLabelKeys()
-	metricKind, _ := protoMetricDescriptorTypeToMetricKind(metric)
+	metricKind, valueType := protoMetricDescriptorTypeToMetricKind(metric)
 
 	timeSeries := make([]*monitoringpb.TimeSeries, 0, len(metric.Timeseries))
 	for _, protoTimeSeries := range metric.Timeseries {
@@ -474,8 +474,10 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, node *comm
 				Type:   metricType,
 				Labels: labels,
 			},
-			Resource: mappedRsc,
-			Points:   sdPoints,
+			MetricKind: metricKind,
+			ValueType:  valueType,
+			Resource:   mappedRsc,
+			Points:     sdPoints,
 		})
 	}
 
