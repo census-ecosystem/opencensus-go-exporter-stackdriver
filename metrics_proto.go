@@ -671,14 +671,13 @@ func fromProtoPoint(startTime *timestamp.Timestamp, pt *metricspb.Point) (*monit
 		return nil, err
 	}
 
-	mpt := &monitoringpb.Point{
+	return &monitoringpb.Point{
 		Value: mptv,
 		Interval: &monitoringpb.TimeInterval{
 			StartTime: startTime,
 			EndTime:   pt.Timestamp,
 		},
-	}
-	return mpt, nil
+	}, nil
 }
 
 func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
@@ -686,8 +685,6 @@ func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
 		return nil, nil
 	}
 
-	var err error
-	var tval *monitoringpb.TypedValue
 	switch v := value.(type) {
 	default:
 		// All the other types are not yet handled.
@@ -703,21 +700,21 @@ func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
 		// TODO: Add conversion from SummaryValue when
 		//      https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/66
 		// has been figured out.
-		err = fmt.Errorf("protoToMetricPoint: unknown Data type: %T", value)
+		return nil, fmt.Errorf("protoToMetricPoint: unknown Data type: %T", value)
 
 	case *metricspb.Point_Int64Value:
-		tval = &monitoringpb.TypedValue{
+		return &monitoringpb.TypedValue{
 			Value: &monitoringpb.TypedValue_Int64Value{
 				Int64Value: v.Int64Value,
 			},
-		}
+		}, nil
 
 	case *metricspb.Point_DoubleValue:
-		tval = &monitoringpb.TypedValue{
+		return &monitoringpb.TypedValue{
 			Value: &monitoringpb.TypedValue_DoubleValue{
 				DoubleValue: v.DoubleValue,
 			},
-		}
+		}, nil
 
 	case *metricspb.Point_DistributionValue:
 		dv := v.DistributionValue
@@ -755,10 +752,8 @@ func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
 			mv.DistributionValue.BucketCounts = addZeroBucketCountOnCondition(insertZeroBound, bucketCounts(dv.Buckets)...)
 
 		}
-		tval = &monitoringpb.TypedValue{Value: mv}
+		return &monitoringpb.TypedValue{Value: mv}, nil
 	}
-
-	return tval, err
 }
 
 func bucketCounts(buckets []*metricspb.DistributionValue_Bucket) []int64 {
