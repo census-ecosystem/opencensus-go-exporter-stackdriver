@@ -159,7 +159,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 
 	// Generate the metricdata.Metric.
 	metrics := []*metricdata.Metric{
-		&metricdata.Metric{
+		{
 			Descriptor: metricdata.Descriptor{
 				Name:        "ocagent.io/calls",
 				Description: "The number of the various calls",
@@ -173,7 +173,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 				},
 			},
 		},
-		&metricdata.Metric{
+		{
 			Descriptor: metricdata.Descriptor{
 				Name:        "ocagent.io/latency",
 				Description: "The latency of the various methods",
@@ -197,7 +197,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 				},
 			},
 		},
-		&metricdata.Metric{
+		{
 			Descriptor: metricdata.Descriptor{
 				Name:        "ocagent.io/connections",
 				Description: "The count of various connections instantaneously",
@@ -210,7 +210,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 				},
 			},
 		},
-		&metricdata.Metric{
+		{
 			Descriptor: metricdata.Descriptor{
 				Name:        "ocagent.io/uptime",
 				Description: "The total uptime at any instance",
