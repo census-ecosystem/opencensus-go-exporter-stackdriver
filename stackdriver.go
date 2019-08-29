@@ -343,9 +343,8 @@ func NewExporter(o Options) (*Exporter, error) {
 
 // ExportView exports to the Stackdriver Monitoring if view data
 // has one or more rows.
-func (e *Exporter) ExportView(vd *view.Data) {
-	e.statsExporter.ExportView(vd)
-}
+// Deprecated: this method does not have any effect now, use ExportMetrics instead.
+func (e *Exporter) ExportView(vd *view.Data) {}
 
 // ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring synchronously,
 // without de-duping or adding proto metrics to the bundler.

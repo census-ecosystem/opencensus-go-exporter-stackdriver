@@ -16,13 +16,13 @@ package stackdriver
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"sync"
 	"testing"
 	"time"
 
-	"go.opencensus.io/stats"
-	"go.opencensus.io/stats/view"
+	"go.opencensus.io/metric/metricdata"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
 
@@ -42,32 +42,30 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 
 	startTime := time.Unix(1000, 0)
 	startTimePb := &timestamp.Timestamp{Seconds: 1000}
-	mLatencyMs := stats.Float64("latency", "The latency for various methods", "ms")
-	v := &view.View{
+	md := metricdata.Descriptor{
 		Name:        "ocagent.io/latency",
 		Description: "The latency of the various methods",
-		Aggregation: view.Count(),
-		Measure:     mLatencyMs,
+		Unit:        "ms",
+		Type:        metricdata.TypeCumulativeInt64,
 	}
 	metricDescriptor := &metricspb.MetricDescriptor{
 		Name:        "ocagent.io/latency",
 		Description: "The latency of the various methods",
-		Unit:        "1",
+		Unit:        "ms",
 		Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 	}
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
 
-	// Generate some view.Data and metrics.
-	var vdl []*view.Data
+	// Generate some metricdata.Metric and metrics proto.
+	var metrics []*metricdata.Metric
 	var metricPbs []*metricspb.Metric
 	for i := 0; i < 100; i++ {
-		vd := &view.Data{
-			Start: startTime,
-			End:   startTime.Add(time.Duration(1+i) * time.Second),
-			View:  v,
-			Rows: []*view.Row{
+		metric := &metricdata.Metric{
+			Descriptor: md,
+			TimeSeries: []*metricdata.TimeSeries{
 				{
-					Data: &view.CountData{Value: int64(4 * (i + 2))},
+					StartTime: startTime,
+					Points:    []metricdata.Point{metricdata.NewInt64Point(startTime.Add(time.Duration(1+i)*time.Second), int64(4*(i+2)))},
 				},
 			},
 		}
@@ -85,35 +83,39 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 				},
 			},
 		}
-		vdl = append(vdl, vd)
+		metrics = append(metrics, metric)
 		metricPbs = append(metricPbs, metricPb)
 	}
 
 	// Now perform some exporting.
-	for i, vd := range vdl {
+	for i, metric := range metrics {
 		se := &statsExporter{
 			o: Options{ProjectID: "equivalence", MapResource: defaultMapResource},
 		}
 
 		ctx := context.Background()
-		sMD, err := se.viewToCreateMetricDescriptorRequest(ctx, vd.View)
+		sMD, err := se.metricToMpbMetricDescriptor(metric)
 		if err != nil {
-			t.Errorf("#%d: Stats.viewToMetricDescriptor: %v", i, err)
+			t.Errorf("#%d: Stats.metricToMpbMetricDescriptor: %v", i, err)
 		}
-		pMD, err := se.protoMetricDescriptorToCreateMetricDescriptorRequest(ctx, metricPbs[i], nil)
+		sMDR := &monitoringpb.CreateMetricDescriptorRequest{
+			Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
+			MetricDescriptor: sMD,
+		}
+		pMDR, err := se.protoMetricDescriptorToCreateMetricDescriptorRequest(ctx, metricPbs[i], nil)
 		if err != nil {
 			t.Errorf("#%d: Stats.protoMetricDescriptorToMetricDescriptor: %v", i, err)
 		}
-		if diff := cmpMDReq(pMD, sMD); diff != "" {
-			t.Fatalf("MetricDescriptor Mismatch -FromMetrics +FromStats: %s", diff)
+		if diff := cmpMDReq(pMDR, sMDR); diff != "" {
+			t.Fatalf("MetricDescriptor Mismatch -FromMetricsPb +FromMetrics: %s", diff)
 		}
 
-		vdl := []*view.Data{vd}
-		sctreql := se.makeReq(vdl, maxTimeSeriesPerUpload)
+		stss, _ := se.metricToMpbTs(ctx, metric)
+		sctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(stss)
 		tsl, _ := se.protoMetricToTimeSeries(ctx, se.getResource(nil, metricPbs[i], seenResources), metricPbs[i], nil)
 		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
 		if diff := cmpTSReqs(pctreql, sctreql); diff != "" {
-			t.Fatalf("TimeSeries Mismatch -FromMetrics +FromStats: %s", diff)
+			t.Fatalf("TimeSeries Mismatch -FromMetricsPb +FromMetrics: %s", diff)
 		}
 	}
 }
@@ -123,8 +125,8 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 // that the Stackdriver Metrics Proto client then sends to, as it would
 // send to Google Stackdriver backends.
 //
-// This test ensures that the final responses sent by direct stats(view.Data) exporting
-// are exactly equal to those from view.Data-->OpenCensus-Proto.Metrics exporting.
+// This test ensures that the final responses sent by direct stats(metricdata.Metric) exporting
+// are exactly equal to those from metricdata.Metric-->OpenCensus-Proto.Metrics exporting.
 func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
@@ -154,90 +156,87 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 
 	startTime := time.Unix(1000, 0)
 	startTimePb := &timestamp.Timestamp{Seconds: 1000}
-	mLatencyMs := stats.Float64("latency", "The latency for various methods", "ms")
-	mConnections := stats.Int64("connections", "The count of various connections at a point in time", "1")
-	mTimeMs := stats.Float64("time", "Counts time in milliseconds", "ms")
 
-	// Generate the view.Data.
-	var vdl []*view.Data
-	vdl = append(vdl,
-		&view.Data{
-			Start: startTime,
-			End:   startTime.Add(time.Duration(1) * time.Second),
-			View: &view.View{
+	// Generate the metricdata.Metric.
+	metrics := []*metricdata.Metric{
+		&metricdata.Metric{
+			Descriptor: metricdata.Descriptor{
 				Name:        "ocagent.io/calls",
 				Description: "The number of the various calls",
-				Aggregation: view.Count(),
-				Measure:     mLatencyMs,
+				Unit:        "1",
+				Type:        metricdata.TypeCumulativeInt64,
 			},
-			Rows: []*view.Row{
+			TimeSeries: []*metricdata.TimeSeries{
 				{
-					Data: &view.CountData{Value: int64(8)},
+					StartTime: startTime,
+					Points:    []metricdata.Point{metricdata.NewInt64Point(startTime.Add(time.Duration(1)*time.Second), 8)},
 				},
 			},
 		},
-		&view.Data{
-			Start: startTime,
-			End:   startTime.Add(time.Duration(2) * time.Second),
-			View: &view.View{
+		&metricdata.Metric{
+			Descriptor: metricdata.Descriptor{
 				Name:        "ocagent.io/latency",
 				Description: "The latency of the various methods",
-				Aggregation: view.Distribution(100, 500, 1000, 2000, 4000, 8000, 16000),
-				Measure:     mLatencyMs,
+
+				Unit: "ms",
+				Type: metricdata.TypeCumulativeDistribution,
 			},
-			Rows: []*view.Row{
+			TimeSeries: []*metricdata.TimeSeries{
 				{
-					Data: &view.DistributionData{
-						Count:          1,
-						Min:            100,
-						Max:            500,
-						Mean:           125.9,
-						CountPerBucket: []int64{0, 1, 0, 0, 0, 0, 0},
+					StartTime: startTime,
+					Points: []metricdata.Point{
+						metricdata.NewDistributionPoint(
+							startTime.Add(time.Duration(2)*time.Second),
+							&metricdata.Distribution{
+								Count:         1,
+								Sum:           125.9,
+								Buckets:       []metricdata.Bucket{{Count: 0}, {Count: 1}, {Count: 0}, {Count: 0}, {Count: 0}, {Count: 0}, {Count: 0}},
+								BucketOptions: &metricdata.BucketOptions{Bounds: []float64{100, 500, 1000, 2000, 4000, 8000, 16000}},
+							}),
 					},
 				},
 			},
 		},
-		&view.Data{
-			Start: startTime,
-			End:   startTime.Add(time.Duration(3) * time.Second),
-			View: &view.View{
+		&metricdata.Metric{
+			Descriptor: metricdata.Descriptor{
 				Name:        "ocagent.io/connections",
 				Description: "The count of various connections instantaneously",
-				Aggregation: view.LastValue(),
-				Measure:     mConnections,
+				Unit:        "1",
+				Type:        metricdata.TypeGaugeInt64,
 			},
-			Rows: []*view.Row{
-				{Data: &view.LastValueData{Value: 99}},
+			TimeSeries: []*metricdata.TimeSeries{
+				{
+					Points: []metricdata.Point{metricdata.NewInt64Point(startTime.Add(time.Duration(3)*time.Second), 99)},
+				},
 			},
 		},
-		&view.Data{
-			Start: startTime,
-			End:   startTime.Add(time.Duration(1) * time.Second),
-			View: &view.View{
+		&metricdata.Metric{
+			Descriptor: metricdata.Descriptor{
 				Name:        "ocagent.io/uptime",
 				Description: "The total uptime at any instance",
-				Aggregation: view.Sum(),
-				Measure:     mTimeMs,
+				Unit:        "ms",
+				Type:        metricdata.TypeCumulativeFloat64,
 			},
-			Rows: []*view.Row{
-				{Data: &view.SumData{Value: 199903.97}},
+			TimeSeries: []*metricdata.TimeSeries{
+				{
+					StartTime: startTime,
+					Points:    []metricdata.Point{metricdata.NewFloat64Point(startTime.Add(time.Duration(1)*time.Second), 199903.97)},
+				},
 			},
-		})
-
-	for _, vd := range vdl {
-		// Export the view.Data to the Stackdriver backend.
-		se.ExportView(vd)
+		},
 	}
+
+	se.ExportMetrics(context.Background(), metrics)
 	se.Flush()
 
 	// Examining the stackdriver metrics that are available.
-	var stackdriverTimeSeriesFromStats []*monitoringpb.CreateTimeSeriesRequest
+	var stackdriverTimeSeriesFromMetrics []*monitoringpb.CreateTimeSeriesRequest
 	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
-		stackdriverTimeSeriesFromStats = append(stackdriverTimeSeriesFromStats, sdt)
+		stackdriverTimeSeriesFromMetrics = append(stackdriverTimeSeriesFromMetrics, sdt)
 	})
-	var stackdriverMetricDescriptorsFromStats []*monitoringpb.CreateMetricDescriptorRequest
+	var stackdriverMetricDescriptorsFromMetrics []*monitoringpb.CreateMetricDescriptorRequest
 	server.forEachStackdriverMetricDescriptor(func(sdmd *monitoringpb.CreateMetricDescriptorRequest) {
-		stackdriverMetricDescriptorsFromStats = append(stackdriverMetricDescriptorsFromStats, sdmd)
+		stackdriverMetricDescriptorsFromMetrics = append(stackdriverMetricDescriptorsFromMetrics, sdmd)
 	})
 
 	// Reset the stackdriverTimeSeries to enable fresh collection
@@ -340,24 +339,23 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 	se.ExportMetricsProto(context.Background(), nil, nil, metricPbs)
 	se.Flush()
 
-	var stackdriverTimeSeriesFromMetrics []*monitoringpb.CreateTimeSeriesRequest
+	var stackdriverTimeSeriesFromMetricsPb []*monitoringpb.CreateTimeSeriesRequest
 	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
-		stackdriverTimeSeriesFromMetrics = append(stackdriverTimeSeriesFromMetrics, sdt)
+		stackdriverTimeSeriesFromMetricsPb = append(stackdriverTimeSeriesFromMetricsPb, sdt)
 	})
-
-	var stackdriverMetricDescriptorsFromMetrics []*monitoringpb.CreateMetricDescriptorRequest
+	var stackdriverMetricDescriptorsFromMetricsPb []*monitoringpb.CreateMetricDescriptorRequest
 	server.forEachStackdriverMetricDescriptor(func(sdmd *monitoringpb.CreateMetricDescriptorRequest) {
-		stackdriverMetricDescriptorsFromMetrics = append(stackdriverMetricDescriptorsFromMetrics, sdmd)
+		stackdriverMetricDescriptorsFromMetricsPb = append(stackdriverMetricDescriptorsFromMetricsPb, sdmd)
 	})
 
 	// The results should be equal now
-	if diff := cmpTSReqs(stackdriverTimeSeriesFromMetrics, stackdriverTimeSeriesFromStats); diff != "" {
-		t.Fatalf("Unexpected CreateTimeSeriesRequests -FromMetrics +FromStats: %s", diff)
+	if diff := cmpTSReqs(stackdriverTimeSeriesFromMetricsPb, stackdriverTimeSeriesFromMetrics); diff != "" {
+		t.Fatalf("Unexpected CreateTimeSeriesRequests -FromMetricsPb +FromMetrics: %s", diff)
 	}
 
 	// Examining the metric descriptors too.
-	if diff := cmpMDReqs(stackdriverMetricDescriptorsFromMetrics, stackdriverMetricDescriptorsFromStats); diff != "" {
-		t.Fatalf("Unexpected CreateMetricDescriptorRequests -FromMetrics +FromStats: %s", diff)
+	if diff := cmpMDReqs(stackdriverMetricDescriptorsFromMetricsPb, stackdriverMetricDescriptorsFromMetrics); diff != "" {
+		t.Fatalf("Unexpected CreateMetricDescriptorRequests -FromMetricsPb +FromMetrics: %s", diff)
 	}
 }
 
