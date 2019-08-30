@@ -102,9 +102,13 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 			Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
 			MetricDescriptor: sMD,
 		}
-		pMDR, err := se.protoMetricDescriptorToCreateMetricDescriptorRequest(ctx, metricPbs[i], nil)
+		inMD, err := se.protoToMonitoringMetricDescriptor(metricPbs[i], nil)
 		if err != nil {
 			t.Errorf("#%d: Stats.protoMetricDescriptorToMetricDescriptor: %v", i, err)
+		}
+		pMDR := &monitoringpb.CreateMetricDescriptorRequest{
+			Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
+			MetricDescriptor: inMD,
 		}
 		if diff := cmpMDReq(pMDR, sMDR); diff != "" {
 			t.Fatalf("MetricDescriptor Mismatch -FromMetricsPb +FromMetrics: %s", diff)
@@ -112,8 +116,8 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 
 		stss, _ := se.metricToMpbTs(ctx, metric)
 		sctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(stss)
-		tsl, _ := se.protoMetricToTimeSeries(ctx, se.getResource(nil, metricPbs[i], seenResources), metricPbs[i], nil)
-		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
+		allTss, _ := protoMetricToTimeSeries(ctx, se, se.getResource(nil, metricPbs[i], seenResources), metricPbs[i])
+		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(allTss)
 		if diff := cmpTSReqs(pctreql, sctreql); diff != "" {
 			t.Fatalf("TimeSeries Mismatch -FromMetricsPb +FromMetrics: %s", diff)
 		}

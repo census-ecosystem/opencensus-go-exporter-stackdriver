@@ -142,7 +142,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 		if se == nil {
 			se = new(statsExporter)
 		}
-		tsl, err := se.protoMetricToTimeSeries(context.Background(), se.getResource(nil, tt.in, seenResources), tt.in, nil)
+		allTss, err := protoMetricToTimeSeries(context.Background(), se, se.getResource(nil, tt.in, seenResources), tt.in)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
@@ -154,7 +154,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 			continue
 		}
 
-		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
+		got := se.combineTimeSeriesToCreateTimeSeriesRequest(allTss)
 		// Our saving grace is serialization equality since some
 		// unexported fields could be present in the various values.
 		if diff := cmpTSReqs(got, tt.want); diff != "" {
@@ -331,7 +331,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 		if se == nil {
 			se = new(statsExporter)
 		}
-		tsl, err := se.protoMetricToTimeSeries(context.Background(), se.getResource(nil, tt.in, seenResources), tt.in, nil)
+		allTss, err := protoMetricToTimeSeries(context.Background(), se, se.getResource(nil, tt.in, seenResources), tt.in)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
@@ -343,7 +343,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 			continue
 		}
 
-		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
+		got := se.combineTimeSeriesToCreateTimeSeriesRequest(allTss)
 		// Our saving grace is serialization equality since some
 		// unexported fields could be present in the various values.
 		if diff := cmpTSReqs(got, tt.want); diff != "" {
@@ -847,4 +847,10 @@ func makePercentileValue(val, percentile float64) *metricspb.SummaryValue_Snapsh
 		Value:      val,
 		Percentile: percentile,
 	}
+}
+
+func protoMetricToTimeSeries(ctx context.Context, se *statsExporter, mappedRsc *monitoredrespb.MonitoredResource, metric *metricspb.Metric) ([]*monitoringpb.TimeSeries, error) {
+	mb := newMetricsBatcher(se.o.ProjectID)
+	se.protoMetricToTimeSeries(ctx, mappedRsc, metric, mb)
+	return mb.allTss, mb.finalError()
 }
