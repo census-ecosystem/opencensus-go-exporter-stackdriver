@@ -343,6 +343,7 @@ func NewExporter(o Options) (*Exporter, error) {
 
 // ExportView exports to the Stackdriver Monitoring if view data
 // has one or more rows.
+// Deprecated: use ExportMetrics and StartMetricsExporter instead.
 func (e *Exporter) ExportView(vd *view.Data) {
 	e.statsExporter.ExportView(vd)
 }
