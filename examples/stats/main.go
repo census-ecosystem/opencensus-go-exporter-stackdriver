@@ -46,18 +46,16 @@ func main() {
 	// to setup the authorization.
 	// See https://developers.google.com/identity/protocols/application-default-credentials
 	// for more details.
-	_, err := stackdriver.NewExporter(stackdriver.Options{
+	se, err := stackdriver.NewExporter(stackdriver.Options{
 		ProjectID:         "your-project-id", // Google Cloud Console project ID for stackdriver.
 		MonitoredResource: monitoredresource.Autodetect(),
 	})
+	se.StartMetricsExporter()
+	defer se.StopMetricsExporter()
+
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Set reporting period to report data at 60 seconds.
-	// The recommended reporting period by Stackdriver Monitoring is >= 1 minute:
-	// https://cloud.google.com/monitoring/custom-metrics/creating-metrics#writing-ts.
-	view.SetReportingPeriod(60 * time.Second)
 
 	// Create view to see the processed video size cumulatively.
 	// Subscribe will allow view data to be exported.
