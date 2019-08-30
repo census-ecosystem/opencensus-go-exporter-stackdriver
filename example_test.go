@@ -34,6 +34,11 @@ func Example_defaults() {
 		log.Fatal(err)
 	}
 
+	// Export to Stackdriver Monitoring.
+	if err = exporter.StartMetricsExporter(); err != nil {
+		log.Fatal(err)
+	}
+
 	// Subscribe views to see stats in Stackdriver Monitoring.
 	if err := view.Register(
 		ochttp.ClientLatencyView,
@@ -73,7 +78,7 @@ func Example_gKE() {
 		zone = "unknown"
 	}
 
-	_, err = stackdriver.NewExporter(stackdriver.Options{
+	exporter, err := stackdriver.NewExporter(stackdriver.Options{
 		ProjectID: "google-project-id",
 		// Set a MonitoredResource that represents a GKE container.
 		Resource: &monitoredres.MonitoredResource{
@@ -98,6 +103,11 @@ func Example_gKE() {
 		DefaultMonitoringLabels: &stackdriver.Labels{},
 	})
 	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Register so that views are exported.
+	if err = exporter.StartMetricsExporter(); err != nil {
 		log.Fatal(err)
 	}
 }
