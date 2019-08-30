@@ -24,12 +24,14 @@ import (
 )
 
 type metricsBatcher struct {
-	projectID          string
-	allReqs            []*monitoringpb.CreateTimeSeriesRequest
-	allTss             []*monitoringpb.TimeSeries
-	allErrs            []error
+	projectID string
+	allReqs   []*monitoringpb.CreateTimeSeriesRequest
+	allTss    []*monitoringpb.TimeSeries
+	allErrs   []error
+	// Counts all received TimeSeries by this exporter.
 	receivedTimeSeries int
-	droppedTimeSeries  int
+	// Counts all dropped TimeSeries by this exporter.
+	droppedTimeSeries int
 }
 
 func newMetricsBatcher(projectID string) *metricsBatcher {
@@ -42,10 +44,12 @@ func newMetricsBatcher(projectID string) *metricsBatcher {
 
 func (mb *metricsBatcher) recordDroppedTimeseries(numTimeSeries int, err error) {
 	mb.droppedTimeSeries += numTimeSeries
+	mb.receivedTimeSeries += numTimeSeries
 	mb.allErrs = append(mb.allErrs, err)
 }
 
 func (mb *metricsBatcher) addTimeSeries(ts *monitoringpb.TimeSeries) {
+	mb.receivedTimeSeries++
 	mb.allTss = append(mb.allTss, ts)
 	if len(mb.allReqs) == maxTimeSeriesPerUpload {
 		mb.allReqs = append(mb.allReqs, &monitoringpb.CreateTimeSeriesRequest{
@@ -70,8 +74,6 @@ func (mb *metricsBatcher) export(ctx context.Context, mc *monitoring.MetricClien
 		if err := createTimeSeries(ctx, mc, req); err != nil {
 			mb.droppedTimeSeries += len(req.TimeSeries)
 			mb.allErrs = append(mb.allErrs, err)
-		} else {
-			mb.receivedTimeSeries += len(req.TimeSeries)
 		}
 	}
 }
