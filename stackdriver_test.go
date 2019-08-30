@@ -25,6 +25,7 @@ import (
 
 	"contrib.go.opencensus.io/exporter/stackdriver/internal/testpb"
 	"go.opencensus.io/plugin/ochttp"
+	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
 	"golang.org/x/net/context/ctxhttp"
 )
@@ -47,6 +48,8 @@ func TestExport(t *testing.T) {
 
 	trace.RegisterExporter(exporter)
 	defer trace.UnregisterExporter(exporter)
+	view.RegisterExporter(exporter)
+	defer view.UnregisterExporter(exporter)
 
 	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
 
@@ -110,6 +113,8 @@ func TestGRPC(t *testing.T) {
 
 	trace.RegisterExporter(exporter)
 	defer trace.UnregisterExporter(exporter)
+	view.RegisterExporter(exporter)
+	defer view.UnregisterExporter(exporter)
 
 	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
 
