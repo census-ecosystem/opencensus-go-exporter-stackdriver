@@ -27,12 +27,13 @@ import (
 	"sort"
 	"strings"
 
+	"go.opencensus.io/resource"
+
 	monitoring "cloud.google.com/go/monitoring/apiv3"
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
-	"github.com/golang/protobuf/ptypes/timestamp"
-	"go.opencensus.io/resource"
+	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
@@ -549,7 +550,7 @@ func hasDomain(name string) bool {
 	return false
 }
 
-func fromProtoPoint(startTime *timestamp.Timestamp, pt *metricspb.Point) (*monitoringpb.Point, error) {
+func fromProtoPoint(startTime *timestamppb.Timestamp, pt *metricspb.Point) (*monitoringpb.Point, error) {
 	if pt == nil {
 		return nil, nil
 	}
