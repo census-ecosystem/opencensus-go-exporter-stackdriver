@@ -49,9 +49,9 @@ var domains = []string{"googleapis.com", "kubernetes.io", "istio.io"}
 
 // ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring synchronously,
 // without de-duping or adding proto metrics to the bundler.
-func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
+func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) (int, error) {
 	if len(metrics) == 0 {
-		return errNilMetricOrMetricDescriptor
+		return 0, errNilMetricOrMetricDescriptor
 	}
 
 	ctx, cancel := se.o.newContextWithTimeout()
@@ -86,7 +86,7 @@ func (se *statsExporter) ExportMetricsProto(ctx context.Context, node *commonpb.
 	}
 
 	mb.export(ctx, se.c)
-	return mb.finalError()
+	return mb.droppedTimeSeries, mb.finalError()
 }
 
 func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*metricspb.Metric {

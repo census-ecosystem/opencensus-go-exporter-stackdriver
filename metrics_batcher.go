@@ -28,8 +28,6 @@ type metricsBatcher struct {
 	allReqs   []*monitoringpb.CreateTimeSeriesRequest
 	allTss    []*monitoringpb.TimeSeries
 	allErrs   []error
-	// Counts all received TimeSeries by this exporter.
-	receivedTimeSeries int
 	// Counts all dropped TimeSeries by this exporter.
 	droppedTimeSeries int
 }
@@ -44,14 +42,12 @@ func newMetricsBatcher(projectID string) *metricsBatcher {
 
 func (mb *metricsBatcher) recordDroppedTimeseries(numTimeSeries int, err error) {
 	mb.droppedTimeSeries += numTimeSeries
-	mb.receivedTimeSeries += numTimeSeries
 	mb.allErrs = append(mb.allErrs, err)
 }
 
 func (mb *metricsBatcher) addTimeSeries(ts *monitoringpb.TimeSeries) {
-	mb.receivedTimeSeries++
 	mb.allTss = append(mb.allTss, ts)
-	if len(mb.allReqs) == maxTimeSeriesPerUpload {
+	if len(mb.allTss) == maxTimeSeriesPerUpload {
 		mb.allReqs = append(mb.allReqs, &monitoringpb.CreateTimeSeriesRequest{
 			Name:       monitoring.MetricProjectPath(mb.projectID),
 			TimeSeries: mb.allTss,
