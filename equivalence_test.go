@@ -340,7 +340,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 		})
 
 	// Export the proto Metrics to the Stackdriver backend.
-	se.ExportMetricsProto(context.Background(), nil, nil, metricPbs)
+	se.PushMetricsProto(context.Background(), nil, nil, metricPbs)
 	se.Flush()
 
 	var stackdriverTimeSeriesFromMetricsPb []*monitoringpb.CreateTimeSeriesRequest
