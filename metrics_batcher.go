@@ -68,8 +68,7 @@ func (mb *metricsBatcher) export(ctx context.Context, mc *monitoring.MetricClien
 	// Send create time series requests to Stackdriver.
 	for _, req := range mb.allReqs {
 		if err := createTimeSeries(ctx, mc, req); err != nil {
-			mb.droppedTimeSeries += len(req.TimeSeries)
-			mb.allErrs = append(mb.allErrs, err)
+			mb.recordDroppedTimeseries(len(req.TimeSeries), err)
 		}
 	}
 }
