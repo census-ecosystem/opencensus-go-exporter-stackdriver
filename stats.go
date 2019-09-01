@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -40,6 +41,7 @@ import (
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	"google.golang.org/genproto/googleapis/api/metric"
+	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	metricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
@@ -392,6 +394,81 @@ func (e *statsExporter) displayName(suffix string) string {
 		displayNamePrefix = e.o.MetricPrefix
 	}
 	return path.Join(displayNamePrefix, suffix)
+}
+
+func (e *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monitoringpb.TimeSeries) (ctsreql []*monitoringpb.CreateTimeSeriesRequest) {
+	if len(ts) == 0 {
+		return nil
+	}
+
+	// Since there are scenarios in which Metrics with the same Type
+	// can be bunched in the same TimeSeries, we have to ensure that
+	// we create a unique CreateTimeSeriesRequest with entirely unique Metrics
+	// per TimeSeries, lest we'll encounter:
+	//
+	//      err: rpc error: code = InvalidArgument desc = One or more TimeSeries could not be written:
+	//      Field timeSeries[2] had an invalid value: Duplicate TimeSeries encountered.
+	//      Only one point can be written per TimeSeries per request.: timeSeries[2]
+	//
+	// This scenario happens when we are using the OpenCensus Agent in which multiple metrics
+	// are streamed by various client applications.
+	// See https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/73
+	uniqueTimeSeries := make([]*monitoringpb.TimeSeries, 0, len(ts))
+	nonUniqueTimeSeries := make([]*monitoringpb.TimeSeries, 0, len(ts))
+	seenMetrics := make(map[string]struct{})
+
+	for _, tti := range ts {
+		key := metricSignature(tti.Metric)
+		if _, alreadySeen := seenMetrics[key]; !alreadySeen {
+			uniqueTimeSeries = append(uniqueTimeSeries, tti)
+			seenMetrics[key] = struct{}{}
+		} else {
+			nonUniqueTimeSeries = append(nonUniqueTimeSeries, tti)
+		}
+	}
+
+	// UniqueTimeSeries can be bunched up together
+	// While for each nonUniqueTimeSeries, we have
+	// to make a unique CreateTimeSeriesRequest.
+	ctsreql = append(ctsreql, &monitoringpb.CreateTimeSeriesRequest{
+		Name:       monitoring.MetricProjectPath(e.o.ProjectID),
+		TimeSeries: uniqueTimeSeries,
+	})
+
+	// Now recursively also combine the non-unique TimeSeries
+	// that were singly added to nonUniqueTimeSeries.
+	// The reason is that we need optimal combinations
+	// for optimal combinations because:
+	// * "a/b/c"
+	// * "a/b/c"
+	// * "x/y/z"
+	// * "a/b/c"
+	// * "x/y/z"
+	// * "p/y/z"
+	// * "d/y/z"
+	//
+	// should produce:
+	//      CreateTimeSeries(uniqueTimeSeries)    :: ["a/b/c", "x/y/z", "p/y/z", "d/y/z"]
+	//      CreateTimeSeries(nonUniqueTimeSeries) :: ["a/b/c"]
+	//      CreateTimeSeries(nonUniqueTimeSeries) :: ["a/b/c", "x/y/z"]
+	nonUniqueRequests := e.combineTimeSeriesToCreateTimeSeriesRequest(nonUniqueTimeSeries)
+	ctsreql = append(ctsreql, nonUniqueRequests...)
+
+	return ctsreql
+}
+
+// metricSignature creates a unique signature consisting of a
+// metric's type and its lexicographically sorted label values
+// See https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/120
+func metricSignature(metric *googlemetricpb.Metric) string {
+	labels := metric.GetLabels()
+	labelValues := make([]string, 0, len(labels))
+
+	for _, labelValue := range labels {
+		labelValues = append(labelValues, labelValue)
+	}
+	sort.Strings(labelValues)
+	return fmt.Sprintf("%s:%s", metric.GetType(), strings.Join(labelValues, ","))
 }
 
 func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {

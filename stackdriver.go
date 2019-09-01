@@ -351,7 +351,13 @@ func (e *Exporter) ExportView(vd *view.Data) {
 // ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring synchronously,
 // without de-duping or adding proto metrics to the bundler.
 func (e *Exporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
-	return e.statsExporter.ExportMetricsProto(ctx, node, rsc, metrics)
+	_, err := e.statsExporter.PushMetricsProto(ctx, node, rsc, metrics)
+	return err
+}
+
+// PushMetricsProto simliar with ExportMetricsProto but returns the number of dropped timeseries.
+func (e *Exporter) PushMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) (int, error) {
+	return e.statsExporter.PushMetricsProto(ctx, node, rsc, metrics)
 }
 
 // ExportMetrics exports OpenCensus Metrics to Stackdriver Monitoring
