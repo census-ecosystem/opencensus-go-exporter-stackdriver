@@ -243,7 +243,7 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, mappedRsc 
 	metricType := se.metricTypeFromProto(metricName)
 	metricLabelKeys := metric.GetMetricDescriptor().GetLabelKeys()
 	metricKind, valueType := protoMetricDescriptorTypeToMetricKind(metric)
-	labelKeys := make([]string, len(metricLabelKeys))
+	labelKeys := make([]string, 0, len(metricLabelKeys))
 	for _, key := range metricLabelKeys {
 		labelKeys = append(labelKeys, sanitize(key.GetKey()))
 	}
