@@ -145,7 +145,7 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 
 func (e *statsExporter) startMetricsReader() error {
 	e.initReaderOnce.Do(func() {
-		e.ir, _ = metricexport.NewIntervalReader(&metricexport.Reader{}, e)
+		e.ir, _ = metricexport.NewIntervalReader(metricexport.NewReader(), e)
 	})
 	e.ir.ReportingInterval = e.o.ReportingInterval
 	return e.ir.Start()
