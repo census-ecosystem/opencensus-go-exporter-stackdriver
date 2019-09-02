@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -129,13 +130,13 @@ func (se *statsExporter) uploadMetrics(metrics []*metricdata.Metric) error {
 // but it doesn't invoke any remote API.
 func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.Metric) ([]*monitoringpb.TimeSeries, error) {
 	if metric == nil {
-		return nil, errNilMetric
+		return nil, errNilMetricOrMetricDescriptor
 	}
 
 	resource := se.metricRscToMpbRsc(metric.Resource)
 
 	metricName := metric.Descriptor.Name
-	metricType, _ := se.metricTypeFromProto(metricName)
+	metricType := se.metricTypeFromProto(metricName)
 	metricLabelKeys := metric.Descriptor.LabelKeys
 	metricKind, _ := metricDescriptorTypeToMetricKind(metric)
 
@@ -210,24 +211,18 @@ func (se *statsExporter) createMetricDescriptorFromMetric(ctx context.Context, m
 		return err
 	}
 
-	var md *googlemetricpb.MetricDescriptor
 	if builtinMetric(inMD.Type) {
-		gmrdesc := &monitoringpb.GetMetricDescriptorRequest{
-			Name: inMD.Name,
-		}
-		md, err = getMetricDescriptor(ctx, se.c, gmrdesc)
+		se.metricDescriptors[name] = true
 	} else {
-
 		cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
 			Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
 			MetricDescriptor: inMD,
 		}
-		md, err = createMetricDescriptor(ctx, se.c, cmrdesc)
-	}
-
-	if err == nil {
-		// Now record the metric as having been created.
-		se.metricDescriptors[name] = md
+		_, err = createMetricDescriptor(ctx, se.c, cmrdesc)
+		if err == nil {
+			// Now record the metric as having been created.
+			se.metricDescriptors[name] = true
+		}
 	}
 
 	return err
@@ -235,10 +230,10 @@ func (se *statsExporter) createMetricDescriptorFromMetric(ctx context.Context, m
 
 func (se *statsExporter) metricToMpbMetricDescriptor(metric *metricdata.Metric) (*googlemetricpb.MetricDescriptor, error) {
 	if metric == nil {
-		return nil, errNilMetric
+		return nil, errNilMetricOrMetricDescriptor
 	}
 
-	metricType, _ := se.metricTypeFromProto(metric.Descriptor.Name)
+	metricType := se.metricTypeFromProto(metric.Descriptor.Name)
 	displayName := se.displayName(metric.Descriptor.Name)
 	metricKind, valueType := metricDescriptorTypeToMetricKind(metric)
 

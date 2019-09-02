@@ -16,11 +16,10 @@ package stackdriver
 
 import (
 	"context"
-	"reflect"
 	"strings"
 	"testing"
 
-	"cloud.google.com/go/monitoring/apiv3"
+	monitoring "cloud.google.com/go/monitoring/apiv3"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
@@ -29,7 +28,6 @@ import (
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
-	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/google/go-cmp/cmp"
@@ -103,6 +101,8 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "global",
 							},
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_DISTRIBUTION,
 							Points: []*monitoringpb.Point{
 								{
 									Interval: &monitoringpb.TimeInterval{
@@ -135,12 +135,14 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 		},
 	}
 
+	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
+
 	for i, tt := range tests {
 		se := tt.statsExporter
 		if se == nil {
 			se = new(statsExporter)
 		}
-		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, nil, tt.in, nil)
+		allTss, err := protoMetricToTimeSeries(context.Background(), se, se.getResource(nil, tt.in, seenResources), tt.in)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
@@ -152,7 +154,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 			continue
 		}
 
-		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
+		got := se.combineTimeSeriesToCreateTimeSeriesRequest(allTss)
 		// Our saving grace is serialization equality since some
 		// unexported fields could be present in the various values.
 		if diff := cmpTSReqs(got, tt.want); diff != "" {
@@ -171,6 +173,8 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 		Nanos:   100000997,
 	}
 
+	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
+
 	tests := []struct {
 		in            *metricspb.Metric
 		want          []*monitoringpb.CreateTimeSeriesRequest
@@ -183,6 +187,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 					Name:        "with_container_resource",
 					Description: "This is a test",
 					Unit:        "By",
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 				},
 				Resource: &resourcepb.Resource{
 					Type: resourcekeys.ContainerType,
@@ -230,6 +235,8 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 									"container_name": "container-name1",
 								},
 							},
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_INT64,
 							Points: []*monitoringpb.Point{
 								{
 									Interval: &monitoringpb.TimeInterval{
@@ -254,6 +261,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 					Name:        "with_gce_resource",
 					Description: "This is a test",
 					Unit:        "By",
+					Type:        metricspb.MetricDescriptor_CUMULATIVE_INT64,
 				},
 				Resource: &resourcepb.Resource{
 					Type: resourcekeys.CloudType,
@@ -296,6 +304,8 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 									"zone":        "zone1",
 								},
 							},
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_INT64,
 							Points: []*monitoringpb.Point{
 								{
 									Interval: &monitoringpb.TimeInterval{
@@ -321,7 +331,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 		if se == nil {
 			se = new(statsExporter)
 		}
-		tsl, err := se.protoMetricToTimeSeries(context.Background(), nil, nil, tt.in, nil)
+		allTss, err := protoMetricToTimeSeries(context.Background(), se, se.getResource(nil, tt.in, seenResources), tt.in)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
@@ -333,12 +343,16 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 			continue
 		}
 
-		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
+		got := se.combineTimeSeriesToCreateTimeSeriesRequest(allTss)
 		// Our saving grace is serialization equality since some
 		// unexported fields could be present in the various values.
 		if diff := cmpTSReqs(got, tt.want); diff != "" {
 			t.Fatalf("Test %d failed. Unexpected CreateTimeSeriesRequests -got +want: %s", i, diff)
 		}
+	}
+
+	if len(seenResources) != 2 {
+		t.Errorf("Should cache 2 resources, got %d", len(seenResources))
 	}
 }
 
@@ -350,10 +364,10 @@ func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
 
 		statsExporter *statsExporter
 	}{
-		{in: nil, wantErr: "non-nil metric"},
+		{in: nil, wantErr: "non-nil metric or metric descriptor"},
 		{
 			in:      &metricspb.Metric{},
-			wantErr: "non-nil metric descriptor",
+			wantErr: "non-nil metric or metric descriptor",
 		},
 		{
 			in: &metricspb.Metric{
@@ -616,45 +630,6 @@ func TestCombineTimeSeriesAndDeduplication(t *testing.T) {
 	}
 }
 
-func TestNodeToDefaultLabels(t *testing.T) {
-	tests := []struct {
-		in   *commonpb.Node
-		want map[string]labelValue
-	}{
-		{
-			in: &commonpb.Node{
-				Identifier:  &commonpb.ProcessIdentifier{HostName: "host1", Pid: 8081},
-				LibraryInfo: &commonpb.LibraryInfo{Language: commonpb.LibraryInfo_JAVA},
-			},
-			want: map[string]labelValue{
-				"opencensus_task": {
-					val:  "java-8081@host1",
-					desc: "Opencensus task identifier",
-				},
-			},
-		},
-		{
-			in: &commonpb.Node{
-				Identifier:  &commonpb.ProcessIdentifier{HostName: "host2", Pid: 9090},
-				LibraryInfo: &commonpb.LibraryInfo{Language: commonpb.LibraryInfo_PYTHON},
-			},
-			want: map[string]labelValue{
-				"opencensus_task": {
-					val:  "python-9090@host2",
-					desc: "Opencensus task identifier",
-				},
-			},
-		},
-	}
-
-	for i, tt := range tests {
-		got := getDefaultLabelsFromNode(tt.in)
-		if !reflect.DeepEqual(got, tt.want) {
-			t.Fatalf("Test %d failed. Default labels mismatch. Want %v\nGot %v\n", i, tt.want, got)
-		}
-	}
-}
-
 func TestConvertSummaryMetrics(t *testing.T) {
 	startTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
@@ -774,6 +749,47 @@ func TestConvertSummaryMetrics(t *testing.T) {
 	}
 }
 
+func TestMetricPrefix(t *testing.T) {
+	tests := []struct {
+		name          string
+		in            string
+		want          string
+		statsExporter *statsExporter
+	}{
+		{
+			name: "No prefix and metric name has a kubernetes domain",
+			in:   "kubernetes.io/container/memory/limit_bytes",
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo"},
+			},
+			want: "kubernetes.io/container/memory/limit_bytes",
+		},
+		{
+			name: "Has a prefix but prefix doesn't have a domain",
+			in:   "my_metric",
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo", MetricPrefix: "prefix/"},
+			},
+			want: "custom.googleapis.com/opencensus/prefix/my_metric",
+		},
+		{
+			name: "Has a prefix and prefix has a domain",
+			in:   "my_metric",
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo", MetricPrefix: "appengine.googleapis.com/"},
+			},
+			want: "appengine.googleapis.com/my_metric",
+		},
+	}
+
+	for _, tt := range tests {
+		got := tt.statsExporter.metricTypeFromProto(tt.in)
+		if !cmp.Equal(got, tt.want) {
+			t.Fatalf("mismatch metric names for test %v:\n  got=%v\n want=%v\n", tt.name, got, tt.want)
+		}
+	}
+}
+
 func makeInt64Ts(val int64, label string, start, end *timestamp.Timestamp) *metricspb.TimeSeries {
 	ts := &metricspb.TimeSeries{
 		StartTimestamp: start,
@@ -831,4 +847,10 @@ func makePercentileValue(val, percentile float64) *metricspb.SummaryValue_Snapsh
 		Value:      val,
 		Percentile: percentile,
 	}
+}
+
+func protoMetricToTimeSeries(ctx context.Context, se *statsExporter, mappedRsc *monitoredrespb.MonitoredResource, metric *metricspb.Metric) ([]*monitoringpb.TimeSeries, error) {
+	mb := newMetricsBatcher(se.o.ProjectID)
+	se.protoMetricToTimeSeries(ctx, mappedRsc, metric, mb)
+	return mb.allTss, mb.finalError()
 }
