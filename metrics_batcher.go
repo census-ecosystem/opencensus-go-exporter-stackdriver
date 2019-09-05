@@ -52,7 +52,7 @@ func (mb *metricsBatcher) addTimeSeries(ts *monitoringpb.TimeSeries) {
 			Name:       monitoring.MetricProjectPath(mb.projectID),
 			TimeSeries: mb.allTss,
 		})
-		mb.allTss = make([]*monitoringpb.TimeSeries, maxTimeSeriesPerUpload)
+		mb.allTss = make([]*monitoringpb.TimeSeries, 0, maxTimeSeriesPerUpload)
 	}
 }
 
