@@ -22,17 +22,178 @@ import (
 	monitoring "cloud.google.com/go/monitoring/apiv3"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"google.golang.org/api/option"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
+	"google.golang.org/grpc"
 
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/resource/resourcekeys"
 )
+
+func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
+	server, addr, doneFn := createFakeServer(t)
+	defer doneFn()
+
+	// Now create a gRPC connection to the agent.
+	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	if err != nil {
+		t.Fatalf("Failed to make a gRPC connection to the agent: %v", err)
+	}
+	defer conn.Close()
+
+	// Finally create the OpenCensus stats exporter
+	exporterOptions := Options{
+		ProjectID:               "equivalence",
+		MonitoringClientOptions: []option.ClientOption{option.WithGRPCConn(conn)},
+
+		// Set empty labels to avoid the opencensus-task
+		DefaultMonitoringLabels: &Labels{},
+	}
+	se, err := NewExporter(exporterOptions)
+	if err != nil {
+		t.Fatalf("Failed to create the statsExporter: %v", err)
+	}
+
+	startTimePb := &timestamp.Timestamp{Seconds: 1000}
+	endTimePb := &timestamp.Timestamp{Seconds: 1001}
+
+	// Generate the proto Metrics.
+	var metricPbs []*metricspb.Metric
+	metricPbs = append(metricPbs,
+		&metricspb.Metric{
+			MetricDescriptor: &metricspb.MetricDescriptor{
+				Name:        "ocagent.io/calls",
+				Description: "The number of the various calls",
+				LabelKeys: []*metricspb.LabelKey{
+					{
+						Key: "empty_key",
+					},
+					{
+						Key: "operation_type",
+					},
+				},
+				Unit: "1",
+				Type: metricspb.MetricDescriptor_CUMULATIVE_INT64,
+			},
+			Timeseries: []*metricspb.TimeSeries{
+				{
+					StartTimestamp: startTimePb,
+					LabelValues: []*metricspb.LabelValue{
+						{
+							Value:    "",
+							HasValue: true,
+						},
+						{
+							Value:    "test_1",
+							HasValue: true,
+						},
+					},
+					Points: []*metricspb.Point{
+						{
+							Timestamp: endTimePb,
+							Value:     &metricspb.Point_Int64Value{Int64Value: int64(1)},
+						},
+					},
+				},
+				{
+					StartTimestamp: startTimePb,
+					LabelValues: []*metricspb.LabelValue{
+						{
+							Value:    "",
+							HasValue: true,
+						},
+						{
+							Value:    "test_2",
+							HasValue: true,
+						},
+					},
+					Points: []*metricspb.Point{
+						{
+							Timestamp: endTimePb,
+							Value:     &metricspb.Point_Int64Value{Int64Value: int64(1)},
+						},
+					},
+				},
+			},
+		})
+
+	var wantTimeSeries []*monitoringpb.CreateTimeSeriesRequest
+	wantTimeSeries = append(wantTimeSeries, &monitoringpb.CreateTimeSeriesRequest{
+		Name: "projects/equivalence",
+		TimeSeries: []*monitoringpb.TimeSeries{
+			{
+				Metric: &googlemetricpb.Metric{
+					Type: "custom.googleapis.com/opencensus/ocagent.io/calls",
+					Labels: map[string]string{
+						"empty_key":      "",
+						"operation_type": "test_1",
+					},
+				},
+				Resource: &monitoredrespb.MonitoredResource{
+					Type: "global",
+				},
+				Points: []*monitoringpb.Point{
+					{
+						Interval: &monitoringpb.TimeInterval{
+							StartTime: startTimePb,
+							EndTime:   endTimePb,
+						},
+						Value: &monitoringpb.TypedValue{
+							Value: &monitoringpb.TypedValue_Int64Value{
+								Int64Value: 1,
+							},
+						},
+					},
+				},
+			},
+			{
+				Metric: &googlemetricpb.Metric{
+					Type: "custom.googleapis.com/opencensus/ocagent.io/calls",
+					Labels: map[string]string{
+						"empty_key":      "",
+						"operation_type": "test_2",
+					},
+				},
+				Resource: &monitoredrespb.MonitoredResource{
+					Type: "global",
+				},
+				Points: []*monitoringpb.Point{
+					{
+						Interval: &monitoringpb.TimeInterval{
+							StartTime: startTimePb,
+							EndTime:   endTimePb,
+						},
+						Value: &monitoringpb.TypedValue{
+							Value: &monitoringpb.TypedValue_Int64Value{
+								Int64Value: 1,
+							},
+						},
+					},
+				},
+			},
+		}, //<metric:<type:"custom.googleapis.com/opencensus/ocagent.io/calls" labels:<key:"opencensus_task" value:"go-99078@bdrutu-macbookpro2.roam.corp.google.com" > > resource:<type:"global" > metric_kind:CUMULATIVE value_type:INT64 points:<interval:<end_time:<seconds:1001 > start_time:<seconds:1000 > > value:<int64_value:8 > > > time_series:<metric:<type:"custom.googleapis.com/opencensus/ocagent.io/calls" labels:<key:"opencensus_task" value:"go-99078@bdrutu-macbookpro2.roam.corp.google.com" > > resource:<type:"global" > metric_kind:CUMULATIVE value_type:INT64 points:<interval:<end_time:<seconds:1001 > start_time:<seconds:1000 > > value:<int64_value:8 > > > `,
+	})
+
+	// Export the proto Metrics to the Stackdriver backend.
+	se.PushMetricsProto(context.Background(), nil, nil, metricPbs)
+	se.Flush()
+
+	var stackdriverTimeSeriesFromMetricsPb []*monitoringpb.CreateTimeSeriesRequest
+	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
+		stackdriverTimeSeriesFromMetricsPb = append(stackdriverTimeSeriesFromMetricsPb, sdt)
+	})
+
+	// The results should be equal now
+	if diff := cmpTSReqs(stackdriverTimeSeriesFromMetricsPb, wantTimeSeries); diff != "" {
+		t.Fatalf("Unexpected CreateTimeSeriesRequests -FromMetricsPb +FromMetrics: %s", diff)
+	}
+}
 
 func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 	startTimestamp := &timestamp.Timestamp{

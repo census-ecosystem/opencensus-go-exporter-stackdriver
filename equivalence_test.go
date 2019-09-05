@@ -37,9 +37,6 @@ import (
 )
 
 func TestStatsAndMetricsEquivalence(t *testing.T) {
-	_, _, stop := createFakeServer(t)
-	defer stop()
-
 	startTime := time.Unix(1000, 0)
 	startTimePb := &timestamp.Timestamp{Seconds: 1000}
 	md := metricdata.Descriptor{
