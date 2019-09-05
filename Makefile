@@ -13,7 +13,6 @@ GOLINT=golint
 GOIMPORTS=goimports
 GOVET=go vet
 EMBEDMD=embedmd
-ADDLICENCESE= addlicense
 STATICCHECK=staticcheck
 # TODO decide if we need to change these names.
 README_FILES := $(shell find . -name '*README.md' | sort | tr '\n' ' ')
@@ -21,11 +20,11 @@ README_FILES := $(shell find . -name '*README.md' | sort | tr '\n' ' ')
 .DEFAULT_GOAL := defaul-goal
 
 .PHONY: defaul-goal
-defaul-goal: addlicense fmt lint vet embedmd goimports staticcheck test
+defaul-goal: fmt lint vet embedmd goimports staticcheck test
 
 # TODO: enable test-with-cover when find out why "scripts/check-test-files.sh: 4: set: Illegal option -o pipefail"
 .PHONY: travis-ci
-travis-ci: addlicense fmt lint vet embedmd goimports staticcheck test test-386 test-with-coverage
+travis-ci: fmt lint vet embedmd goimports staticcheck test test-386 test-with-coverage
 
 all-pkgs:
 	@echo $(ALL_PKGS) | tr ' ' '\n' | sort
@@ -102,17 +101,6 @@ embedmd:
 	    echo "Embedmd finished successfully"; \
 	fi
 
-.PHONY: addlicense
-addlicense:
-	@ADDLICENCESEOUT=`$(ADDLICENCESE) -y 2019 -c 'OpenTelemetry Authors' $(ALL_SRC) 2>&1`; \
-		if [ "$$ADDLICENCESEOUT" ]; then \
-			echo "$(ADDLICENCESE) FAILED => add License errors:\n"; \
-			echo "$$ADDLICENCESEOUT\n"; \
-			exit 1; \
-		else \
-			echo "Add License finished successfully"; \
-		fi
-
 .PHONY: goimports
 goimports:
 	@IMPORTSOUT=`$(GOIMPORTS) -d . 2>&1`; \
@@ -133,6 +121,5 @@ install-tools:
 	GO111MODULE=on go install \
 		golang.org/x/lint/golint \
 		golang.org/x/tools/cmd/goimports \
-		github.com/google/addlicense \
 		github.com/rakyll/embedmd \
 		honnef.co/go/tools/cmd/staticcheck
