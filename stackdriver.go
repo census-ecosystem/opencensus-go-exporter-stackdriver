@@ -279,10 +279,6 @@ func NewExporter(o Options) (*Exporter, error) {
 	}
 	if o.Location == "" {
 		if metadataapi.OnGCE() {
-			ctx := o.Context
-			if ctx == nil {
-				ctx = context.Background()
-			}
 			zone, err := metadataapi.Zone()
 			if err != nil {
 				// This error should be logged with a warning level.
@@ -425,12 +421,10 @@ func (o Options) handleError(err error) {
 	log.Printf("Failed to export to Stackdriver: %v", err)
 }
 
-func (o Options) newContextWithTimeout() (context.Context, func()) {
-	ctx := o.Context
+func newContextWithTimeout(ctx context.Context, timeout time.Duration) (context.Context, func()) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	timeout := o.Timeout
 	if timeout <= 0 {
 		timeout = defaultTimeout
 	}

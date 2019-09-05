@@ -20,9 +20,9 @@ import (
 	"testing"
 	"time"
 
+	monitoring "cloud.google.com/go/monitoring/apiv3"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 
-	"cloud.google.com/go/monitoring/apiv3"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/stats"
@@ -107,7 +107,7 @@ func TestExporter_makeReq(t *testing.T) {
 			vd:     newTestViewData(v, start, end, count1, count2),
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
-					Name: monitoring.MetricProjectPath("proj-id"),
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
@@ -182,7 +182,7 @@ func TestExporter_makeReq(t *testing.T) {
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
-					Name: monitoring.MetricProjectPath("proj-id"),
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
@@ -252,7 +252,7 @@ func TestExporter_makeReq(t *testing.T) {
 			vd:     newTestViewData(v, start, end, sum1, sum2),
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
-					Name: monitoring.MetricProjectPath("proj-id"),
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
@@ -322,7 +322,7 @@ func TestExporter_makeReq(t *testing.T) {
 			vd:     newTestViewData(lastValueView, start, end, &last1, &last2),
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
-					Name: monitoring.MetricProjectPath("proj-id"),
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
@@ -383,7 +383,7 @@ func TestExporter_makeReq(t *testing.T) {
 			projID: "proj-id",
 			vd:     newTestDistViewData(distView, start, end),
 			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
 				TimeSeries: []*monitoringpb.TimeSeries{
 					{
 						Metric: &metricpb.Metric{
@@ -429,7 +429,7 @@ func TestExporter_makeReq(t *testing.T) {
 			projID: "proj-id",
 			vd:     newTestDistViewData(distView, start, end),
 			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
 				TimeSeries: []*monitoringpb.TimeSeries{
 					{
 						Metric: &metricpb.Metric{
@@ -947,7 +947,7 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 			vd:   newTestViewData(v, start, end, count1, count2),
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
-					Name: monitoring.MetricProjectPath("proj-id"),
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
@@ -1020,7 +1020,7 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 			vd: newTestViewData(v, start, end, count1, count2),
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
-					Name: monitoring.MetricProjectPath("proj-id"),
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
@@ -1093,7 +1093,7 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 			vd: newTestViewData(v, start, end, count1, count2),
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
-					Name: monitoring.MetricProjectPath("proj-id"),
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
@@ -1159,7 +1159,7 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 			vd:   newTestViewData(v, start, end, count1, count2),
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
-					Name: monitoring.MetricProjectPath("proj-id"),
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &metricpb.Metric{
@@ -1331,24 +1331,6 @@ func newTestDistViewData(v *view.View, start, end time.Time) *view.Data {
 				Mean:            3,
 				SumOfSquaredDev: 1.5,
 				CountPerBucket:  []int64{2, 2, 1},
-			}},
-		},
-		Start: start,
-		End:   end,
-	}
-}
-
-func newTestDistViewDataWithZeroBucket(v *view.View, start, end time.Time) *view.Data {
-	return &view.Data{
-		View: v,
-		Rows: []*view.Row{
-			{Data: &view.DistributionData{
-				Count:           5,
-				Min:             1,
-				Max:             7,
-				Mean:            3,
-				SumOfSquaredDev: 1.5,
-				CountPerBucket:  []int64{0, 2, 2, 1},
 			}},
 		},
 		Start: start,
