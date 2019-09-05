@@ -22,3 +22,6 @@ script:
   - GO111MODULE=off go build ./...
   - GO111MODULE=off go test -v -race $PKGS            # Make sure tests still pass when not using Go modules.
   - 'if [[ $TRAVIS_GO_VERSION = 1.8* ]]; then ! golint ./... | grep -vE "(_mock|_string|\.pb)\.go:"; fi'
+
+after_success:
+  - bash <(curl -s https://codecov.io/bash)

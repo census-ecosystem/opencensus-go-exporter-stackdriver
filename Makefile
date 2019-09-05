@@ -15,15 +15,22 @@ EMBEDMD=embedmd
 # TODO decide if we need to change these names.
 README_FILES := $(shell find . -name '*README.md' | sort | tr '\n' ' ')
 
-
 .DEFAULT_GOAL := fmt-lint-vet-embedmd-test
 
 .PHONY: fmt-lint-vet-embedmd-test
 fmt-lint-vet-embedmd-test: fmt lint vet embedmd test
 
-# TODO enable test-with-coverage in tavis
 .PHONY: travis-ci
-travis-ci: fmt lint vet embedmd test test-386
+travis-ci: fmt lint vet embedmd test test-386 test-with-cover
+
+.PHONY: test-with-cover
+test-with-cover:
+	@echo Verifying that all packages have test files to count in coverage
+	@scripts/check-test-files.sh $(subst contrib.go.opencensus.io/exporter/stackdriver,./,$(ALL_PKGS))
+	@echo pre-compiling tests
+	@time go test -i $(ALL_PKGS)
+	$(GOTEST) $(GOTEST_OPT_WITH_COVERAGE) $(ALL_PKGS)
+	go tool cover -html=coverage.txt -o coverage.html
 
 all-pkgs:
 	@echo $(ALL_PKGS) | tr ' ' '\n' | sort
