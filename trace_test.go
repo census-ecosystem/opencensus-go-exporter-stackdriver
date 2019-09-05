@@ -67,7 +67,7 @@ func TestNewContext_Timeout(t *testing.T) {
 	e := newTraceExporterWithClient(Options{
 		Timeout: 10 * time.Millisecond,
 	}, nil)
-	ctx, cancel := e.o.newContextWithTimeout()
+	ctx, cancel := newContextWithTimeout(e.o.Context, e.o.Timeout)
 	defer cancel()
 	select {
 	case <-time.After(60 * time.Second):

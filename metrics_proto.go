@@ -54,7 +54,7 @@ func (se *statsExporter) PushMetricsProto(ctx context.Context, node *commonpb.No
 		return 0, errNilMetricOrMetricDescriptor
 	}
 
-	ctx, cancel := se.o.newContextWithTimeout()
+	ctx, cancel := newContextWithTimeout(ctx, se.o.Timeout)
 	defer cancel()
 
 	// Caches the resources seen so far
@@ -284,7 +284,7 @@ func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []string, lab
 
 	// Perform this sanity check now.
 	if len(labelKeys) != len(labelValues) {
-		return labels, fmt.Errorf("Length mismatch: len(labelKeys)=%d len(labelValues)=%d", len(labelKeys), len(labelValues))
+		return labels, fmt.Errorf("length mismatch: len(labelKeys)=%d len(labelValues)=%d", len(labelKeys), len(labelValues))
 	}
 
 	for i, labelKey := range labelKeys {

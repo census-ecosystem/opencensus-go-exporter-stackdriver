@@ -12,13 +12,15 @@ GOFMT=gofmt
 GOLINT=golint
 GOVET=go vet
 EMBEDMD=embedmd
+ADDLICENCESE= addlicense
+STATICCHECK=staticcheck
 # TODO decide if we need to change these names.
 README_FILES := $(shell find . -name '*README.md' | sort | tr '\n' ' ')
 
 .DEFAULT_GOAL := fmt-lint-vet-embedmd-test
 
 .PHONY: fmt-lint-vet-embedmd-test
-fmt-lint-vet-embedmd-test: fmt lint vet embedmd test
+fmt-lint-vet-embedmd-test: addlicense fmt lint vet embedmd staticcheck test
 
 .PHONY: travis-ci
 travis-ci: fmt lint vet embedmd test test-386 test-with-cover
@@ -95,8 +97,26 @@ embedmd:
 	    echo "Embedmd finished successfully"; \
 	fi
 
+.PHONY: addlicense
+addlicense:
+	@ADDLICENCESEOUT=`$(ADDLICENCESE) -y 2019 -c 'OpenTelemetry Authors' $(ALL_SRC) 2>&1`; \
+		if [ "$$ADDLICENCESEOUT" ]; then \
+			echo "$(ADDLICENCESE) FAILED => add License errors:\n"; \
+			echo "$$ADDLICENCESEOUT\n"; \
+			exit 1; \
+		else \
+			echo "Add License finished successfully"; \
+		fi
+
+.PHONY: staticcheck
+staticcheck:
+	$(STATICCHECK) ./...
+
 .PHONY: install-tools
 install-tools:
-	go get -u golang.org/x/tools/cmd/cover
-	go get -u golang.org/x/lint/golint
-	go get -u github.com/rakyll/embedmd
+	GO111MODULE=on go install \
+		golang.org/x/lint/golint \
+		golang.org/x/tools/cmd/goimports \
+		github.com/google/addlicense \
+		github.com/rakyll/embedmd \
+		honnef.co/go/tools/cmd/staticcheck

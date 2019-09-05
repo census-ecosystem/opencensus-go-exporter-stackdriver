@@ -41,8 +41,8 @@ func Example_defaults() {
 
 	// Subscribe views to see stats in Stackdriver Monitoring.
 	if err := view.Register(
-		ochttp.ClientLatencyView,
-		ochttp.ClientResponseBytesView,
+		ochttp.ClientRoundtripLatencyDistribution,
+		ochttp.ClientReceivedBytesDistribution,
 	); err != nil {
 		log.Fatal(err)
 	}
