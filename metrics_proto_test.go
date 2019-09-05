@@ -60,8 +60,14 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 		t.Fatalf("Failed to create the statsExporter: %v", err)
 	}
 
-	startTimePb := &timestamp.Timestamp{Seconds: 1000}
-	endTimePb := &timestamp.Timestamp{Seconds: 1001}
+	startTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000090,
+	}
+	endTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000997,
+	}
 
 	// Generate the proto Metrics.
 	var metricPbs []*metricspb.Metric
@@ -83,7 +89,7 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 			},
 			Timeseries: []*metricspb.TimeSeries{
 				{
-					StartTimestamp: startTimePb,
+					StartTimestamp: startTimestamp,
 					LabelValues: []*metricspb.LabelValue{
 						{
 							Value:    "",
@@ -96,13 +102,13 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 					},
 					Points: []*metricspb.Point{
 						{
-							Timestamp: endTimePb,
+							Timestamp: endTimestamp,
 							Value:     &metricspb.Point_Int64Value{Int64Value: int64(1)},
 						},
 					},
 				},
 				{
-					StartTimestamp: startTimePb,
+					StartTimestamp: startTimestamp,
 					LabelValues: []*metricspb.LabelValue{
 						{
 							Value:    "",
@@ -115,7 +121,7 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 					},
 					Points: []*metricspb.Point{
 						{
-							Timestamp: endTimePb,
+							Timestamp: endTimestamp,
 							Value:     &metricspb.Point_Int64Value{Int64Value: int64(1)},
 						},
 					},
@@ -138,11 +144,13 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 				Resource: &monitoredrespb.MonitoredResource{
 					Type: "global",
 				},
+				MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+				ValueType:  googlemetricpb.MetricDescriptor_INT64,
 				Points: []*monitoringpb.Point{
 					{
 						Interval: &monitoringpb.TimeInterval{
-							StartTime: startTimePb,
-							EndTime:   endTimePb,
+							StartTime: startTimestamp,
+							EndTime:   endTimestamp,
 						},
 						Value: &monitoringpb.TypedValue{
 							Value: &monitoringpb.TypedValue_Int64Value{
@@ -163,11 +171,13 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 				Resource: &monitoredrespb.MonitoredResource{
 					Type: "global",
 				},
+				MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+				ValueType:  googlemetricpb.MetricDescriptor_INT64,
 				Points: []*monitoringpb.Point{
 					{
 						Interval: &monitoringpb.TimeInterval{
-							StartTime: startTimePb,
-							EndTime:   endTimePb,
+							StartTime: startTimestamp,
+							EndTime:   endTimestamp,
 						},
 						Value: &monitoringpb.TypedValue{
 							Value: &monitoringpb.TypedValue_Int64Value{
