@@ -5,6 +5,7 @@ require (
 	github.com/aws/aws-sdk-go v1.22.1
 	github.com/census-instrumentation/opencensus-proto v0.2.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/gogo/protobuf v1.3.0
 	github.com/golang/protobuf v1.3.2
 	github.com/google/addlicense v0.0.0-20190510175307-22550fa7c1b0 // indirect
 	github.com/google/go-cmp v0.3.1
