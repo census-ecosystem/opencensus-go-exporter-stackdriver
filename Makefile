@@ -10,6 +10,7 @@ GOTEST_OPT_WITH_COVERAGE = $(GOTEST_OPT) -coverprofile=coverage.txt -covermode=a
 GOTEST=go test
 GOFMT=gofmt
 GOLINT=golint
+GOIMPORTS=goimports
 GOVET=go vet
 EMBEDMD=embedmd
 ADDLICENCESE= addlicense
@@ -17,10 +18,10 @@ STATICCHECK=staticcheck
 # TODO decide if we need to change these names.
 README_FILES := $(shell find . -name '*README.md' | sort | tr '\n' ' ')
 
-.DEFAULT_GOAL := fmt-lint-vet-embedmd-test
+.DEFAULT_GOAL := defaul-goal
 
-.PHONY: fmt-lint-vet-embedmd-test
-fmt-lint-vet-embedmd-test: addlicense fmt lint vet embedmd staticcheck test
+.PHONY: defaul-goal
+defaul-goal: addlicense fmt lint vet embedmd goimports staticcheck test
 
 .PHONY: travis-ci
 travis-ci: fmt lint vet embedmd test test-386 test-with-cover
@@ -107,6 +108,17 @@ addlicense:
 		else \
 			echo "Add License finished successfully"; \
 		fi
+
+.PHONY: goimports
+goimports:
+	@IMPORTSOUT=`$(GOIMPORTS) -d . 2>&1`; \
+	if [ "$$IMPORTSOUT" ]; then \
+		echo "$(GOIMPORTS) FAILED => fix the following goimports errors:\n"; \
+		echo "$$IMPORTSOUT\n"; \
+		exit 1; \
+	else \
+	    echo "Goimports finished successfully"; \
+	fi
 
 .PHONY: staticcheck
 staticcheck:
