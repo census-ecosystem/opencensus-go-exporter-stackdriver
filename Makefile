@@ -1,7 +1,7 @@
 # TODO: Fix this on windows.
 ALL_SRC := $(shell find . -name '*.go' \
-								-not -path './vendor/*' \
-								-not -path '*/gen-go/*' \
+								-not -path '*/internal/testpb/*' \
+								-not -name 'tools.go' \
 								-type f | sort)
 ALL_PKGS := $(shell go list $(sort $(dir $(ALL_SRC))))
 
