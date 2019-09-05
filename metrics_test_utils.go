@@ -19,26 +19,31 @@ Common test utilities for comparing Stackdriver metrics.
 */
 
 import (
-	"github.com/golang/protobuf/ptypes/timestamp"
+	"testing"
+
+	"github.com/golang/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
-
-	"time"
 )
-
-func timestampToTime(ts *timestamp.Timestamp) time.Time {
-	if ts == nil {
-		return time.Unix(0, 0).UTC()
-	}
-	return time.Unix(ts.Seconds, int64(ts.Nanos)).UTC()
-}
 
 func cmpResource(got, want *monitoredrespb.MonitoredResource) string {
 	return cmp.Diff(got, want, cmpopts.IgnoreUnexported(monitoredrespb.MonitoredResource{}))
+}
+
+func requireTimeSeriesRequestEqual(t *testing.T, got, want []*monitoringpb.CreateTimeSeriesRequest) {
+	if len(got) != len(want) {
+		t.Fatalf("Unexpected slice len got: %d want: %d", len(got), len(want))
+	}
+	for i, g := range got {
+		w := want[i]
+		if !proto.Equal(g, w) {
+			t.Fatalf("Unexpected proto difference got: %s want: %s", proto.MarshalTextString(g), proto.MarshalTextString(w))
+		}
+	}
 }
 
 func cmpTSReqs(got, want []*monitoringpb.CreateTimeSeriesRequest) string {

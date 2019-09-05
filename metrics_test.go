@@ -19,9 +19,9 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/timestamp"
 
@@ -90,11 +90,12 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 		Seconds: 1543160298,
 		Nanos:   100000090,
 	}
-	startTime := time.Unix(1543160298, 100000090)
+	startTime, _ := ptypes.Timestamp(startTimestamp)
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
 		Nanos:   100000997,
 	}
+	endTime, _ := ptypes.Timestamp(endTimestamp)
 
 	// TODO:[rghetia] add test for built-in metrics.
 	tests := []struct {
@@ -113,10 +114,10 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 				Resource: nil,
 				TimeSeries: []*metricdata.TimeSeries{
 					{
-						StartTime: timestampToTime(startTimestamp),
+						StartTime: startTime,
 						Points: []metricdata.Point{
 							{
-								Time: timestampToTime(endTimestamp),
+								Time: endTime,
 								Value: &metricdata.Distribution{
 									Count:                 1,
 									Sum:                   11.9,
@@ -201,10 +202,10 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 				Resource: nil,
 				TimeSeries: []*metricdata.TimeSeries{
 					{
-						StartTime: timestampToTime(startTimestamp),
+						StartTime: startTime,
 						Points: []metricdata.Point{
 							{
-								Time: timestampToTime(endTimestamp),
+								Time: endTime,
 								Value: &metricdata.Distribution{
 									Count:                 1,
 									Sum:                   11.9,
@@ -430,11 +431,12 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 		Seconds: 1543160298,
 		Nanos:   100000090,
 	}
-	startTime := time.Unix(1543160298, 100000090)
+	startTime, _ := ptypes.Timestamp(startTimestamp)
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
 		Nanos:   100000997,
 	}
+	endTime, _ := ptypes.Timestamp(endTimestamp)
 
 	traceID := trace.TraceID{1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 4, 8, 16, 32, 64, 128}
 	spanID := trace.SpanID{1, 2, 4, 8, 16, 32, 64, 128}
@@ -452,7 +454,7 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 	}{
 		{
 			in: &metricdata.Point{
-				Time: timestampToTime(endTimestamp),
+				Time: endTime,
 				Value: &metricdata.Distribution{
 					Count:                 1,
 					Sum:                   11.9,
@@ -509,7 +511,7 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 		},
 		{
 			in: &metricdata.Point{
-				Time:  timestampToTime(endTimestamp),
+				Time:  endTime,
 				Value: float64(50.0),
 			},
 			want: &monitoringpb.Point{
@@ -524,7 +526,7 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 		},
 		{
 			in: &metricdata.Point{
-				Time:  timestampToTime(endTimestamp),
+				Time:  endTime,
 				Value: int64(17),
 			},
 			want: &monitoringpb.Point{

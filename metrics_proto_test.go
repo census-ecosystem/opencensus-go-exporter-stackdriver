@@ -194,15 +194,12 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 	se.PushMetricsProto(context.Background(), nil, nil, metricPbs)
 	se.Flush()
 
-	var stackdriverTimeSeriesFromMetricsPb []*monitoringpb.CreateTimeSeriesRequest
+	var gotTimeSeries []*monitoringpb.CreateTimeSeriesRequest
 	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
-		stackdriverTimeSeriesFromMetricsPb = append(stackdriverTimeSeriesFromMetricsPb, sdt)
+		gotTimeSeries = append(gotTimeSeries, sdt)
 	})
 
-	// The results should be equal now
-	if diff := cmpTSReqs(stackdriverTimeSeriesFromMetricsPb, wantTimeSeries); diff != "" {
-		t.Fatalf("Unexpected CreateTimeSeriesRequests -FromMetricsPb +FromMetrics: %s", diff)
-	}
+	requireTimeSeriesRequestEqual(t, gotTimeSeries, wantTimeSeries)
 }
 
 func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
