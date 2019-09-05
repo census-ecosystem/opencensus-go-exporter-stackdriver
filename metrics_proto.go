@@ -289,7 +289,7 @@ func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []string, lab
 
 	for i, labelKey := range labelKeys {
 		labelValue := labelValues[i]
-		if labelValue.GetHasValue() {
+		if !labelValue.GetHasValue() {
 			continue
 		}
 		labels[labelKey] = labelValue.GetValue()
