@@ -45,12 +45,14 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 	}
 
 	tests := []struct {
+		name          string
 		in            *metricspb.Metric
 		want          []*monitoringpb.CreateTimeSeriesRequest
 		wantErr       string
 		statsExporter *statsExporter
 	}{
 		{
+			name: "Test converting Distribution",
 			in: &metricspb.Metric{
 				MetricDescriptor: &metricspb.MetricDescriptor{
 					Name:        "with_metric_descriptor",
@@ -133,6 +135,65 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Test some label keys don't have values",
+			in: &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "with_metric_descriptor_2",
+					Description: "This is a test",
+					Unit:        "By",
+					LabelKeys:   []*metricspb.LabelKey{{Key: "key1"}, {Key: "key2"}, {Key: "key3"}},
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimestamp,
+						LabelValues:    []*metricspb.LabelValue{{}, {}, {HasValue: true, Value: "val3"}},
+						Points: []*metricspb.Point{
+							{
+								Timestamp: endTimestamp,
+								Value: &metricspb.Point_DoubleValue{
+									DoubleValue: 25.0,
+								},
+							},
+						},
+					},
+				},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/foo",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type:   "custom.googleapis.com/opencensus/with_metric_descriptor_2",
+								Labels: map[string]string{"key3": "val3"},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
+							},
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_DISTRIBUTION,
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: startTimestamp,
+										EndTime:   endTimestamp,
+									},
+									Value: &monitoringpb.TypedValue{
+										Value: &monitoringpb.TypedValue_DoubleValue{
+											DoubleValue: 25.0,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
@@ -145,12 +206,12 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 		allTss, err := protoMetricToTimeSeries(context.Background(), se, se.getResource(nil, tt.in, seenResources), tt.in)
 		if tt.wantErr != "" {
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
-				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
+				t.Errorf("#%v: unmatched error. Got\n\t%v\nWant\n\t%v", tt.name, err, tt.wantErr)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("#%d: unexpected error: %v", i, err)
+			t.Errorf("#%v: unexpected error: %v", tt.name, err)
 			continue
 		}
 
