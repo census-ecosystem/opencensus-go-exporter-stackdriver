@@ -24,17 +24,17 @@ import (
 )
 
 type metricsBatcher struct {
-	projectID string
-	allReqs   []*monitoringpb.CreateTimeSeriesRequest
-	allTss    []*monitoringpb.TimeSeries
-	allErrs   []error
+	projectName string
+	allReqs     []*monitoringpb.CreateTimeSeriesRequest
+	allTss      []*monitoringpb.TimeSeries
+	allErrs     []error
 	// Counts all dropped TimeSeries by this exporter.
 	droppedTimeSeries int
 }
 
 func newMetricsBatcher(projectID string) *metricsBatcher {
 	return &metricsBatcher{
-		projectID:         projectID,
+		projectName:       fmt.Sprintf("projects/%s", projectID),
 		allTss:            make([]*monitoringpb.TimeSeries, 0, maxTimeSeriesPerUpload),
 		droppedTimeSeries: 0,
 	}
@@ -49,7 +49,7 @@ func (mb *metricsBatcher) addTimeSeries(ts *monitoringpb.TimeSeries) {
 	mb.allTss = append(mb.allTss, ts)
 	if len(mb.allTss) == maxTimeSeriesPerUpload {
 		mb.allReqs = append(mb.allReqs, &monitoringpb.CreateTimeSeriesRequest{
-			Name:       monitoring.MetricProjectPath(mb.projectID),
+			Name:       mb.projectName,
 			TimeSeries: mb.allTss,
 		})
 		mb.allTss = make([]*monitoringpb.TimeSeries, 0, maxTimeSeriesPerUpload)
@@ -60,7 +60,7 @@ func (mb *metricsBatcher) export(ctx context.Context, mc *monitoring.MetricClien
 	// Last batch, if any.
 	if len(mb.allTss) > 0 {
 		mb.allReqs = append(mb.allReqs, &monitoringpb.CreateTimeSeriesRequest{
-			Name:       monitoring.MetricProjectPath(mb.projectID),
+			Name:       mb.projectName,
 			TimeSeries: mb.allTss,
 		})
 	}

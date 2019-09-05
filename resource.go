@@ -22,13 +22,6 @@ import (
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 )
 
-type resourceMap struct {
-	// Mapping from the input resource type to the monitored resource type in Stackdriver.
-	srcType, dstType string
-	// Mapping from Stackdriver monitored resource label to an OpenCensus resource label.
-	labels map[string]string
-}
-
 // Resource labels that are generally internal to the exporter.
 // Consider exposing these labels and a type identifier in the future to allow
 // for customization.

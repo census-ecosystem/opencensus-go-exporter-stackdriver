@@ -16,10 +16,10 @@ package stackdriver
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
-	monitoring "cloud.google.com/go/monitoring/apiv3"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
@@ -636,7 +636,7 @@ func TestCombineTimeSeriesAndDeduplication(t *testing.T) {
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
-					Name: monitoring.MetricProjectPath(se.o.ProjectID),
+					Name: fmt.Sprintf("projects/%s", se.o.ProjectID),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &googlemetricpb.Metric{
@@ -667,7 +667,7 @@ func TestCombineTimeSeriesAndDeduplication(t *testing.T) {
 					},
 				},
 				{
-					Name: monitoring.MetricProjectPath(se.o.ProjectID),
+					Name: fmt.Sprintf("projects/%s", se.o.ProjectID),
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &googlemetricpb.Metric{

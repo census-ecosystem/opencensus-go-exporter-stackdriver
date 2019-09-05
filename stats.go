@@ -212,7 +212,7 @@ func (e *statsExporter) Flush() {
 }
 
 func (e *statsExporter) uploadStats(vds []*view.Data) error {
-	ctx, cancel := e.o.newContextWithTimeout()
+	ctx, cancel := newContextWithTimeout(e.o.Context, e.o.Timeout)
 	defer cancel()
 	ctx, span := trace.StartSpan(
 		ctx,
@@ -331,19 +331,6 @@ func (e *statsExporter) viewToMetricDescriptor(ctx context.Context, v *view.View
 	return res, nil
 }
 
-func (e *statsExporter) viewToCreateMetricDescriptorRequest(ctx context.Context, v *view.View) (*monitoringpb.CreateMetricDescriptorRequest, error) {
-	inMD, err := e.viewToMetricDescriptor(ctx, v)
-	if err != nil {
-		return nil, err
-	}
-
-	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
-		Name:             fmt.Sprintf("projects/%s", e.o.ProjectID),
-		MetricDescriptor: inMD,
-	}
-	return cmrdesc, nil
-}
-
 // createMeasure creates a MetricDescriptor for the given view data in Stackdriver Monitoring.
 // An error will be returned if there is already a metric descriptor created with the same name
 // but it has a different aggregation or keys.
@@ -431,7 +418,7 @@ func (e *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monitor
 	// While for each nonUniqueTimeSeries, we have
 	// to make a unique CreateTimeSeriesRequest.
 	ctsreql = append(ctsreql, &monitoringpb.CreateTimeSeriesRequest{
-		Name:       monitoring.MetricProjectPath(e.o.ProjectID),
+		Name:       fmt.Sprintf("projects/%s", e.o.ProjectID),
 		TimeSeries: uniqueTimeSeries,
 	})
 

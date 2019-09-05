@@ -6,6 +6,7 @@ require (
 	github.com/census-instrumentation/opencensus-proto v0.2.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.3.2
+	github.com/google/addlicense v0.0.0-20190510175307-22550fa7c1b0 // indirect
 	github.com/google/go-cmp v0.3.1
 	github.com/hashicorp/golang-lru v0.5.3 // indirect
 	github.com/stretchr/testify v1.3.0 // indirect

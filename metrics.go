@@ -21,7 +21,6 @@ directly to Stackdriver Metrics.
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/golang/protobuf/proto"
@@ -37,11 +36,6 @@ import (
 
 	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/resource"
-)
-
-var (
-	errLableExtraction       = errors.New("error extracting labels")
-	errUnspecifiedMetricKind = errors.New("metric kind is unpsecified")
 )
 
 const (
@@ -74,7 +68,7 @@ func (se *statsExporter) handleMetricsUpload(metrics []*metricdata.Metric) {
 }
 
 func (se *statsExporter) uploadMetrics(metrics []*metricdata.Metric) error {
-	ctx, cancel := se.o.newContextWithTimeout()
+	ctx, cancel := newContextWithTimeout(se.o.Context, se.o.Timeout)
 	defer cancel()
 
 	ctx, span := trace.StartSpan(
@@ -182,7 +176,7 @@ func metricLabelsToTsLabels(defaults map[string]labelValue, labelKeys []metricda
 
 	// Perform this sanity check now.
 	if len(labelKeys) != len(labelValues) {
-		return labels, fmt.Errorf("Length mismatch: len(labelKeys)=%d len(labelValues)=%d", len(labelKeys), len(labelValues))
+		return labels, fmt.Errorf("length mismatch: len(labelKeys)=%d len(labelValues)=%d", len(labelKeys), len(labelValues))
 	}
 
 	for i, labelKey := range labelKeys {
@@ -461,11 +455,9 @@ func metricExemplarToPbExemplar(exemplar *metricdata.Exemplar, projectID string)
 func attachmentsToPbAttachments(attachments metricdata.Attachments, projectID string) []*any.Any {
 	var pbAttachments []*any.Any
 	for _, v := range attachments {
-		switch v.(type) {
-		case trace.SpanContext:
-			spanCtx, _ := v.(trace.SpanContext)
+		if spanCtx, succ := v.(trace.SpanContext); succ {
 			pbAttachments = append(pbAttachments, toPbSpanCtxAttachment(spanCtx, projectID))
-		default:
+		} else {
 			// Treat everything else as plain string for now.
 			// TODO(songy23): add support for dropped label attachments.
 			pbAttachments = append(pbAttachments, toPbStringAttachment(v))
