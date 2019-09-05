@@ -23,17 +23,9 @@ README_FILES := $(shell find . -name '*README.md' | sort | tr '\n' ' ')
 .PHONY: defaul-goal
 defaul-goal: addlicense fmt lint vet embedmd goimports staticcheck test
 
+# TODO: enable test-with-cover when find out why "scripts/check-test-files.sh: 4: set: Illegal option -o pipefail"
 .PHONY: travis-ci
-travis-ci: fmt lint vet embedmd test test-386 test-with-cover
-
-.PHONY: test-with-cover
-test-with-cover:
-	@echo Verifying that all packages have test files to count in coverage
-	@scripts/check-test-files.sh $(subst contrib.go.opencensus.io/exporter/stackdriver,./,$(ALL_PKGS))
-	@echo pre-compiling tests
-	@time go test -i $(ALL_PKGS)
-	$(GOTEST) $(GOTEST_OPT_WITH_COVERAGE) $(ALL_PKGS)
-	go tool cover -html=coverage.txt -o coverage.html
+travis-ci: addlicense fmt lint vet embedmd goimports staticcheck test test-386 test-with-coverage
 
 all-pkgs:
 	@echo $(ALL_PKGS) | tr ' ' '\n' | sort
@@ -51,7 +43,19 @@ test-386:
 
 .PHONY: test-with-coverage
 test-with-coverage:
+	@echo pre-compiling tests
+	@time go test -i $(ALL_PKGS)
 	$(GOTEST) $(GOTEST_OPT_WITH_COVERAGE) $(ALL_PKGS)
+	go tool cover -html=coverage.txt -o coverage.html
+
+.PHONY: test-with-cover
+test-with-cover:
+	@echo Verifying that all packages have test files to count in coverage
+	@scripts/check-test-files.sh $(subst contrib.go.opencensus.io/exporter/stackdriver,./,$(ALL_PKGS))
+	@echo pre-compiling tests
+	@time go test -i $(ALL_PKGS)
+	$(GOTEST) $(GOTEST_OPT_WITH_COVERAGE) $(ALL_PKGS)
+	go tool cover -html=coverage.txt -o coverage.html
 
 .PHONY: fmt
 fmt:
