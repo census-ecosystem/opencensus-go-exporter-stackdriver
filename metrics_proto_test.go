@@ -54,8 +54,9 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 
 		// Set empty labels to avoid the opencensus-task
 		DefaultMonitoringLabels: &Labels{},
+		MapResource:             defaultMapResource,
 	}
-	se, err := NewExporter(exporterOptions)
+	se, err := newStatsExporter(exporterOptions)
 	if err != nil {
 		t.Fatalf("Failed to create the statsExporter: %v", err)
 	}
