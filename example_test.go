@@ -35,12 +35,14 @@ func Example_defaults() {
 	}
 
 	// Export to Stackdriver Monitoring.
-	view.RegisterExporter(exporter)
+	if err = exporter.StartMetricsExporter(); err != nil {
+		log.Fatal(err)
+	}
 
 	// Subscribe views to see stats in Stackdriver Monitoring.
 	if err := view.Register(
-		ochttp.ClientLatencyView,
-		ochttp.ClientResponseBytesView,
+		ochttp.ClientRoundtripLatencyDistribution,
+		ochttp.ClientReceivedBytesDistribution,
 	); err != nil {
 		log.Fatal(err)
 	}
@@ -105,5 +107,7 @@ func Example_gKE() {
 	}
 
 	// Register so that views are exported.
-	view.RegisterExporter(exporter)
+	if err = exporter.StartMetricsExporter(); err != nil {
+		log.Fatal(err)
+	}
 }

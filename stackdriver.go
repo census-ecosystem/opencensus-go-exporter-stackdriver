@@ -52,16 +52,25 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path"
+	"strings"
 	"time"
 
+	metadataapi "cloud.google.com/go/compute/metadata"
 	traceapi "cloud.google.com/go/trace/apiv2"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
+	"go.opencensus.io/resource"
 	"go.opencensus.io/stats/view"
-	"go.opencensus.io/tag"
 	"go.opencensus.io/trace"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
+
+	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
+	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	"go.opencensus.io/metric/metricdata"
 )
 
 // Options contains options for configuring the exporter.
@@ -69,8 +78,21 @@ type Options struct {
 	// ProjectID is the identifier of the Stackdriver
 	// project the user is uploading the stats data to.
 	// If not set, this will default to your "Application Default Credentials".
-	// For details see: https://developers.google.com/accounts/docs/application-default-credentials
+	// For details see: https://developers.google.com/accounts/docs/application-default-credentials.
+	//
+	// It will be used in the project_id label of a Stackdriver monitored
+	// resource if the resource does not inherently belong to a specific
+	// project, e.g. on-premise resource like k8s_container or generic_task.
 	ProjectID string
+
+	// Location is the identifier of the GCP or AWS cloud region/zone in which
+	// the data for a resource is stored.
+	// If not set, it will default to the location provided by the metadata server.
+	//
+	// It will be used in the location label of a Stackdriver monitored resource
+	// if the resource does not inherently belong to a specific project, e.g.
+	// on-premise resource like k8s_container or generic_task.
+	Location string
 
 	// OnError is the hook to be called when there is
 	// an error uploading the stats or tracing data.
@@ -89,15 +111,21 @@ type Options struct {
 	TraceClientOptions []option.ClientOption
 
 	// BundleDelayThreshold determines the max amount of time
-	// the exporter can wait before uploading view data to
+	// the exporter can wait before uploading view data or trace spans to
 	// the backend.
 	// Optional.
 	BundleDelayThreshold time.Duration
 
-	// BundleCountThreshold determines how many view data events
+	// BundleCountThreshold determines how many view data events or trace spans
 	// can be buffered before batch uploading them to the backend.
 	// Optional.
 	BundleCountThreshold int
+
+	// TraceSpansBufferMaxBytes is the maximum size (in bytes) of spans that
+	// will be buffered in memory before being dropped.
+	//
+	// If unset, a default of 8MB will be used.
+	TraceSpansBufferMaxBytes int
 
 	// Resource sets the MonitoredResource against which all views will be
 	// recorded by this exporter.
@@ -142,6 +170,21 @@ type Options struct {
 	// Resource field.
 	// Optional, but encouraged.
 	MonitoredResource monitoredresource.Interface
+
+	// ResourceDetector provides a hook to discover arbitrary resource information.
+	//
+	// The translation function provided in MapResource must be able to conver the
+	// the resource information to a Stackdriver monitored resource.
+	//
+	// If this field is unset, resource type and tags will automatically be discovered through
+	// the OC_RESOURCE_TYPE and OC_RESOURCE_LABELS environment variables.
+	ResourceDetector resource.Detector
+
+	// MapResource converts a OpenCensus resource to a Stackdriver monitored resource.
+	//
+	// If this field is unset, defaultMapResource will be used which encodes a set of default
+	// conversions from auto-detected resources to well-known Stackdriver monitored resources.
+	MapResource func(*resource.Resource) *monitoredrespb.MonitoredResource
 
 	// MetricPrefix overrides the prefix of a Stackdriver metric display names.
 	// Optional. If unset defaults to "OpenCensus/".
@@ -190,24 +233,22 @@ type Options struct {
 	// trace and metric clients, and then every time a new batch of traces or
 	// stats needs to be uploaded.
 	//
+	// Do not set a timeout on this context. Instead, set the Timeout option.
+	//
 	// If unset, context.Background() will be used.
 	Context context.Context
 
-	// GetMonitoredResource may be provided to supply the details of the
-	// monitored resource dynamically based on the tags associated with each
-	// data point. Most users will not need to set this, but should instead
-	// set the MonitoredResource field.
-	//
-	// GetMonitoredResource may add or remove tags by returning a new set of
-	// tags. It is safe for the function to mutate its argument and return it.
-	//
-	// See the documentation on the MonitoredResource field for guidance on the
-	// interaction between monitored resources and labels.
-	//
-	// The MonitoredResource field is ignored if this field is set to a non-nil
-	// value.
-	GetMonitoredResource func(*view.View, []tag.Tag) ([]tag.Tag, monitoredresource.Interface)
+	// Timeout for all API calls. If not set, defaults to 5 seconds.
+	Timeout time.Duration
+
+	// ReportingInterval sets the interval between reporting metrics.
+	// If it is set to zero then default value is used.
+	ReportingInterval time.Duration
 }
+
+const defaultTimeout = 5 * time.Second
+
+var defaultDomain = path.Join("custom.googleapis.com", "opencensus")
 
 // Exporter is a stats and trace exporter that uploads data to Stackdriver.
 //
@@ -222,11 +263,12 @@ type Exporter struct {
 // NewExporter creates a new Exporter that implements both stats.Exporter and
 // trace.Exporter.
 func NewExporter(o Options) (*Exporter, error) {
-	if o.Context == nil {
-		o.Context = context.Background()
-	}
 	if o.ProjectID == "" {
-		creds, err := google.FindDefaultCredentials(o.Context, traceapi.DefaultAuthScopes()...)
+		ctx := o.Context
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		creds, err := google.FindDefaultCredentials(ctx, traceapi.DefaultAuthScopes()...)
 		if err != nil {
 			return nil, fmt.Errorf("stackdriver: %v", err)
 		}
@@ -235,9 +277,50 @@ func NewExporter(o Options) (*Exporter, error) {
 		}
 		o.ProjectID = creds.ProjectID
 	}
+	if o.Location == "" {
+		if metadataapi.OnGCE() {
+			zone, err := metadataapi.Zone()
+			if err != nil {
+				// This error should be logged with a warning level.
+				err = fmt.Errorf("setting Stackdriver default location failed: %s", err)
+				if o.OnError != nil {
+					o.OnError(err)
+				} else {
+					log.Print(err)
+				}
+			} else {
+				o.Location = zone
+			}
+		}
+	}
 
 	if o.MonitoredResource != nil {
 		o.Resource = convertMonitoredResourceToPB(o.MonitoredResource)
+	}
+	if o.MapResource == nil {
+		o.MapResource = defaultMapResource
+	}
+	if o.ResourceDetector != nil {
+		// For backwards-compatibility we still respect the deprecated resource field.
+		if o.Resource != nil {
+			return nil, errors.New("stackdriver: ResourceDetector must not be used in combination with deprecated resource fields")
+		}
+		res, err := o.ResourceDetector(o.Context)
+		if err != nil {
+			return nil, fmt.Errorf("stackdriver: detect resource: %s", err)
+		}
+		// Populate internal resource labels for defaulting project_id, location, and
+		// generic resource labels of applicable monitored resources.
+		res.Labels[stackdriverProjectID] = o.ProjectID
+		res.Labels[stackdriverLocation] = o.Location
+		res.Labels[stackdriverGenericTaskNamespace] = "default"
+		res.Labels[stackdriverGenericTaskJob] = path.Base(os.Args[0])
+		res.Labels[stackdriverGenericTaskID] = getTaskValue()
+
+		o.Resource = o.MapResource(res)
+	}
+	if o.MetricPrefix != "" && !strings.HasSuffix(o.MetricPrefix, "/") {
+		o.MetricPrefix = o.MetricPrefix + "/"
 	}
 
 	se, err := newStatsExporter(o)
@@ -256,8 +339,49 @@ func NewExporter(o Options) (*Exporter, error) {
 
 // ExportView exports to the Stackdriver Monitoring if view data
 // has one or more rows.
+// Deprecated: use ExportMetrics and StartMetricsExporter instead.
 func (e *Exporter) ExportView(vd *view.Data) {
 	e.statsExporter.ExportView(vd)
+}
+
+// ExportMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring synchronously,
+// without de-duping or adding proto metrics to the bundler.
+func (e *Exporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) error {
+	_, err := e.statsExporter.PushMetricsProto(ctx, node, rsc, metrics)
+	return err
+}
+
+// PushMetricsProto simliar with ExportMetricsProto but returns the number of dropped timeseries.
+func (e *Exporter) PushMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) (int, error) {
+	return e.statsExporter.PushMetricsProto(ctx, node, rsc, metrics)
+}
+
+// ExportMetrics exports OpenCensus Metrics to Stackdriver Monitoring
+func (e *Exporter) ExportMetrics(ctx context.Context, metrics []*metricdata.Metric) error {
+	return e.statsExporter.ExportMetrics(ctx, metrics)
+}
+
+// StartMetricsExporter starts exporter by creating an interval reader that reads metrics
+// from all registered producers at set interval and exports them.
+// Use StopMetricsExporter to stop exporting metrics.
+// Previously, it required registering exporter to export stats collected by opencensus.
+//    exporter := stackdriver.NewExporter(stackdriver.Option{})
+//    view.RegisterExporter(exporter)
+// Now, it requires to call StartMetricsExporter() to export stats and metrics collected by opencensus.
+//    exporter := stackdriver.NewExporter(stackdriver.Option{})
+//    exporter.StartMetricsExporter()
+//    defer exporter.StopMetricsExporter()
+//
+// Both approach should not be used simultaenously. Otherwise it may result into unknown behavior.
+// Previous approach continues to work as before but will not report newly define metrics such
+// as gauges.
+func (e *Exporter) StartMetricsExporter() error {
+	return e.statsExporter.startMetricsReader()
+}
+
+// StopMetricsExporter stops exporter from exporting metrics.
+func (e *Exporter) StopMetricsExporter() {
+	e.statsExporter.stopMetricsReader()
 }
 
 // ExportSpan exports a SpanData to Stackdriver Trace.
@@ -295,6 +419,16 @@ func (o Options) handleError(err error) {
 		return
 	}
 	log.Printf("Failed to export to Stackdriver: %v", err)
+}
+
+func newContextWithTimeout(ctx context.Context, timeout time.Duration) (context.Context, func()) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if timeout <= 0 {
+		timeout = defaultTimeout
+	}
+	return context.WithTimeout(ctx, timeout)
 }
 
 // convertMonitoredResourceToPB converts MonitoredResource data in to

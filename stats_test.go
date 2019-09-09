@@ -16,12 +16,13 @@ package stackdriver
 
 import (
 	"context"
-	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"fmt"
 	"testing"
 	"time"
 
-	"cloud.google.com/go/monitoring/apiv3"
+	monitoring "cloud.google.com/go/monitoring/apiv3"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
+
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/stats"
@@ -104,69 +105,71 @@ func TestExporter_makeReq(t *testing.T) {
 			name:   "count agg + timeline",
 			projID: "proj-id",
 			vd:     newTestViewData(v, start, end, count1, count2),
-			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/example.com/views/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-1",
-								opencensusTaskKey: taskValue,
-							},
-						},
-						Resource: &monitoredrespb.MonitoredResource{
-							Type: "global",
-						},
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/example.com/views/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-1",
+									opencensusTaskKey: taskValue,
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 10,
-								}},
 							},
-						},
-					},
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/example.com/views/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-2",
-								opencensusTaskKey: taskValue,
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
 							},
-						},
-						Resource: &monitoredrespb.MonitoredResource{
-							Type: "global",
-						},
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
 									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 10,
+									}},
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 16,
-								}},
+							},
+						},
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/example.com/views/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-2",
+									opencensusTaskKey: taskValue,
+								},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 16,
+									}},
+								},
 							},
 						},
 					},
 				},
-			}},
+			},
 		},
 		{
 			name:   "metric type formatter",
@@ -177,204 +180,210 @@ func TestExporter_makeReq(t *testing.T) {
 					return fmt.Sprintf("external.googleapis.com/%s", v.Name)
 				},
 			},
-			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &metricpb.Metric{
-							Type: "external.googleapis.com/example.com/views/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-1",
-								opencensusTaskKey: taskValue,
-							},
-						},
-						Resource: &monitoredrespb.MonitoredResource{
-							Type: "global",
-						},
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &metricpb.Metric{
+								Type: "external.googleapis.com/example.com/views/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-1",
+									opencensusTaskKey: taskValue,
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
-									DoubleValue: 5.5,
-								}},
 							},
-						},
-					},
-					{
-						Metric: &metricpb.Metric{
-							Type: "external.googleapis.com/example.com/views/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-2",
-								opencensusTaskKey: taskValue,
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
 							},
-						},
-						Resource: &monitoredrespb.MonitoredResource{
-							Type: "global",
-						},
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
 									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+										DoubleValue: 5.5,
+									}},
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
-									DoubleValue: -11.1,
-								}},
+							},
+						},
+						{
+							Metric: &metricpb.Metric{
+								Type: "external.googleapis.com/example.com/views/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-2",
+									opencensusTaskKey: taskValue,
+								},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+										DoubleValue: -11.1,
+									}},
+								},
 							},
 						},
 					},
 				},
-			}},
+			},
 		},
 		{
 			name:   "sum agg + timeline",
 			projID: "proj-id",
 			vd:     newTestViewData(v, start, end, sum1, sum2),
-			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/example.com/views/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-1",
-								opencensusTaskKey: taskValue,
-							},
-						},
-						Resource: &monitoredrespb.MonitoredResource{
-							Type: "global",
-						},
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/example.com/views/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-1",
+									opencensusTaskKey: taskValue,
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
-									DoubleValue: 5.5,
-								}},
 							},
-						},
-					},
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/example.com/views/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-2",
-								opencensusTaskKey: taskValue,
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
 							},
-						},
-						Resource: &monitoredrespb.MonitoredResource{
-							Type: "global",
-						},
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
 									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+										DoubleValue: 5.5,
+									}},
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
-									DoubleValue: -11.1,
-								}},
+							},
+						},
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/example.com/views/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-2",
+									opencensusTaskKey: taskValue,
+								},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+										DoubleValue: -11.1,
+									}},
+								},
 							},
 						},
 					},
 				},
-			}},
+			},
 		},
 		{
 			name:   "last value agg",
 			projID: "proj-id",
 			vd:     newTestViewData(lastValueView, start, end, &last1, &last2),
-			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/lasttestview",
-							Labels: map[string]string{
-								"test_key":        "test-value-1",
-								opencensusTaskKey: taskValue,
-							},
-						},
-						Resource: &monitoredrespb.MonitoredResource{
-							Type: "global",
-						},
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/lasttestview",
+								Labels: map[string]string{
+									"test_key":        "test-value-1",
+									opencensusTaskKey: taskValue,
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
-									DoubleValue: 100,
-								}},
 							},
-						},
-					},
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/lasttestview",
-							Labels: map[string]string{
-								"test_key":        "test-value-2",
-								opencensusTaskKey: taskValue,
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
 							},
-						},
-						Resource: &monitoredrespb.MonitoredResource{
-							Type: "global",
-						},
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
 									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+										DoubleValue: 100,
+									}},
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
-									DoubleValue: 200,
-								}},
+							},
+						},
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/lasttestview",
+								Labels: map[string]string{
+									"test_key":        "test-value-2",
+									opencensusTaskKey: taskValue,
+								},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+										DoubleValue: 200,
+									}},
+								},
 							},
 						},
 					},
 				},
-			}},
+			},
 		},
 		{
-			name:   "dist agg + time window",
+			name:   "dist agg + time window - without zero bucket",
 			projID: "proj-id",
 			vd:     newTestDistViewData(distView, start, end),
 			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
 				TimeSeries: []*monitoringpb.TimeSeries{
 					{
 						Metric: &metricpb.Metric{
@@ -406,8 +415,54 @@ func TestExporter_makeReq(t *testing.T) {
 										BucketOptions: &distribution.Distribution_BucketOptions{
 											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
 												ExplicitBuckets: &distribution.Distribution_BucketOptions_Explicit{
-													Bounds: []float64{2.0, 4.0, 7.0}}}},
-										BucketCounts: []int64{2, 2, 1}},
+													Bounds: []float64{0.0, 2.0, 4.0, 7.0}}}},
+										BucketCounts: []int64{0, 2, 2, 1}},
+								}},
+							},
+						},
+					},
+				},
+			}},
+		},
+		{
+			name:   "dist agg + time window + zero bucket",
+			projID: "proj-id",
+			vd:     newTestDistViewData(distView, start, end),
+			want: []*monitoringpb.CreateTimeSeriesRequest{{
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/distview",
+							Labels: map[string]string{
+								opencensusTaskKey: taskValue,
+							},
+						},
+						Resource: &monitoredrespb.MonitoredResource{
+							Type: "global",
+						},
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: &timestamp.Timestamp{
+										Seconds: start.Unix(),
+										Nanos:   int32(start.Nanosecond()),
+									},
+									EndTime: &timestamp.Timestamp{
+										Seconds: end.Unix(),
+										Nanos:   int32(end.Nanosecond()),
+									},
+								},
+								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DistributionValue{
+									DistributionValue: &distribution.Distribution{
+										Count:                 5,
+										Mean:                  3.0,
+										SumOfSquaredDeviation: 1.5,
+										BucketOptions: &distribution.Distribution_BucketOptions{
+											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
+												ExplicitBuckets: &distribution.Distribution_BucketOptions_Explicit{
+													Bounds: []float64{0.0, 2.0, 4.0, 7.0}}}},
+										BucketCounts: []int64{0, 2, 2, 1}},
 								}},
 							},
 						},
@@ -416,6 +471,7 @@ func TestExporter_makeReq(t *testing.T) {
 			}},
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			opts := tt.opts
@@ -466,21 +522,21 @@ func TestExporter_makeReq_batching(t *testing.T) {
 			name:      "4 vds; 3 limit",
 			iter:      2,
 			limit:     3,
-			wantReqs:  2,
+			wantReqs:  3,
 			wantTotal: 4,
 		},
 		{
 			name:      "4 vds; 4 limit",
 			iter:      2,
 			limit:     4,
-			wantReqs:  1,
+			wantReqs:  2,
 			wantTotal: 4,
 		},
 		{
 			name:      "4 vds; 5 limit",
 			iter:      2,
 			limit:     5,
-			wantReqs:  1,
+			wantReqs:  2,
 			wantTotal: 4,
 		},
 	}
@@ -500,7 +556,7 @@ func TestExporter_makeReq_batching(t *testing.T) {
 		}
 		resps := e.makeReq(vds, tt.limit)
 		if len(resps) != tt.wantReqs {
-			t.Errorf("%v: got %v; want %d requests", tt.name, resps, tt.wantReqs)
+			t.Errorf("%v:\ngot %d:: %v;\n\nwant %d requests\n\n", tt.name, len(resps), resps, tt.wantReqs)
 		}
 
 		var total int
@@ -889,65 +945,67 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 			name: "count agg timeline",
 			opts: Options{Resource: resource},
 			vd:   newTestViewData(v, start, end, count1, count2),
-			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-1",
-								opencensusTaskKey: taskValue,
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-1",
+									opencensusTaskKey: taskValue,
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 10,
-								}},
 							},
-						},
-					},
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-2",
-								opencensusTaskKey: taskValue,
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
+							Resource: resource,
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
 									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 10,
+									}},
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 16,
-								}},
+							},
+						},
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-2",
+									opencensusTaskKey: taskValue,
+								},
+							},
+							Resource: resource,
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 16,
+									}},
+								},
 							},
 						},
 					},
 				},
-			}},
+			},
 		},
 		{
 			name: "with MonitoredResource and labels",
@@ -960,138 +1018,67 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 				}
 			}(),
 			vd: newTestViewData(v, start, end, count1, count2),
-			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key": "test-value-1",
-								"pid":      "1234",
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/testview",
+								Labels: map[string]string{
+									"test_key": "test-value-1",
+									"pid":      "1234",
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 10,
-								}},
 							},
-						},
-					},
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key": "test-value-2",
-								"pid":      "1234",
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
+							Resource: resource,
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
 									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 10,
+									}},
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 16,
-								}},
+							},
+						},
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/testview",
+								Labels: map[string]string{
+									"test_key": "test-value-2",
+									"pid":      "1234",
+								},
+							},
+							Resource: resource,
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 16,
+									}},
+								},
 							},
 						},
 					},
 				},
-			}},
-		},
-		{
-			name: "GetMonitoredResource and labels",
-			opts: func() Options {
-				var labels Labels
-				labels.Set("pid", "1234", "Process identifier")
-				return Options{
-					GetMonitoredResource: func(v *view.View, t []tag.Tag) ([]tag.Tag, monitoredresource.Interface) {
-						return t, gceInst
-					},
-					DefaultMonitoringLabels: &labels,
-				}
-			}(),
-			vd: newTestViewData(v, start, end, count1, count2),
-			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key": "test-value-1",
-								"pid":      "1234",
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
-								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 10,
-								}},
-							},
-						},
-					},
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key": "test-value-2",
-								"pid":      "1234",
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
-								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 16,
-								}},
-							},
-						},
-					},
-				},
-			}},
+			},
 		},
 		{
 			name: "custom default monitoring labels",
@@ -1104,129 +1091,133 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 				}
 			}(),
 			vd: newTestViewData(v, start, end, count1, count2),
-			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key": "test-value-1",
-								"pid":      "1234",
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/testview",
+								Labels: map[string]string{
+									"test_key": "test-value-1",
+									"pid":      "1234",
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 10,
-								}},
 							},
-						},
-					},
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key": "test-value-2",
-								"pid":      "1234",
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
+							Resource: resource,
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
 									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 10,
+									}},
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 16,
-								}},
+							},
+						},
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/testview",
+								Labels: map[string]string{
+									"test_key": "test-value-2",
+									"pid":      "1234",
+								},
+							},
+							Resource: resource,
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 16,
+									}},
+								},
 							},
 						},
 					},
 				},
-			}},
+			},
 		},
 		{
 			name: "count agg timeline",
 			opts: Options{Resource: resource},
 			vd:   newTestViewData(v, start, end, count1, count2),
-			want: []*monitoringpb.CreateTimeSeriesRequest{{
-				Name: monitoring.MetricProjectPath("proj-id"),
-				TimeSeries: []*monitoringpb.TimeSeries{
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-1",
-								opencensusTaskKey: taskValue,
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
-									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: fmt.Sprintf("projects/%s", "proj-id"),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-1",
+									opencensusTaskKey: taskValue,
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 10,
-								}},
 							},
-						},
-					},
-					{
-						Metric: &metricpb.Metric{
-							Type: "custom.googleapis.com/opencensus/testview",
-							Labels: map[string]string{
-								"test_key":        "test-value-2",
-								opencensusTaskKey: taskValue,
-							},
-						},
-						Resource: resource,
-						Points: []*monitoringpb.Point{
-							{
-								Interval: &monitoringpb.TimeInterval{
-									StartTime: &timestamp.Timestamp{
-										Seconds: start.Unix(),
-										Nanos:   int32(start.Nanosecond()),
+							Resource: resource,
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
 									},
-									EndTime: &timestamp.Timestamp{
-										Seconds: end.Unix(),
-										Nanos:   int32(end.Nanosecond()),
-									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 10,
+									}},
 								},
-								Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
-									Int64Value: 16,
-								}},
+							},
+						},
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-2",
+									opencensusTaskKey: taskValue,
+								},
+							},
+							Resource: resource,
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_Int64Value{
+										Int64Value: 16,
+									}},
+								},
 							},
 						},
 					},
 				},
-			}},
+			},
 		},
 	}
 	for _, tt := range tests {
