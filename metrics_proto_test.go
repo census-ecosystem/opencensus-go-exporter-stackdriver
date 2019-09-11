@@ -188,12 +188,14 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 					},
 				},
 			},
-		}, //<metric:<type:"custom.googleapis.com/opencensus/ocagent.io/calls" labels:<key:"opencensus_task" value:"go-99078@bdrutu-macbookpro2.roam.corp.google.com" > > resource:<type:"global" > metric_kind:CUMULATIVE value_type:INT64 points:<interval:<end_time:<seconds:1001 > start_time:<seconds:1000 > > value:<int64_value:8 > > > time_series:<metric:<type:"custom.googleapis.com/opencensus/ocagent.io/calls" labels:<key:"opencensus_task" value:"go-99078@bdrutu-macbookpro2.roam.corp.google.com" > > resource:<type:"global" > metric_kind:CUMULATIVE value_type:INT64 points:<interval:<end_time:<seconds:1001 > start_time:<seconds:1000 > > value:<int64_value:8 > > > `,
+		},
 	})
 
 	// Export the proto Metrics to the Stackdriver backend.
-	se.PushMetricsProto(context.Background(), nil, nil, metricPbs)
-	se.Flush()
+	dropped, err := se.PushMetricsProto(context.Background(), nil, nil, metricPbs)
+	if dropped != 0 || err != nil {
+		t.Fatalf("Error pushing metrics, dropped:%d err:%v", dropped, err)
+	}
 
 	var gotTimeSeries []*monitoringpb.CreateTimeSeriesRequest
 	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
