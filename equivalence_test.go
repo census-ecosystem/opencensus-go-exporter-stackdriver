@@ -132,17 +132,10 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
 
-	// Now create a gRPC connection to the agent.
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
-	if err != nil {
-		t.Fatalf("Failed to make a gRPC connection to the agent: %v", err)
-	}
-	defer conn.Close()
-
 	// Finally create the OpenCensus stats exporter
 	exporterOptions := Options{
 		ProjectID:               "equivalence",
-		MonitoringClientOptions: []option.ClientOption{option.WithGRPCConn(conn)},
+		MonitoringClientOptions: []option.ClientOption{option.WithEndpoint(addr)},
 
 		// Setting this time delay threshold to a very large value
 		// so that batching is performed deterministically and flushing is
