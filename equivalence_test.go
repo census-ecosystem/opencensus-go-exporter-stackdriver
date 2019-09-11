@@ -383,7 +383,7 @@ func createFakeServer(t *testing.T) (*fakeMetricsServer, string, func()) {
 		_ = ln.Close()
 	}
 	_, agentPortStr, _ := net.SplitHostPort(ln.Addr().String())
-	return server, ":" + agentPortStr, stop
+	return server, "localhost:" + agentPortStr, stop
 }
 
 func (server *fakeMetricsServer) forEachStackdriverTimeSeries(fn func(sdt *monitoringpb.CreateTimeSeriesRequest)) {
