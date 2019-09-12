@@ -138,7 +138,8 @@ func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*met
 			for _, percentileValue := range snapshot.GetPercentileValues() {
 				lvsWithPercentile := lvs[0:]
 				lvsWithPercentile = append(lvsWithPercentile, &metricspb.LabelValue{
-					Value: fmt.Sprintf("%f", percentileValue.Percentile),
+					HasValue: true,
+					Value:    fmt.Sprintf("%f", percentileValue.Percentile),
 				})
 				percentileTs := &metricspb.TimeSeries{
 					LabelValues:    lvsWithPercentile,

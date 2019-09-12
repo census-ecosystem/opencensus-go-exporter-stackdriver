@@ -1069,7 +1069,8 @@ func makeDoublePoint(val float64, end *timestamp.Timestamp) []*metricspb.Point {
 func makeLabelValue(value string) []*metricspb.LabelValue {
 	return []*metricspb.LabelValue{
 		{
-			Value: value,
+			HasValue: true,
+			Value:    value,
 		},
 	}
 }
