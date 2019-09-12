@@ -132,10 +132,10 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
 
-	// Now create a gRPC connection to the agent.
+	// Now create a gRPC connection to the fake Stackdriver server.
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
-		t.Fatalf("Failed to make a gRPC connection to the agent: %v", err)
+		t.Fatalf("Failed to make a gRPC connection to the server: %v", err)
 	}
 	defer conn.Close()
 
@@ -348,6 +348,14 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 	server.forEachStackdriverMetricDescriptor(func(sdmd *monitoringpb.CreateMetricDescriptorRequest) {
 		stackdriverMetricDescriptorsFromMetricsPb = append(stackdriverMetricDescriptorsFromMetricsPb, sdmd)
 	})
+
+	if len(stackdriverTimeSeriesFromMetrics) == 0 {
+		t.Fatalf("Failed to export timeseries with metrics")
+	}
+
+	if len(stackdriverTimeSeriesFromMetricsPb) == 0 {
+		t.Fatalf("Failed to export timeseries with metrics pb")
+	}
 
 	// The results should be equal now
 	if diff := cmpTSReqs(stackdriverTimeSeriesFromMetricsPb, stackdriverTimeSeriesFromMetrics); diff != "" {
