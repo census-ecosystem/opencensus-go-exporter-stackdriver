@@ -242,6 +242,9 @@ func (e *statsExporter) makeReq(vds []*view.Data, limit int) []*monitoringpb.Cre
 
 	var allTimeSeries []*monitoringpb.TimeSeries
 	for _, vd := range vds {
+		if !e.shouldExportMetric(vd.View) {
+			continue
+		}
 		for _, row := range vd.Rows {
 			tags, resource := e.getMonitoredResource(vd.View, append([]tag.Tag(nil), row.Tags...))
 			ts := &monitoringpb.TimeSeries{
@@ -576,6 +579,13 @@ func (e *statsExporter) metricType(v *view.View) string {
 		return formatter(v)
 	}
 	return path.Join("custom.googleapis.com", "opencensus", v.Name)
+}
+
+func (e *statsExporter) shouldExportMetric(v *view.View) bool {
+	if filter := e.o.MetricFilter; filter != nil {
+		return filter(v)
+	}
+	return true
 }
 
 func newLabels(defaults map[string]labelValue, tags []tag.Tag) map[string]string {

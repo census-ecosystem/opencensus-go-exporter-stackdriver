@@ -247,6 +247,98 @@ func TestExporter_makeReq(t *testing.T) {
 			},
 		},
 		{
+			name:   "skipped via metric filter",
+			projID: "proj-id",
+			vd:     newTestViewData(v, start, end, sum1, sum2),
+			opts: Options{
+				MetricFilter: func(v *view.View) bool {
+					if v.Name == "example.com/views/testview" {
+						return false
+					}
+					return true
+				},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{},
+		},
+		{
+			name:   "kept via metric filter",
+			projID: "proj-id",
+			vd:     newTestViewData(v, start, end, sum1, sum2),
+			opts: Options{
+				MetricFilter: func(v *view.View) bool {
+					if v.Name == "example.com/views/testview" {
+						return true
+					}
+					return false
+				},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: monitoring.MetricProjectPath("proj-id"),
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/example.com/views/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-1",
+									opencensusTaskKey: taskValue,
+								},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+										DoubleValue: 5.5,
+									}},
+								},
+							},
+						},
+						{
+							Metric: &metricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/example.com/views/testview",
+								Labels: map[string]string{
+									"test_key":        "test-value-2",
+									opencensusTaskKey: taskValue,
+								},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: &timestamp.Timestamp{
+											Seconds: start.Unix(),
+											Nanos:   int32(start.Nanosecond()),
+										},
+										EndTime: &timestamp.Timestamp{
+											Seconds: end.Unix(),
+											Nanos:   int32(end.Nanosecond()),
+										},
+									},
+									Value: &monitoringpb.TypedValue{Value: &monitoringpb.TypedValue_DoubleValue{
+										DoubleValue: -11.1,
+									}},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:   "sum agg + timeline",
 			projID: "proj-id",
 			vd:     newTestViewData(v, start, end, sum1, sum2),

@@ -205,6 +205,13 @@ type Options struct {
 	// See: https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.metricDescriptors#MetricDescriptor
 	GetMetricType func(view *view.View) string
 
+	// MetricFilter allows keeping/skipping a set of views when exporting.
+	// Optional. If unset, all views will be exported.
+	//
+	// The view will be exported if the filter returns true, and will be skipped
+	// if the filter returns false.
+	MetricFilter func(view *view.View) bool
+
 	// DefaultTraceAttributes will be appended to every span that is exported to
 	// Stackdriver Trace.
 	DefaultTraceAttributes map[string]interface{}
