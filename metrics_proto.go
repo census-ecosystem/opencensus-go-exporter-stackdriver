@@ -60,7 +60,7 @@ func (se *statsExporter) PushMetricsProto(ctx context.Context, node *commonpb.No
 	// Caches the resources seen so far
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
 
-	mb := newMetricsBatcher(se.o.ProjectID)
+	mb := newMetricsBatcher(ctx, se.o.ProjectID, se.o.NumberOfWorkers, se.c)
 	for _, metric := range metrics {
 		if len(metric.GetTimeseries()) == 0 {
 			// No TimeSeries to export, skip this metric.
@@ -85,8 +85,7 @@ func (se *statsExporter) PushMetricsProto(ctx context.Context, node *commonpb.No
 		}
 	}
 
-	mb.export(ctx, se.c)
-	return mb.droppedTimeSeries, mb.finalError()
+	return mb.droppedTimeSeries, mb.close(ctx)
 }
 
 func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*metricspb.Metric {
