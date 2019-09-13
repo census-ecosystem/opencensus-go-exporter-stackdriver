@@ -1,4 +1,4 @@
-// Copyright 2019	, OpenCensus Authors
+// Copyright 2019, OpenCensus Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,6 +38,8 @@ import (
 
 	sd "contrib.go.opencensus.io/exporter/stackdriver"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	"go.opencensus.io/resource/resourcekeys"
 )
 
 type testCases struct {
@@ -207,7 +209,7 @@ func TestExportLabels(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
 
-	// Now create a gRPC connection to the agent.
+	// Now create a gRPC connection to the server.
 	conn := createConn(t, addr)
 	defer conn.Close()
 
@@ -310,7 +312,7 @@ func TestExportLabels(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		executeTestCase(t, tc, se, server)
+		executeTestCase(t, tc, se, server, nil)
 	}
 }
 
@@ -318,7 +320,7 @@ func TestExportMetricOfDifferentType(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
 
-	// Now create a gRPC connection to the agent.
+	// Now create a gRPC connection to the server.
 	conn := createConn(t, addr)
 	defer conn.Close()
 
@@ -738,7 +740,116 @@ func TestExportMetricOfDifferentType(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		executeTestCase(t, tc, se, server)
+		executeTestCase(t, tc, se, server, nil)
+	}
+}
+
+func TestMetricsWithResourcePerPushCall(t *testing.T) {
+	server, addr, doneFn := createFakeServer(t)
+	defer doneFn()
+
+	// Now create a gRPC connection to the server.
+	conn := createConn(t, addr)
+	defer conn.Close()
+
+	resourceTests := []struct {
+		name        string
+		inResource  *resourcepb.Resource
+		outResource *monitoredrespb.MonitoredResource
+	}{
+		{
+			name:        "k8s_container Resource mapping",
+			inResource:  createResourcePbContainer(),
+			outResource: createMonitoredResourcePbK8sContainer(),
+		},
+		{
+			name:        "k8s_pod Resource mapping",
+			inResource:  createResourcePbK8sPodType(),
+			outResource: createMonitoredResourcePbK8sPodType(),
+		},
+		{
+			name:        "k8s_node Resource mapping",
+			inResource:  createResourcePbK8sNodType(),
+			outResource: createMonitoredResourcePbK8sNodType(),
+		},
+		{
+			name:        "gce_instance Resource mapping",
+			inResource:  createResourcePbGCE(),
+			outResource: createMonitoredResourcePbGCE(),
+		},
+		{
+			name:        "aws_instance Resource mapping",
+			inResource:  createResourcePbAWS(),
+			outResource: createMonitoredResourcePbAWS(),
+		},
+		{
+			name:        "unkown Resource mapping",
+			inResource:  createResourcePbUnknown(),
+			outResource: outGlobalResource,
+		},
+	}
+
+	for _, rt := range resourceTests {
+		// Finally create the OpenCensus stats exporter
+		se := createExporter(t, conn, defaultOpts)
+
+		inMDCummDouble := createMetricDescriptorByType("metricCummDouble", metricspb.MetricDescriptor_CUMULATIVE_DOUBLE)
+		outMDCummDouble := createGoogleMetricPbDescriptorByType("metricCummDouble", googlemetricpb.MetricDescriptor_CUMULATIVE, googlemetricpb.MetricDescriptor_DOUBLE)
+
+		tcs := []*testCases{
+			{
+				name: rt.name,
+				inMetric: []*metricspb.Metric{
+					createMetric(inMDCummDouble, inPointsFloat64_1, inEmptyValue, inOperTypeValue1),
+				},
+				outTSR: []*monitoringpb.CreateTimeSeriesRequest{
+					createGoogleMetric(outMDCummDouble, rt.outResource, googlemetricpb.MetricDescriptor_CUMULATIVE, googlemetricpb.MetricDescriptor_DOUBLE, outPointsDouble64_1),
+				},
+				outMDR: []*monitoringpb.CreateMetricDescriptorRequest{
+					{
+						Name:             "projects/metrics_proto_test",
+						MetricDescriptor: outMDCummDouble,
+					},
+				},
+			},
+		}
+		for _, tc := range tcs {
+			executeTestCase(t, tc, se, server, rt.inResource)
+		}
+	}
+
+	// Missing label(s) should result into global resource type.
+	for _, rt := range resourceTests {
+		se := createExporter(t, conn, defaultOpts)
+
+		inMDCummDouble := createMetricDescriptorByType("metricCummDouble", metricspb.MetricDescriptor_CUMULATIVE_DOUBLE)
+		outMDCummDouble := createGoogleMetricPbDescriptorByType("metricCummDouble", googlemetricpb.MetricDescriptor_CUMULATIVE, googlemetricpb.MetricDescriptor_DOUBLE)
+
+		inRes := &resourcepb.Resource{
+			Type: rt.inResource.Type,
+		}
+
+		tcs := []*testCases{
+			{
+				name: rt.name + " with missing labels",
+				inMetric: []*metricspb.Metric{
+					createMetric(inMDCummDouble, inPointsFloat64_1, inEmptyValue, inOperTypeValue1),
+				},
+				outTSR: []*monitoringpb.CreateTimeSeriesRequest{
+					createGoogleMetric(outMDCummDouble, outGlobalResource, googlemetricpb.MetricDescriptor_CUMULATIVE, googlemetricpb.MetricDescriptor_DOUBLE, outPointsDouble64_1),
+				},
+				outMDR: []*monitoringpb.CreateMetricDescriptorRequest{
+					{
+						Name:             "projects/metrics_proto_test",
+						MetricDescriptor: outMDCummDouble,
+					},
+				},
+			},
+		}
+		for _, tc := range tcs {
+			executeTestCase(t, tc, se, server, inRes)
+		}
+
 	}
 }
 
@@ -746,7 +857,7 @@ func TestExportMaxTSPerRequest(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
 
-	// Now create a gRPC connection to the agent.
+	// Now create a gRPC connection to the server.
 	conn := createConn(t, addr)
 	defer conn.Close()
 
@@ -807,7 +918,7 @@ func TestExportMaxTSPerRequest(t *testing.T) {
 		tcs[0].outTSR[j].TimeSeries = append(tcs[0].outTSR[j].TimeSeries, outTS)
 	}
 	for _, tc := range tcs {
-		executeTestCase(t, tc, se, server)
+		executeTestCase(t, tc, se, server, nil)
 	}
 }
 
@@ -815,7 +926,7 @@ func TestExportMaxTSPerRequestAcrossTwoMetrics(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
 
-	// Now create a gRPC connection to the agent.
+	// Now create a gRPC connection to the server.
 	conn := createConn(t, addr)
 	defer conn.Close()
 
@@ -894,14 +1005,14 @@ func TestExportMaxTSPerRequestAcrossTwoMetrics(t *testing.T) {
 		tcs[0].outTSR[j].TimeSeries = append(tcs[0].outTSR[j].TimeSeries, outTS)
 	}
 	for _, tc := range tcs {
-		executeTestCase(t, tc, se, server)
+		executeTestCase(t, tc, se, server, nil)
 	}
 }
 
 func createConn(t *testing.T, addr string) *grpc.ClientConn {
 	conn, err := grpc.Dial(addr, grpc.WithInsecure())
 	if err != nil {
-		t.Fatalf("Failed to make a gRPC connection to the agent: %v", err)
+		t.Fatalf("Failed to make a gRPC connection to the server: %v", err)
 	}
 	return conn
 }
@@ -915,13 +1026,13 @@ func createExporter(t *testing.T, conn *grpc.ClientConn, opts sd.Options) *sd.Ex
 	return se
 }
 
-func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeMetricsServer) {
-	dropped, err := se.PushMetricsProto(context.Background(), nil, nil, tc.inMetric)
+func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeMetricsServer, rsc *resourcepb.Resource) {
+	dropped, err := se.PushMetricsProto(context.Background(), nil, rsc, tc.inMetric)
 	if dropped != 0 || err != nil {
 		t.Fatalf("Name: %s, Error pushing metrics, dropped:%d err:%v", tc.name, dropped, err)
 	}
 
-	var gotTimeSeries []*monitoringpb.CreateTimeSeriesRequest
+	gotTimeSeries := []*monitoringpb.CreateTimeSeriesRequest{}
 	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
 		gotTimeSeries = append(gotTimeSeries, sdt)
 	})
@@ -930,7 +1041,7 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 		t.Errorf("Name[%s], TimeSeries[%d], Error: -got +want %s\n", tc.name, idx, diff)
 	}
 
-	var gotCreateMDRequest []*monitoringpb.CreateMetricDescriptorRequest
+	gotCreateMDRequest := []*monitoringpb.CreateMetricDescriptorRequest{}
 	server.forEachStackdriverMetricDescriptor(func(sdm *monitoringpb.CreateMetricDescriptorRequest) {
 		gotCreateMDRequest = append(gotCreateMDRequest, sdm)
 	})
@@ -940,6 +1051,178 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 	}
 	server.resetStackdriverMetricDescriptors()
 	server.resetStackdriverTimeSeries()
+}
+
+func createResourcePbUnknown() *resourcepb.Resource {
+	return &resourcepb.Resource{
+		Type: "Unknown",
+		Labels: map[string]string{
+			resourcekeys.K8SKeyClusterName:   "cluster1",
+			resourcekeys.K8SKeyPodName:       "pod1",
+			resourcekeys.K8SKeyNamespaceName: "namespace1",
+			resourcekeys.ContainerKeyName:    "container-name1",
+			resourcekeys.CloudKeyZone:        "zone1",
+		},
+	}
+}
+
+func createResourcePbContainer() *resourcepb.Resource {
+	return &resourcepb.Resource{
+		Type: resourcekeys.ContainerType,
+		Labels: map[string]string{
+			resourcekeys.K8SKeyClusterName:   "cluster1",
+			resourcekeys.K8SKeyPodName:       "pod1",
+			resourcekeys.K8SKeyNamespaceName: "namespace1",
+			resourcekeys.ContainerKeyName:    "container-name1",
+			resourcekeys.CloudKeyZone:        "zone1",
+		},
+	}
+}
+
+func createMonitoredResourcePbK8sContainer() *monitoredrespb.MonitoredResource {
+	return &monitoredrespb.MonitoredResource{
+		Type: "k8s_container",
+		Labels: map[string]string{
+			"location":       "zone1",
+			"cluster_name":   "cluster1",
+			"namespace_name": "namespace1",
+			"pod_name":       "pod1",
+			"container_name": "container-name1",
+		},
+	}
+
+}
+
+func createResourcePbK8sPodType() *resourcepb.Resource {
+	return &resourcepb.Resource{
+		Type: resourcekeys.K8SType,
+		Labels: map[string]string{
+			resourcekeys.K8SKeyClusterName:   "cluster1",
+			resourcekeys.K8SKeyPodName:       "pod1",
+			resourcekeys.K8SKeyNamespaceName: "namespace1",
+			resourcekeys.ContainerKeyName:    "container-name1",
+			resourcekeys.CloudKeyZone:        "zone1",
+		},
+	}
+}
+
+func createMonitoredResourcePbK8sPodType() *monitoredrespb.MonitoredResource {
+	return &monitoredrespb.MonitoredResource{
+		Type: "k8s_pod",
+		Labels: map[string]string{
+			"location":       "zone1",
+			"cluster_name":   "cluster1",
+			"namespace_name": "namespace1",
+			"pod_name":       "pod1",
+		},
+	}
+
+}
+
+func createResourcePbK8sNodType() *resourcepb.Resource {
+	return &resourcepb.Resource{
+		Type: resourcekeys.HostType,
+		Labels: map[string]string{
+			resourcekeys.K8SKeyClusterName:   "cluster1",
+			resourcekeys.K8SKeyPodName:       "pod1",
+			resourcekeys.K8SKeyNamespaceName: "namespace1",
+			resourcekeys.ContainerKeyName:    "container-name1",
+			resourcekeys.CloudKeyZone:        "zone1",
+			resourcekeys.HostKeyName:         "host1",
+		},
+	}
+}
+
+func createMonitoredResourcePbK8sNodType() *monitoredrespb.MonitoredResource {
+	return &monitoredrespb.MonitoredResource{
+		Type: "k8s_node",
+		Labels: map[string]string{
+			"location":     "zone1",
+			"cluster_name": "cluster1",
+			"node_name":    "host1",
+		},
+	}
+
+}
+
+func createResourcePbGCE() *resourcepb.Resource {
+	return &resourcepb.Resource{
+		Type: resourcekeys.CloudType,
+		Labels: map[string]string{
+			resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderGCP,
+			resourcekeys.HostKeyID:        "inst1",
+			resourcekeys.CloudKeyZone:     "zone1",
+		},
+	}
+}
+
+func createMonitoredResourcePbGCE() *monitoredrespb.MonitoredResource {
+	return &monitoredrespb.MonitoredResource{
+		Type: "gce_instance",
+		Labels: map[string]string{
+			"instance_id": "inst1",
+			"zone":        "zone1",
+		},
+	}
+}
+
+func createResourcePbAWS() *resourcepb.Resource {
+	return &resourcepb.Resource{
+		Type: resourcekeys.CloudType,
+		Labels: map[string]string{
+			resourcekeys.CloudKeyProvider:  resourcekeys.CloudProviderAWS,
+			resourcekeys.HostKeyID:         "inst1",
+			resourcekeys.CloudKeyRegion:    "region1",
+			resourcekeys.CloudKeyAccountID: "account1",
+		},
+	}
+}
+
+func createMonitoredResourcePbAWS() *monitoredrespb.MonitoredResource {
+	return &monitoredrespb.MonitoredResource{
+		Type: "aws_ec2_instance",
+		Labels: map[string]string{
+			"instance_id": "inst1",
+			"region":      "aws:region1",
+			"aws_account": "account1",
+		},
+	}
+}
+
+func createMetric(md *metricspb.MetricDescriptor, points []*metricspb.Point, labelValues ...*metricspb.LabelValue) *metricspb.Metric {
+	lvs := []*metricspb.LabelValue{}
+	lvs = append(lvs, labelValues...)
+	return &metricspb.Metric{
+		MetricDescriptor: md,
+		Timeseries: []*metricspb.TimeSeries{
+			{
+				StartTimestamp: startTimestamp,
+				LabelValues:    lvs,
+				Points:         points,
+			},
+		},
+	}
+}
+
+func createGoogleMetric(md *googlemetricpb.MetricDescriptor, res *monitoredrespb.MonitoredResource, mk googlemetricpb.MetricDescriptor_MetricKind, mt googlemetricpb.MetricDescriptor_ValueType, points []*monitoringpb.Point) *monitoringpb.CreateTimeSeriesRequest {
+	return &monitoringpb.CreateTimeSeriesRequest{
+		Name: "projects/metrics_proto_test",
+		TimeSeries: []*monitoringpb.TimeSeries{
+			{
+				Metric: &googlemetricpb.Metric{
+					Type: md.Type,
+					Labels: map[string]string{
+						"empty_key":      "",
+						"operation_type": "test_1",
+					},
+				},
+				Resource:   res,
+				MetricKind: mk,
+				ValueType:  mt,
+				Points:     points,
+			},
+		},
+	}
 }
 
 func createMetricDescriptorByType(metricName string, mt metricspb.MetricDescriptor_Type) *metricspb.MetricDescriptor {
@@ -1141,8 +1424,8 @@ func createFakeServer(t *testing.T) (*fakeMetricsServer, string, func()) {
 		srv.Stop()
 		_ = ln.Close()
 	}
-	_, agentPortStr, _ := net.SplitHostPort(ln.Addr().String())
-	return server, "localhost:" + agentPortStr, stop
+	_, serverPortStr, _ := net.SplitHostPort(ln.Addr().String())
+	return server, "localhost:" + serverPortStr, stop
 }
 
 func (server *fakeMetricsServer) forEachStackdriverTimeSeries(fn func(sdt *monitoringpb.CreateTimeSeriesRequest)) {
