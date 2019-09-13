@@ -97,7 +97,7 @@ func (mb *metricsBatcher) close(ctx context.Context) error {
 				Name:       mb.projectName,
 				TimeSeries: mb.allTss[start:end],
 			})
-			start = end + 1
+			start = end
 		}
 
 		for _, req := range reqs {
