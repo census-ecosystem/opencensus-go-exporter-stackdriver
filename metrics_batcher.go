@@ -56,7 +56,11 @@ func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc
 
 func (mb *metricsBatcher) recordDroppedTimeseries(numTimeSeries int, errs ...error) {
 	mb.droppedTimeSeries += numTimeSeries
-	mb.allErrs = append(mb.allErrs, errs...)
+	for _, err := range errs {
+		if err != nil {
+			mb.allErrs = append(mb.allErrs, err)
+		}
+	}
 }
 
 func (mb *metricsBatcher) addTimeSeries(ts *monitoringpb.TimeSeries) {
@@ -173,7 +177,9 @@ func (w *worker) stop() *response {
 
 func (w *worker) recordDroppedTimeseries(numTimeSeries int, err error) {
 	w.resp.droppedTimeSeries += numTimeSeries
-	w.resp.errs = append(w.resp.errs, err)
+	if err != nil {
+		w.resp.errs = append(w.resp.errs, err)
+	}
 }
 
 type response struct {
