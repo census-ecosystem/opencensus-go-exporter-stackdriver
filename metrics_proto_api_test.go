@@ -1,4 +1,4 @@
-// Copyright 2019, OpenCensus Authors
+// Copyright 2019	, OpenCensus Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,7 +24,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
-	//resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/golang/protobuf/ptypes/wrappers"
@@ -39,8 +38,6 @@ import (
 
 	sd "contrib.go.opencensus.io/exporter/stackdriver"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
-	//"github.com/golang/protobuf/ptypes/wrappers"
-	//"go.opencensus.io/resource/resourcekeys"
 )
 
 type testCases struct {
