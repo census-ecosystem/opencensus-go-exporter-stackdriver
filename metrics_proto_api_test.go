@@ -29,7 +29,7 @@ import (
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"google.golang.org/api/option"
 
-	//distributionpb "google.golang.org/genproto/googleapis/api/distribution"
+	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
@@ -78,6 +78,9 @@ var (
 		StartTime: startTimestamp,
 		EndTime:   endTimestamp,
 	}
+	outGaugeInterval = &monitoringpb.TimeInterval{
+		EndTime: endTimestamp,
+	}
 
 	// label keys and values
 	inEmptyKey       = &metricspb.LabelKey{Key: "empty_key"}
@@ -121,8 +124,8 @@ var (
 	outMetricTypeLatency   = "custom.googleapis.com/opencensus/" + inMetricNameLatency
 	outDisplayNameLatency  = "OpenCensus/" + inMetricNameLatency
 
-	inMetricDescLatency  = "Sum of latency"
-	outMetricDescLatency = "Sum of latency"
+	inMetricDescLatency  = "Description of latency"
+	outMetricDescLatency = "Description of latency"
 
 	metricUnitLatency    = "ms"
 	outMetricUnitLatency = "ms"
@@ -144,7 +147,7 @@ var (
 		"empty_key",
 		"operation_type")
 
-	// points
+	// points int64
 	inPointsInt64_1 = []*metricspb.Point{
 		{
 			Timestamp: endTimestamp,
@@ -162,6 +165,41 @@ var (
 			Value:    outValueInt64_1,
 		},
 	}
+	outPointsGaugeInt64_1 = []*monitoringpb.Point{
+		{
+			Interval: outGaugeInterval,
+			Value:    outValueInt64_1,
+		},
+	}
+
+	// points int64
+	inPointsFloat64_1 = []*metricspb.Point{
+		{
+			Timestamp: endTimestamp,
+			Value:     &metricspb.Point_DoubleValue{DoubleValue: float64(35.5)},
+		},
+	}
+	outValueDouble64_1 = &monitoringpb.TypedValue{
+		Value: &monitoringpb.TypedValue_DoubleValue{
+			DoubleValue: float64(35.5),
+		},
+	}
+	outPointsDouble64_1 = []*monitoringpb.Point{
+		{
+			Interval: outInterval,
+			Value:    outValueDouble64_1,
+		},
+	}
+	outPointsGaugeDouble64_1 = []*monitoringpb.Point{
+		{
+			Interval: outGaugeInterval,
+			Value:    outValueDouble64_1,
+		},
+	}
+
+	// Distribution stuff
+	inBounds  = []float64{10, 20, 30, 40}
+	outBounds = []float64{0, 10, 20, 30, 40}
 )
 
 func TestExportLabels(t *testing.T) {
@@ -266,6 +304,217 @@ func TestExportLabels(t *testing.T) {
 				{
 					Name:             "projects/metrics_proto_test",
 					MetricDescriptor: outMDCall,
+				},
+			},
+		},
+	}
+	for _, tc := range tcs {
+		executeTestCase(t, tc, se, server)
+	}
+}
+
+func TestExportMetricOfDifferentType(t *testing.T) {
+	server, addr, doneFn := createFakeServer(t)
+	defer doneFn()
+
+	// Now create a gRPC connection to the agent.
+	conn := createConn(t, addr)
+	defer conn.Close()
+
+	// Finally create the OpenCensus stats exporter
+	se := createExporter(t, conn, defaultOpts)
+
+	inMDCummDouble := createMetricDescriptorByType("metricCummDouble", metricspb.MetricDescriptor_CUMULATIVE_DOUBLE)
+	outMDCummDouble := createGoogleMetricPbDescriptorByType("metricCummDouble", googlemetricpb.MetricDescriptor_CUMULATIVE, googlemetricpb.MetricDescriptor_DOUBLE)
+	inMDGaugeDouble := createMetricDescriptorByType("metricGaugeDouble", metricspb.MetricDescriptor_GAUGE_DOUBLE)
+	outMDGaugeDouble := createGoogleMetricPbDescriptorByType("metricGaugeDouble", googlemetricpb.MetricDescriptor_GAUGE, googlemetricpb.MetricDescriptor_DOUBLE)
+	inMDCummInt64 := createMetricDescriptorByType("metricCummInt64", metricspb.MetricDescriptor_CUMULATIVE_INT64)
+	outMDCummInt64 := createGoogleMetricPbDescriptorByType("metricCummInt64", googlemetricpb.MetricDescriptor_CUMULATIVE, googlemetricpb.MetricDescriptor_INT64)
+	inMDGaugeInt64 := createMetricDescriptorByType("metricGaugeInt64", metricspb.MetricDescriptor_GAUGE_INT64)
+	outMDGaugeInt64 := createGoogleMetricPbDescriptorByType("metricGaugeInt64", googlemetricpb.MetricDescriptor_GAUGE, googlemetricpb.MetricDescriptor_INT64)
+
+	inMDCummDist := createMetricDescriptorByType("metricCummDist", metricspb.MetricDescriptor_CUMULATIVE_DISTRIBUTION)
+	outMDCummDist := createGoogleMetricPbDescriptorByType("metricCummDist", googlemetricpb.MetricDescriptor_CUMULATIVE, googlemetricpb.MetricDescriptor_DISTRIBUTION)
+	inPointsCummDist := createMetricPbPointDistribution(1, 11.9, inBounds, 1, 0, 0, 0)
+	outPointsCummDist := createGoogleMetricPbPointDistribution(1, 11.9, startTimestamp, outBounds, 0, 1, 0, 0, 0)
+
+	inMDGuageDist := createMetricDescriptorByType("metricGuageDist", metricspb.MetricDescriptor_GAUGE_DISTRIBUTION)
+	outMDGuageDist := createGoogleMetricPbDescriptorByType("metricGuageDist", googlemetricpb.MetricDescriptor_GAUGE, googlemetricpb.MetricDescriptor_DISTRIBUTION)
+	inPointsGaugeDist := createMetricPbPointDistribution(1, 11.9, inBounds, 1, 0, 0, 0)
+	outPointsGuageDist := createGoogleMetricPbPointDistribution(1, 11.9, nil, outBounds, 0, 1, 0, 0, 0)
+
+	tcs := []*testCases{
+		{
+			name: "Metrics of different types",
+			inMetric: []*metricspb.Metric{
+				{
+					MetricDescriptor: inMDCummDouble,
+					Timeseries: []*metricspb.TimeSeries{
+						{
+							StartTimestamp: startTimestamp,
+							LabelValues:    []*metricspb.LabelValue{inEmptyValue, inOperTypeValue1},
+							Points:         inPointsFloat64_1,
+						},
+					},
+				},
+				{
+					MetricDescriptor: inMDGaugeDouble,
+					Timeseries: []*metricspb.TimeSeries{
+						{
+							LabelValues: []*metricspb.LabelValue{inEmptyValue, inOperTypeValue2},
+							Points:      inPointsFloat64_1,
+						},
+					},
+				},
+				{
+					MetricDescriptor: inMDCummInt64,
+					Timeseries: []*metricspb.TimeSeries{
+						{
+							StartTimestamp: startTimestamp,
+							LabelValues:    []*metricspb.LabelValue{inEmptyValue, inOperTypeValue1},
+							Points:         inPointsInt64_1,
+						},
+					},
+				},
+				{
+					MetricDescriptor: inMDGaugeInt64,
+					Timeseries: []*metricspb.TimeSeries{
+						{
+							LabelValues: []*metricspb.LabelValue{inEmptyValue, inOperTypeValue2},
+							Points:      inPointsInt64_1,
+						},
+					},
+				},
+				{
+					MetricDescriptor: inMDCummDist,
+					Timeseries: []*metricspb.TimeSeries{
+						{
+							StartTimestamp: startTimestamp,
+							LabelValues:    []*metricspb.LabelValue{inEmptyValue, inOperTypeValue1},
+							Points:         []*metricspb.Point{inPointsCummDist},
+						},
+					},
+				},
+				{
+					MetricDescriptor: inMDGuageDist,
+					Timeseries: []*metricspb.TimeSeries{
+						{
+							StartTimestamp: startTimestamp,
+							LabelValues:    []*metricspb.LabelValue{inEmptyValue, inOperTypeValue1},
+							Points:         []*metricspb.Point{inPointsGaugeDist},
+						},
+					},
+				},
+			},
+			outTSR: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/metrics_proto_test",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDCummDouble.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     outPointsDouble64_1,
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDGaugeDouble.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_2",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     outPointsGaugeDouble64_1,
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDCummInt64.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_INT64,
+							Points:     outPointsInt64_1,
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDGaugeInt64.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_2",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_INT64,
+							Points:     outPointsGaugeInt64_1,
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDCummDist.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_DISTRIBUTION,
+							Points:     []*monitoringpb.Point{outPointsCummDist},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDGuageDist.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DISTRIBUTION,
+							Points:     []*monitoringpb.Point{outPointsGuageDist},
+						},
+					},
+				},
+			},
+			outMDR: []*monitoringpb.CreateMetricDescriptorRequest{
+				{
+					Name:             "projects/metrics_proto_test",
+					MetricDescriptor: outMDCummDouble,
+				},
+				{
+					Name:             "projects/metrics_proto_test",
+					MetricDescriptor: outMDGaugeDouble,
+				},
+				{
+					Name:             "projects/metrics_proto_test",
+					MetricDescriptor: outMDCummInt64,
+				},
+				{
+					Name:             "projects/metrics_proto_test",
+					MetricDescriptor: outMDGaugeInt64,
+				},
+				{
+					Name:             "projects/metrics_proto_test",
+					MetricDescriptor: outMDCummDist,
+				},
+				{
+					Name:             "projects/metrics_proto_test",
+					MetricDescriptor: outMDGuageDist,
 				},
 			},
 		},
@@ -473,6 +722,101 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 	}
 	server.resetStackdriverMetricDescriptors()
 	server.resetStackdriverTimeSeries()
+}
+
+func createMetricDescriptorByType(metricName string, mt metricspb.MetricDescriptor_Type) *metricspb.MetricDescriptor {
+	inMetricName := "ocagent.io/" + metricName
+
+	inMetricDesc := "Description of " + metricName
+
+	metricUnit := "ms"
+
+	inMD := createMetricPbDescriptor(inMetricName,
+		inMetricDesc,
+		metricUnit,
+		mt,
+		inEmptyKey,
+		inOperTypeKey)
+
+	return inMD
+}
+
+func createGoogleMetricPbDescriptorByType(metricName string, mk googlemetricpb.MetricDescriptor_MetricKind, mt googlemetricpb.MetricDescriptor_ValueType) *googlemetricpb.MetricDescriptor {
+	inMetricName := "ocagent.io/" + metricName
+	outCreateMDName := "projects/" + projectID + "/metricDescriptors/custom.googleapis.com/opencensus/" + inMetricName
+	outMetricType := "custom.googleapis.com/opencensus/" + inMetricName
+	outDisplayName := "OpenCensus/" + inMetricName
+
+	outMetricDesc := "Description of " + metricName
+
+	outMetricUnit := "ms"
+
+	outMD := createGoogleMetricPbDescriptor(
+		outCreateMDName,
+		outMetricType,
+		outMetricDesc,
+		outDisplayName,
+		outMetricUnit,
+		mk,
+		mt,
+		"empty_key",
+		"operation_type")
+	return outMD
+}
+
+func createMetricPbPointDistribution(count int64, sum float64, bounds []float64, bktCounts ...int64) *metricspb.Point {
+	buckets := []*metricspb.DistributionValue_Bucket{}
+	for _, count := range bktCounts {
+		bucket := &metricspb.DistributionValue_Bucket{
+			Count: count,
+		}
+		buckets = append(buckets, bucket)
+	}
+	return &metricspb.Point{
+		Timestamp: endTimestamp,
+		Value: &metricspb.Point_DistributionValue{
+			DistributionValue: &metricspb.DistributionValue{
+				Count:                 count,
+				Sum:                   sum,
+				SumOfSquaredDeviation: 0,
+				Buckets:               buckets,
+				BucketOptions: &metricspb.DistributionValue_BucketOptions{
+					Type: &metricspb.DistributionValue_BucketOptions_Explicit_{
+						Explicit: &metricspb.DistributionValue_BucketOptions_Explicit{
+							// Without zero bucket in
+							Bounds: bounds,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+func createGoogleMetricPbPointDistribution(count int64, mean float64, st *timestamp.Timestamp, bounds []float64, bktCounts ...int64) *monitoringpb.Point {
+	return &monitoringpb.Point{
+		Interval: &monitoringpb.TimeInterval{
+			StartTime: st,
+			EndTime:   endTimestamp,
+		},
+		Value: &monitoringpb.TypedValue{
+			Value: &monitoringpb.TypedValue_DistributionValue{
+				DistributionValue: &distributionpb.Distribution{
+					Count:                 count,
+					Mean:                  mean,
+					SumOfSquaredDeviation: 0,
+					BucketCounts:          bktCounts,
+					BucketOptions: &distributionpb.Distribution_BucketOptions{
+						Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
+							ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
+								Bounds: bounds,
+							},
+						},
+					},
+				},
+			},
+		},
+	}
 }
 
 func createMetricPbDescriptor(name, desc, unit string, mt metricspb.MetricDescriptor_Type, lblKeys ...*metricspb.LabelKey) *metricspb.MetricDescriptor {
