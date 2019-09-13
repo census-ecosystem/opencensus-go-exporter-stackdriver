@@ -27,6 +27,7 @@ import (
 	//resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"google.golang.org/api/option"
 
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
@@ -197,9 +198,12 @@ var (
 		},
 	}
 
-	// Distribution stuff
+	// Distribution bounds
 	inBounds  = []float64{10, 20, 30, 40}
 	outBounds = []float64{0, 10, 20, 30, 40}
+
+	// Summary percentile
+	inPercentile = []float64{10.0, 50.0, 90.0, 99.0}
 )
 
 func TestExportLabels(t *testing.T) {
@@ -343,6 +347,31 @@ func TestExportMetricOfDifferentType(t *testing.T) {
 	inPointsGaugeDist := createMetricPbPointDistribution(1, 11.9, inBounds, 1, 0, 0, 0)
 	outPointsGuageDist := createGoogleMetricPbPointDistribution(1, 11.9, nil, outBounds, 0, 1, 0, 0, 0)
 
+	inMDSummary := createMetricDescriptorByType("metricSummary", metricspb.MetricDescriptor_SUMMARY)
+	outMDSummaryCount := createGoogleMetricPbDescriptorByType("metricSummary_summary_count", googlemetricpb.MetricDescriptor_CUMULATIVE, googlemetricpb.MetricDescriptor_INT64)
+	outMDSummarySum := createGoogleMetricPbDescriptorByType("metricSummary_summary_sum", googlemetricpb.MetricDescriptor_CUMULATIVE, googlemetricpb.MetricDescriptor_DOUBLE)
+	outMDSummaryPercentile := createGoogleMetricPbDescriptorByType("metricSummary_summary_percentile", googlemetricpb.MetricDescriptor_GAUGE, googlemetricpb.MetricDescriptor_DOUBLE)
+
+	// Adjust description to original description of summary metris.
+	outMDSummaryCount.Description = inMDSummary.Description
+	outMDSummarySum.Description = inMDSummary.Description
+	outMDSummaryPercentile.Description = inMDSummary.Description
+	outMDSummaryCount.Unit = "1"
+	lbl := &labelpb.LabelDescriptor{
+		Key:         "percentile",
+		ValueType:   labelpb.LabelDescriptor_STRING,
+		Description: "the value at a given percentile of a distribution",
+	}
+	outMDSummaryPercentile.Labels = append(outMDSummaryPercentile.Labels, lbl)
+
+	inPointsSummary := createMetricPbPointSummary(10, 119.0, inPercentile, 5.6, 9.6, 12.6, 17.6)
+	outPointSummaryCount := createGoogleMetricPbPointInt64(10)
+	outPointSummarySum := createGoogleMetricPbPointDouble(119.0, true)
+	outPointSummaryPercentile1 := createGoogleMetricPbPointDouble(5.6, false)
+	outPointSummaryPercentile2 := createGoogleMetricPbPointDouble(9.6, false)
+	outPointSummaryPercentile3 := createGoogleMetricPbPointDouble(12.6, false)
+	outPointSummaryPercentile4 := createGoogleMetricPbPointDouble(17.6, false)
+
 	tcs := []*testCases{
 		{
 			name: "Metrics of different types",
@@ -402,6 +431,16 @@ func TestExportMetricOfDifferentType(t *testing.T) {
 							StartTimestamp: startTimestamp,
 							LabelValues:    []*metricspb.LabelValue{inEmptyValue, inOperTypeValue1},
 							Points:         []*metricspb.Point{inPointsGaugeDist},
+						},
+					},
+				},
+				{
+					MetricDescriptor: inMDSummary,
+					Timeseries: []*metricspb.TimeSeries{
+						{
+							StartTimestamp: startTimestamp,
+							LabelValues:    []*metricspb.LabelValue{inEmptyValue, inOperTypeValue1},
+							Points:         []*metricspb.Point{inPointsSummary},
 						},
 					},
 				},
@@ -488,6 +527,88 @@ func TestExportMetricOfDifferentType(t *testing.T) {
 							ValueType:  googlemetricpb.MetricDescriptor_DISTRIBUTION,
 							Points:     []*monitoringpb.Point{outPointsGuageDist},
 						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummarySum.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummarySum},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryCount.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_INT64,
+							Points:     []*monitoringpb.Point{outPointSummaryCount},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryPercentile.Type,
+								Labels: map[string]string{
+									"percentile":     "10.000000",
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummaryPercentile1},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryPercentile.Type,
+								Labels: map[string]string{
+									"percentile":     "50.000000",
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummaryPercentile2},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryPercentile.Type,
+								Labels: map[string]string{
+									"percentile":     "90.000000",
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummaryPercentile3},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryPercentile.Type,
+								Labels: map[string]string{
+									"percentile":     "99.000000",
+									"empty_key":      "",
+									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummaryPercentile4},
+						},
 					},
 				},
 			},
@@ -515,6 +636,18 @@ func TestExportMetricOfDifferentType(t *testing.T) {
 				{
 					Name:             "projects/metrics_proto_test",
 					MetricDescriptor: outMDGuageDist,
+				},
+				{
+					Name:             "projects/metrics_proto_test",
+					MetricDescriptor: outMDSummarySum,
+				},
+				{
+					Name:             "projects/metrics_proto_test",
+					MetricDescriptor: outMDSummaryCount,
+				},
+				{
+					Name:             "projects/metrics_proto_test",
+					MetricDescriptor: outMDSummaryPercentile,
 				},
 			},
 		},
@@ -709,7 +842,7 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 	})
 
 	if diff, idx := requireTimeSeriesRequestEqual(t, gotTimeSeries, tc.outTSR); diff != "" {
-		t.Errorf("Name[%s], TimeSeries[%d], Error: %s", tc.name, idx, diff)
+		t.Errorf("Name[%s], TimeSeries[%d], Error: -got +want %s\n", tc.name, idx, diff)
 	}
 
 	var gotCreateMDRequest []*monitoringpb.CreateMetricDescriptorRequest
@@ -718,7 +851,7 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 	})
 
 	if diff, idx := requireMetricDescriptorRequestEqual(t, gotCreateMDRequest, tc.outMDR); diff != "" {
-		t.Errorf("Name[%s], MetricDescriptor[%d], Error: %s", tc.name, idx, diff)
+		t.Errorf("Name[%s], MetricDescriptor[%d], Error: -got +want %s\n", tc.name, idx, diff)
 	}
 	server.resetStackdriverMetricDescriptors()
 	server.resetStackdriverTimeSeries()
@@ -814,6 +947,56 @@ func createGoogleMetricPbPointDistribution(count int64, mean float64, st *timest
 						},
 					},
 				},
+			},
+		},
+	}
+}
+
+func createMetricPbPointSummary(count int64, sum float64, percentile []float64, values ...float64) *metricspb.Point {
+	valAtPercentiles := []*metricspb.SummaryValue_Snapshot_ValueAtPercentile{}
+	for i, value := range values {
+		valAtPercentile := &metricspb.SummaryValue_Snapshot_ValueAtPercentile{
+			Value:      value,
+			Percentile: percentile[i],
+		}
+		valAtPercentiles = append(valAtPercentiles, valAtPercentile)
+	}
+
+	return &metricspb.Point{
+		Timestamp: endTimestamp,
+		Value: &metricspb.Point_SummaryValue{
+			SummaryValue: &metricspb.SummaryValue{
+				Count: &wrappers.Int64Value{Value: count},
+				Sum:   &wrappers.DoubleValue{Value: sum},
+				Snapshot: &metricspb.SummaryValue_Snapshot{
+					PercentileValues: valAtPercentiles,
+				},
+			},
+		},
+	}
+}
+
+func createGoogleMetricPbPointInt64(value int64) *monitoringpb.Point {
+	return &monitoringpb.Point{
+		Interval: outInterval,
+		Value: &monitoringpb.TypedValue{
+			Value: &monitoringpb.TypedValue_Int64Value{
+				Int64Value: value,
+			},
+		},
+	}
+}
+
+func createGoogleMetricPbPointDouble(value float64, includeStartTime bool) *monitoringpb.Point {
+	interval := outInterval
+	if includeStartTime == false {
+		interval = outGaugeInterval
+	}
+	return &monitoringpb.Point{
+		Interval: interval,
+		Value: &monitoringpb.TypedValue{
+			Value: &monitoringpb.TypedValue_DoubleValue{
+				DoubleValue: value,
 			},
 		},
 	}
