@@ -91,11 +91,11 @@ func (se *statsExporter) PushMetricsProto(ctx context.Context, node *commonpb.No
 
 func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*metricspb.Metric {
 	var metrics []*metricspb.Metric
-	var percentileTss []*metricspb.TimeSeries
-	var countTss []*metricspb.TimeSeries
-	var sumTss []*metricspb.TimeSeries
 
 	for _, ts := range summary.Timeseries {
+		var percentileTss []*metricspb.TimeSeries
+		var countTss []*metricspb.TimeSeries
+		var sumTss []*metricspb.TimeSeries
 		lvs := ts.GetLabelValues()
 
 		startTime := ts.StartTimestamp
