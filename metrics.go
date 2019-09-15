@@ -190,6 +190,11 @@ func metricLabelsToTsLabels(defaults map[string]labelValue, labelKeys []metricda
 // createMetricDescriptorFromMetric creates a metric descriptor from the OpenCensus metric
 // and then creates it remotely using Stackdriver's API.
 func (se *statsExporter) createMetricDescriptorFromMetric(ctx context.Context, metric *metricdata.Metric) error {
+	// Skip create metric descriptor if configured
+	if se.o.SkipCMD {
+		return nil
+	}
+
 	se.metricMu.Lock()
 	defer se.metricMu.Unlock()
 

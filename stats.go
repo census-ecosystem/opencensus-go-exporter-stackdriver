@@ -331,12 +331,17 @@ func (e *statsExporter) viewToMetricDescriptor(ctx context.Context, v *view.View
 // An error will be returned if there is already a metric descriptor created with the same name
 // but it has a different aggregation or keys.
 func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
+	// Skip create metric descriptor if configured
+	if e.o.SkipCMD {
+		return nil
+	}
+
 	e.metricMu.Lock()
 	defer e.metricMu.Unlock()
 
 	viewName := v.Name
 
-	if _, ok := e.metricDescriptors[viewName]; ok {
+	if _, created := e.metricDescriptors[viewName]; created {
 		return nil
 	}
 

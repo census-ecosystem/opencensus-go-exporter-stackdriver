@@ -238,6 +238,12 @@ type Options struct {
 	// If unset, context.Background() will be used.
 	Context context.Context
 
+	// SkipCMD enforces to skip all the CreateMetricDescriptor calls.
+	// These calls are important in order to configure the unit of the metrics,
+	// but in some cases all the exported metrics are builtin (unit is configured)
+	// or the unit is not important.
+	SkipCMD bool
+
 	// Timeout for all API calls. If not set, defaults to 5 seconds.
 	Timeout time.Duration
 

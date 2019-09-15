@@ -302,11 +302,21 @@ func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []string, lab
 // createMetricDescriptor creates a metric descriptor from the OpenCensus proto metric
 // and then creates it remotely using Stackdriver's API.
 func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *metricspb.Metric) error {
+	// Skip create metric descriptor if configured
+	if se.o.SkipCMD {
+		return nil
+	}
+
 	se.protoMu.Lock()
 	defer se.protoMu.Unlock()
 
 	name := metric.GetMetricDescriptor().GetName()
 	if _, created := se.protoMetricDescriptors[name]; created {
+		return nil
+	}
+
+	if builtinMetric(se.metricTypeFromProto(name)) {
+		se.protoMetricDescriptors[name] = true
 		return nil
 	}
 
@@ -317,21 +327,18 @@ func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *met
 		return err
 	}
 
-	if builtinMetric(inMD.Type) {
-		se.protoMetricDescriptors[name] = true
-	} else {
-		cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
-			Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
-			MetricDescriptor: inMD,
-		}
-		_, err = createMetricDescriptor(ctx, se.c, cmrdesc)
-		if err == nil {
-			// Now record the metric as having been created.
-			se.protoMetricDescriptors[name] = true
-		}
+	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
+		Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
+		MetricDescriptor: inMD,
 	}
 
-	return err
+	_, err = createMetricDescriptor(ctx, se.c, cmrdesc)
+	if err != nil {
+		return err
+	}
+
+	se.protoMetricDescriptors[name] = true
+	return nil
 }
 
 func (se *statsExporter) protoTimeSeriesToMonitoringPoints(ts *metricspb.TimeSeries, metricKind googlemetricpb.MetricDescriptor_MetricKind) (sptl []*monitoringpb.Point, err error) {
