@@ -64,14 +64,11 @@ type statsExporter struct {
 	viewDataBundler *bundler.Bundler
 	metricsBundler  *bundler.Bundler
 
-	createdViewsMu sync.Mutex
-	createdViews   map[string]*metricpb.MetricDescriptor // Views already created remotely
-
 	protoMu                sync.Mutex
-	protoMetricDescriptors map[string]bool // Saves the metric descriptors that were already created remotely
+	protoMetricDescriptors map[string]bool // Metric descriptors that were already created remotely
 
 	metricMu          sync.Mutex
-	metricDescriptors map[string]bool // Saves the metric descriptors that were already created remotely
+	metricDescriptors map[string]bool // <etric descriptors that were already created remotely
 
 	c             *monitoring.MetricClient
 	defaultLabels map[string]labelValue
@@ -104,7 +101,6 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 	e := &statsExporter{
 		c:                      client,
 		o:                      o,
-		createdViews:           make(map[string]*metricpb.MetricDescriptor),
 		protoMetricDescriptors: make(map[string]bool),
 		metricDescriptors:      make(map[string]bool),
 	}
@@ -335,17 +331,18 @@ func (e *statsExporter) viewToMetricDescriptor(ctx context.Context, v *view.View
 // An error will be returned if there is already a metric descriptor created with the same name
 // but it has a different aggregation or keys.
 func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
-	e.createdViewsMu.Lock()
-	defer e.createdViewsMu.Unlock()
+	e.metricMu.Lock()
+	defer e.metricMu.Unlock()
 
 	viewName := v.Name
 
-	if md, ok := e.createdViews[viewName]; ok {
-		// [TODO:rghetia] Temporary fix for https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/76#issuecomment-459459091
-		if builtinMetric(md.Type) {
-			return nil
-		}
-		return e.equalMeasureAggTagKeys(md, v.Measure, v.Aggregation, v.TagKeys)
+	if _, ok := e.metricDescriptors[viewName]; ok {
+		return nil
+	}
+
+	if builtinMetric(e.metricType(v)) {
+		e.metricDescriptors[viewName] = true
+		return nil
 	}
 
 	inMD, err := e.viewToMetricDescriptor(ctx, v)
@@ -353,25 +350,18 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 		return err
 	}
 
-	var dmd *metric.MetricDescriptor
-	if builtinMetric(inMD.Type) {
-		gmrdesc := &monitoringpb.GetMetricDescriptorRequest{
-			Name: inMD.Name,
-		}
-		dmd, err = getMetricDescriptor(ctx, e.c, gmrdesc)
-	} else {
-		cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
-			Name:             fmt.Sprintf("projects/%s", e.o.ProjectID),
-			MetricDescriptor: inMD,
-		}
-		dmd, err = createMetricDescriptor(ctx, e.c, cmrdesc)
+	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
+		Name:             fmt.Sprintf("projects/%s", e.o.ProjectID),
+		MetricDescriptor: inMD,
 	}
+
+	_, err = createMetricDescriptor(ctx, e.c, cmrdesc)
 	if err != nil {
 		return err
 	}
 
 	// Now cache the metric descriptor
-	e.createdViews[viewName] = dmd
+	e.metricDescriptors[viewName] = true
 	return err
 }
 
@@ -607,59 +597,8 @@ func newLabelDescriptors(defaults map[string]labelValue, keys []tag.Key) []*labe
 	return labelDescriptors
 }
 
-func (e *statsExporter) equalMeasureAggTagKeys(md *metricpb.MetricDescriptor, m stats.Measure, agg *view.Aggregation, keys []tag.Key) error {
-	var aggTypeMatch bool
-	switch md.ValueType {
-	case metricpb.MetricDescriptor_INT64:
-		if _, ok := m.(*stats.Int64Measure); !(ok || agg.Type == view.AggTypeCount) {
-			return fmt.Errorf("stackdriver metric descriptor was not created as int64")
-		}
-		aggTypeMatch = agg.Type == view.AggTypeCount || agg.Type == view.AggTypeSum || agg.Type == view.AggTypeLastValue
-	case metricpb.MetricDescriptor_DOUBLE:
-		if _, ok := m.(*stats.Float64Measure); !ok {
-			return fmt.Errorf("stackdriver metric descriptor was not created as double")
-		}
-		aggTypeMatch = agg.Type == view.AggTypeSum || agg.Type == view.AggTypeLastValue
-	case metricpb.MetricDescriptor_DISTRIBUTION:
-		aggTypeMatch = agg.Type == view.AggTypeDistribution
-	}
-
-	if !aggTypeMatch {
-		return fmt.Errorf("stackdriver metric descriptor was not created with aggregation type %T", agg.Type)
-	}
-
-	labels := make(map[string]struct{}, len(keys)+len(e.defaultLabels))
-	for _, k := range keys {
-		labels[sanitize(k.Name())] = struct{}{}
-	}
-	for k := range e.defaultLabels {
-		labels[sanitize(k)] = struct{}{}
-	}
-
-	for _, k := range md.Labels {
-		if _, ok := labels[k.Key]; !ok {
-			return fmt.Errorf("stackdriver metric descriptor %q was not created with label %q", md.Type, k)
-		}
-		delete(labels, k.Key)
-	}
-
-	if len(labels) > 0 {
-		extra := make([]string, 0, len(labels))
-		for k := range labels {
-			extra = append(extra, k)
-		}
-		return fmt.Errorf("stackdriver metric descriptor %q contains unexpected labels: %s", md.Type, strings.Join(extra, ", "))
-	}
-
-	return nil
-}
-
 var createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
 	return c.CreateMetricDescriptor(ctx, mdr)
-}
-
-var getMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.GetMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
-	return c.GetMetricDescriptor(ctx, mdr)
 }
 
 var createTimeSeries = func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
