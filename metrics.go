@@ -215,17 +215,13 @@ func (se *statsExporter) createMetricDescriptorFromMetric(ctx context.Context, m
 		return err
 	}
 
-	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
-		Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
-		MetricDescriptor: inMD,
-	}
-	_, err = createMetricDescriptor(ctx, se.c, cmrdesc)
-	if err == nil {
-		// Now record the metric as having been created.
-		se.metricDescriptors[name] = true
+	if err = se.createMetricDescriptor(ctx, inMD); err != nil {
+		return err
 	}
 
-	return err
+	// Now record the metric as having been created.
+	se.metricDescriptors[name] = true
+	return nil
 }
 
 func (se *statsExporter) metricToMpbMetricDescriptor(metric *metricdata.Metric) (*googlemetricpb.MetricDescriptor, error) {

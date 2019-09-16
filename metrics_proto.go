@@ -70,14 +70,14 @@ func (se *statsExporter) PushMetricsProto(ctx context.Context, node *commonpb.No
 		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
 			summaryMtcs := se.convertSummaryMetrics(metric)
 			for _, summaryMtc := range summaryMtcs {
-				if err := se.createMetricDescriptor(ctx, summaryMtc); err != nil {
+				if err := se.protoCreateMetricDescriptor(ctx, summaryMtc); err != nil {
 					mb.recordDroppedTimeseries(len(summaryMtc.GetTimeseries()), err)
 					continue
 				}
 				se.protoMetricToTimeSeries(ctx, mappedRsc, summaryMtc, mb)
 			}
 		} else {
-			if err := se.createMetricDescriptor(ctx, metric); err != nil {
+			if err := se.protoCreateMetricDescriptor(ctx, metric); err != nil {
 				mb.recordDroppedTimeseries(len(metric.GetTimeseries()), err)
 				continue
 			}
@@ -301,7 +301,7 @@ func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []string, lab
 
 // createMetricDescriptor creates a metric descriptor from the OpenCensus proto metric
 // and then creates it remotely using Stackdriver's API.
-func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *metricspb.Metric) error {
+func (se *statsExporter) protoCreateMetricDescriptor(ctx context.Context, metric *metricspb.Metric) error {
 	// Skip create metric descriptor if configured
 	if se.o.SkipCMD {
 		return nil
@@ -327,13 +327,7 @@ func (se *statsExporter) createMetricDescriptor(ctx context.Context, metric *met
 		return err
 	}
 
-	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
-		Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
-		MetricDescriptor: inMD,
-	}
-
-	_, err = createMetricDescriptor(ctx, se.c, cmrdesc)
-	if err != nil {
+	if err = se.createMetricDescriptor(ctx, inMD); err != nil {
 		return err
 	}
 

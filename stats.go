@@ -355,19 +355,13 @@ func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
 		return err
 	}
 
-	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
-		Name:             fmt.Sprintf("projects/%s", e.o.ProjectID),
-		MetricDescriptor: inMD,
-	}
-
-	_, err = createMetricDescriptor(ctx, e.c, cmrdesc)
-	if err != nil {
+	if err = e.createMetricDescriptor(ctx, inMD); err != nil {
 		return err
 	}
 
 	// Now cache the metric descriptor
 	e.metricDescriptors[viewName] = true
-	return err
+	return nil
 }
 
 func (e *statsExporter) displayName(suffix string) string {
@@ -600,6 +594,16 @@ func newLabelDescriptors(defaults map[string]labelValue, keys []tag.Key) []*labe
 		})
 	}
 	return labelDescriptors
+}
+
+func (e *statsExporter) createMetricDescriptor(ctx context.Context, md *metric.MetricDescriptor) error {
+	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
+		Name:             fmt.Sprintf("projects/%s", e.o.ProjectID),
+		MetricDescriptor: md,
+	}
+
+	_, err := createMetricDescriptor(ctx, e.c, cmrdesc)
+	return err
 }
 
 var createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
