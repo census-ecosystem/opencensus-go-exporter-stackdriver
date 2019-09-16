@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	monitoring "cloud.google.com/go/monitoring/apiv3"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
@@ -31,19 +32,23 @@ type metricsBatcher struct {
 	// Counts all dropped TimeSeries by this metricsBatcher.
 	droppedTimeSeries int
 
-	workers   []*worker
-	curWorker int
-	// respsChan is shared between metricsBatcher and worker goroutines.
+	workers []*worker
+	// reqsChan, respsChan and wg are shared between metricsBatcher and worker goroutines.
+	reqsChan  chan *monitoringpb.CreateTimeSeriesRequest
 	respsChan chan *response
+	wg        *sync.WaitGroup
 
 	mc *monitoring.MetricClient
 }
 
 func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc *monitoring.MetricClient) *metricsBatcher {
 	workers := make([]*worker, 0, numWorkers)
+	reqsChan := make(chan *monitoringpb.CreateTimeSeriesRequest, numWorkers)
 	respsChan := make(chan *response, numWorkers)
+	var wg sync.WaitGroup
+	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {
-		w := newWorker(ctx, mc, respsChan)
+		w := newWorker(ctx, mc, reqsChan, respsChan, &wg)
 		workers = append(workers, w)
 		go w.start()
 	}
@@ -52,6 +57,8 @@ func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc
 		allTss:            make([]*monitoringpb.TimeSeries, 0, maxTimeSeriesPerUpload),
 		droppedTimeSeries: 0,
 		workers:           workers,
+		wg:                &wg,
+		reqsChan:          reqsChan,
 		respsChan:         respsChan,
 		mc:                mc,
 	}
@@ -73,23 +80,14 @@ func (mb *metricsBatcher) addTimeSeries(ts *monitoringpb.TimeSeries) {
 			Name:       mb.projectName,
 			TimeSeries: mb.allTss,
 		}
-		mb.workers[mb.curWorker].reqChan <- req
-		mb.nextWorker()
+		mb.reqsChan <- req
 		mb.allTss = make([]*monitoringpb.TimeSeries, 0, maxTimeSeriesPerUpload)
 	}
 }
 
-func (mb *metricsBatcher) nextWorker() {
-	mb.curWorker++
-	if mb.curWorker >= len(mb.workers) {
-		mb.curWorker = 0
-	}
-}
-
 func (mb *metricsBatcher) close(ctx context.Context) error {
-	for _, w := range mb.workers {
-		w.stop()
-	}
+	close(mb.reqsChan)
+	mb.wg.Wait()
 	for i := 0; i < len(mb.workers); i++ {
 		resp := <-mb.respsChan
 		mb.recordDroppedTimeseries(resp.droppedTimeSeries, resp.errs...)
@@ -148,40 +146,34 @@ type worker struct {
 
 	resp *response
 
-	quit      chan bool
 	respsChan chan *response
-	reqChan   chan *monitoringpb.CreateTimeSeriesRequest
+	reqsChan  chan *monitoringpb.CreateTimeSeriesRequest
+
+	wg *sync.WaitGroup
 }
 
 func newWorker(
 	ctx context.Context,
 	mc *monitoring.MetricClient,
-	respsChan chan *response) *worker {
+	reqsChan chan *monitoringpb.CreateTimeSeriesRequest,
+	respsChan chan *response,
+	wg *sync.WaitGroup) *worker {
 	return &worker{
 		ctx:       ctx,
 		mc:        mc,
 		resp:      &response{},
-		reqChan:   make(chan *monitoringpb.CreateTimeSeriesRequest),
+		reqsChan:  reqsChan,
 		respsChan: respsChan,
-		quit:      make(chan bool),
+		wg:        wg,
 	}
 }
 
 func (w *worker) start() {
-	for {
-		select {
-		case req := <-w.reqChan:
-			w.recordDroppedTimeseries(sendReq(w.ctx, w.mc, req))
-		case <-w.quit:
-			close(w.reqChan)
-			w.respsChan <- w.resp
-			return
-		}
+	for req := range w.reqsChan {
+		w.recordDroppedTimeseries(sendReq(w.ctx, w.mc, req))
 	}
-}
-
-func (w *worker) stop() {
-	w.quit <- true
+	w.respsChan <- w.resp
+	w.wg.Done()
 }
 
 func (w *worker) recordDroppedTimeseries(numTimeSeries int, err error) {
