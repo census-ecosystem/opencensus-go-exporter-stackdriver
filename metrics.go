@@ -190,11 +190,21 @@ func metricLabelsToTsLabels(defaults map[string]labelValue, labelKeys []metricda
 // createMetricDescriptorFromMetric creates a metric descriptor from the OpenCensus metric
 // and then creates it remotely using Stackdriver's API.
 func (se *statsExporter) createMetricDescriptorFromMetric(ctx context.Context, metric *metricdata.Metric) error {
+	// Skip create metric descriptor if configured
+	if se.o.SkipCMD {
+		return nil
+	}
+
 	se.metricMu.Lock()
 	defer se.metricMu.Unlock()
 
 	name := metric.Descriptor.Name
 	if _, created := se.metricDescriptors[name]; created {
+		return nil
+	}
+
+	if builtinMetric(se.metricTypeFromProto(name)) {
+		se.metricDescriptors[name] = true
 		return nil
 	}
 
@@ -205,21 +215,13 @@ func (se *statsExporter) createMetricDescriptorFromMetric(ctx context.Context, m
 		return err
 	}
 
-	if builtinMetric(inMD.Type) {
-		se.metricDescriptors[name] = true
-	} else {
-		cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
-			Name:             fmt.Sprintf("projects/%s", se.o.ProjectID),
-			MetricDescriptor: inMD,
-		}
-		_, err = createMetricDescriptor(ctx, se.c, cmrdesc)
-		if err == nil {
-			// Now record the metric as having been created.
-			se.metricDescriptors[name] = true
-		}
+	if err = se.createMetricDescriptor(ctx, inMD); err != nil {
+		return err
 	}
 
-	return err
+	// Now record the metric as having been created.
+	se.metricDescriptors[name] = true
+	return nil
 }
 
 func (se *statsExporter) metricToMpbMetricDescriptor(metric *metricdata.Metric) (*googlemetricpb.MetricDescriptor, error) {
