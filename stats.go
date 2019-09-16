@@ -68,7 +68,7 @@ type statsExporter struct {
 	protoMetricDescriptors map[string]bool // Metric descriptors that were already created remotely
 
 	metricMu          sync.Mutex
-	metricDescriptors map[string]bool // <etric descriptors that were already created remotely
+	metricDescriptors map[string]bool // Metric descriptors that were already created remotely
 
 	c             *monitoring.MetricClient
 	defaultLabels map[string]labelValue
@@ -218,7 +218,7 @@ func (e *statsExporter) uploadStats(vds []*view.Data) error {
 	defer span.End()
 
 	for _, vd := range vds {
-		if err := e.createMeasure(ctx, vd.View); err != nil {
+		if err := e.createMetricDescriptorFromView(ctx, vd.View); err != nil {
 			span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 			return err
 		}
@@ -327,10 +327,10 @@ func (e *statsExporter) viewToMetricDescriptor(ctx context.Context, v *view.View
 	return res, nil
 }
 
-// createMeasure creates a MetricDescriptor for the given view data in Stackdriver Monitoring.
+// createMetricDescriptorFromView creates a MetricDescriptor for the given view data in Stackdriver Monitoring.
 // An error will be returned if there is already a metric descriptor created with the same name
 // but it has a different aggregation or keys.
-func (e *statsExporter) createMeasure(ctx context.Context, v *view.View) error {
+func (e *statsExporter) createMetricDescriptorFromView(ctx context.Context, v *view.View) error {
 	// Skip create metric descriptor if configured
 	if e.o.SkipCMD {
 		return nil

@@ -568,7 +568,7 @@ func TestExporter_makeReq_batching(t *testing.T) {
 	}
 }
 
-func TestExporter_createMeasure(t *testing.T) {
+func TestExporter_createMetricDescriptorFromView(t *testing.T) {
 	oldCreateMetricDescriptor := createMetricDescriptor
 
 	defer func() {
@@ -576,7 +576,7 @@ func TestExporter_createMeasure(t *testing.T) {
 	}()
 
 	key, _ := tag.NewKey("test-key-one")
-	m := stats.Float64("test-measure/TestExporter_createMeasure", "measure desc", stats.UnitMilliseconds)
+	m := stats.Float64("test-measure/TestExporter_createMetricDescriptorFromView", "measure desc", stats.UnitMilliseconds)
 
 	v := &view.View{
 		Name:        "test_view_sum",
@@ -657,11 +657,11 @@ func TestExporter_createMeasure(t *testing.T) {
 			}
 
 			ctx := context.Background()
-			if err := e.createMeasure(ctx, vd.View); err != nil {
-				t.Errorf("Exporter.createMeasure() error = %v", err)
+			if err := e.createMetricDescriptorFromView(ctx, vd.View); err != nil {
+				t.Errorf("Exporter.createMetricDescriptorFromView() error = %v", err)
 			}
-			if err := e.createMeasure(ctx, vd.View); err != nil {
-				t.Errorf("Exporter.createMeasure() error = %v", err)
+			if err := e.createMetricDescriptorFromView(ctx, vd.View); err != nil {
+				t.Errorf("Exporter.createMetricDescriptorFromView() error = %v", err)
 			}
 			if count := createCalls; count != 1 {
 				t.Errorf("createMetricDescriptor needs to be called for once; called %v times", count)
@@ -673,7 +673,7 @@ func TestExporter_createMeasure(t *testing.T) {
 	}
 }
 
-func TestExporter_createMeasure_CountAggregation(t *testing.T) {
+func TestExporter_createMetricDescriptorFromView_CountAggregation(t *testing.T) {
 	oldCreateMetricDescriptor := createMetricDescriptor
 
 	defer func() {
@@ -681,7 +681,7 @@ func TestExporter_createMeasure_CountAggregation(t *testing.T) {
 	}()
 
 	key, _ := tag.NewKey("test-key-one")
-	m := stats.Float64("test-measure/TestExporter_createMeasure", "measure desc", stats.UnitMilliseconds)
+	m := stats.Float64("test-measure/TestExporter_createMetricDescriptorFromView", "measure desc", stats.UnitMilliseconds)
 
 	v := &view.View{
 		Name:        "test_view_count",
@@ -732,8 +732,8 @@ func TestExporter_createMeasure_CountAggregation(t *testing.T) {
 		}, nil
 	}
 	ctx := context.Background()
-	if err := e.createMeasure(ctx, vd.View); err != nil {
-		t.Errorf("Exporter.createMeasure() error = %v", err)
+	if err := e.createMetricDescriptorFromView(ctx, vd.View); err != nil {
+		t.Errorf("Exporter.createMetricDescriptorFromView() error = %v", err)
 	}
 }
 
@@ -1118,7 +1118,7 @@ func TestExporter_customContext(t *testing.T) {
 	v := &view.View{
 		Name:        "test_view_count",
 		Description: "view_description",
-		Measure:     stats.Float64("test-measure/TestExporter_createMeasure", "measure desc", stats.UnitMilliseconds),
+		Measure:     stats.Float64("test-measure/TestExporter_createMetricDescriptorFromView", "measure desc", stats.UnitMilliseconds),
 		Aggregation: view.Count(),
 	}
 
