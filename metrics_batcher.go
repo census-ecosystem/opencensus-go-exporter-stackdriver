@@ -24,6 +24,8 @@ import (
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 )
 
+const minNumWorkers = 1
+
 type metricsBatcher struct {
 	projectName string
 	allTss      []*monitoringpb.TimeSeries
@@ -37,11 +39,12 @@ type metricsBatcher struct {
 	reqsChan  chan *monitoringpb.CreateTimeSeriesRequest
 	respsChan chan *response
 	wg        *sync.WaitGroup
-
-	mc *monitoring.MetricClient
 }
 
 func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc *monitoring.MetricClient) *metricsBatcher {
+	if numWorkers < minNumWorkers {
+		numWorkers = minNumWorkers
+	}
 	workers := make([]*worker, 0, numWorkers)
 	reqsChan := make(chan *monitoringpb.CreateTimeSeriesRequest, numWorkers)
 	respsChan := make(chan *response, numWorkers)
@@ -60,7 +63,6 @@ func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc
 		wg:                &wg,
 		reqsChan:          reqsChan,
 		respsChan:         respsChan,
-		mc:                mc,
 	}
 }
 
@@ -76,16 +78,17 @@ func (mb *metricsBatcher) recordDroppedTimeseries(numTimeSeries int, errs ...err
 func (mb *metricsBatcher) addTimeSeries(ts *monitoringpb.TimeSeries) {
 	mb.allTss = append(mb.allTss, ts)
 	if len(mb.allTss) == maxTimeSeriesPerUpload && len(mb.workers) != 0 {
-		req := &monitoringpb.CreateTimeSeriesRequest{
-			Name:       mb.projectName,
-			TimeSeries: mb.allTss,
-		}
-		mb.reqsChan <- req
+		mb.sendReqToChan()
 		mb.allTss = make([]*monitoringpb.TimeSeries, 0, maxTimeSeriesPerUpload)
 	}
 }
 
 func (mb *metricsBatcher) close(ctx context.Context) error {
+	// Send any remaining time series, must be <200
+	if len(mb.allTss) > 0 {
+		mb.sendReqToChan()
+	}
+
 	close(mb.reqsChan)
 	mb.wg.Wait()
 	for i := 0; i < len(mb.workers); i++ {
@@ -93,26 +96,6 @@ func (mb *metricsBatcher) close(ctx context.Context) error {
 		mb.recordDroppedTimeseries(resp.droppedTimeSeries, resp.errs...)
 	}
 	close(mb.respsChan)
-
-	// Send any remaining time series
-	if len(mb.allTss) > 0 && mb.mc != nil {
-		var reqs []*monitoringpb.CreateTimeSeriesRequest
-		for start := 0; start < len(mb.allTss); {
-			end := start + maxTimeSeriesPerUpload
-			if end > len(mb.allTss) {
-				end = len(mb.allTss)
-			}
-			reqs = append(reqs, &monitoringpb.CreateTimeSeriesRequest{
-				Name:       mb.projectName,
-				TimeSeries: mb.allTss[start:end],
-			})
-			start = end
-		}
-
-		for _, req := range reqs {
-			mb.recordDroppedTimeseries(sendReq(ctx, mb.mc, req))
-		}
-	}
 
 	numErrors := len(mb.allErrs)
 	if numErrors == 0 {
@@ -130,12 +113,24 @@ func (mb *metricsBatcher) close(ctx context.Context) error {
 	return fmt.Errorf("[%s]", strings.Join(errMsgs, "; "))
 }
 
+// sendReqToChan grabs all the timeseies in this metricsBatcher, puts them
+// to a CreateTimeSeriesRequest and sends the request to reqsChan.
+func (mb *metricsBatcher) sendReqToChan() {
+	req := &monitoringpb.CreateTimeSeriesRequest{
+		Name:       mb.projectName,
+		TimeSeries: mb.allTss,
+	}
+	mb.reqsChan <- req
+}
+
 // sendReq sends create time series requests to Stackdriver,
 // and returns the count of dropped time series and error.
 func sendReq(ctx context.Context, c *monitoring.MetricClient, req *monitoringpb.CreateTimeSeriesRequest) (int, error) {
-	err := createTimeSeries(ctx, c, req)
-	if err != nil {
-		return len(req.TimeSeries), err
+	if c != nil { // c==nil only happens in unit tests where we don't make real calls to Stackdriver server
+		err := createTimeSeries(ctx, c, req)
+		if err != nil {
+			return len(req.TimeSeries), err
+		}
 	}
 	return 0, nil
 }

@@ -253,7 +253,7 @@ type Options struct {
 
 	// NumberOfWorkers sets the number of go rountines that send requests
 	// to Stackdriver Monitoring. This is only used for Proto metrics export
-	// for now. If not set, default value is 0.
+	// for now. The minimum number of workers is 1.
 	NumberOfWorkers int
 }
 

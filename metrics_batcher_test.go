@@ -35,7 +35,7 @@ func TestWorkers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create metric client %v", err)
 	}
-	m1 := newMetricsBatcher(ctx, "test", 0, c1) // batcher with no worker
+	m1 := newMetricsBatcher(ctx, "test", 1, c1) // batcher with 1 worker
 
 	c2, err := makeClient(addr)
 	if err != nil {
@@ -73,10 +73,10 @@ func TestWorkers(t *testing.T) {
 		t.Fatalf("Want 3 CreateTimeSeriesReqs, got %v", len(reqs2))
 	}
 	if m1.droppedTimeSeries != m2.droppedTimeSeries {
-		t.Fatalf("Dropped time series counts don't match, FromNoWorker: %v, FromTwoWorkers: %v", m1.droppedTimeSeries, m2.droppedTimeSeries)
+		t.Fatalf("Dropped time series counts don't match, FromOneWorker: %v, FromTwoWorkers: %v", m1.droppedTimeSeries, m2.droppedTimeSeries)
 	}
 	if diff := cmpTSReqs(reqs1, reqs2); diff != "" {
-		t.Fatalf("CreateTimeSeriesRequests don't match -FromNoWorker +FromTwoWorkers: %s", diff)
+		t.Fatalf("CreateTimeSeriesRequests don't match -FromOneWorker +FromTwoWorkers: %s", diff)
 	}
 }
 
