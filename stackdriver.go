@@ -250,6 +250,11 @@ type Options struct {
 	// ReportingInterval sets the interval between reporting metrics.
 	// If it is set to zero then default value is used.
 	ReportingInterval time.Duration
+
+	// NumberOfWorkers sets the number of go rountines that send requests
+	// to Stackdriver Monitoring. This is only used for Proto metrics export
+	// for now. The minimum number of workers is 1.
+	NumberOfWorkers int
 }
 
 const defaultTimeout = 5 * time.Second
