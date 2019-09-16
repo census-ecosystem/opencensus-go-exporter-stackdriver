@@ -17,13 +17,18 @@ package stackdriver_test
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"os"
+
+	"strings"
 	"sync"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 
+	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/golang/protobuf/ptypes/wrappers"
@@ -205,6 +210,27 @@ var (
 	inPercentile = []float64{10.0, 50.0, 90.0, 99.0}
 )
 
+func TestVariousCasesFromFile(t *testing.T) {
+	files := []string{
+		"ExportLabels",
+		"ExportMetricsOfAllTypes",
+	}
+	for _, file := range files {
+		tc := readFromFile(file)
+		server, addr, doneFn := createFakeServer(t)
+		defer doneFn()
+
+		// Now create a gRPC connection to the agent.
+		conn := createConn(t, addr)
+		defer conn.Close()
+
+		// Finally create the OpenCensus stats exporter
+		se := createExporter(t, conn, defaultOpts)
+		executeTestCase(t, tc, se, server)
+
+	}
+}
+
 func TestExportLabels(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
@@ -218,7 +244,8 @@ func TestExportLabels(t *testing.T) {
 
 	tcs := []*testCases{
 		{
-			name: "Label Test: [empty,v1], [empty,v2], [noValue,v1], [empty,noValue]",
+			// Label Test: [empty,v1], [empty,v2], [noValue,v1], [empty,noValue]
+			name: "ExportLabels",
 			inMetric: []*metricspb.Metric{
 				{
 					MetricDescriptor: inMDCall,
@@ -316,7 +343,7 @@ func TestExportLabels(t *testing.T) {
 	}
 }
 
-func TestExportMetricOfDifferentType(t *testing.T) {
+func TestExportMetricsOfAllTypes(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
 
@@ -373,7 +400,7 @@ func TestExportMetricOfDifferentType(t *testing.T) {
 
 	tcs := []*testCases{
 		{
-			name: "Metrics of different types",
+			name: "ExportMetricsOfAllTypes",
 			inMetric: []*metricspb.Metric{
 				{
 					MetricDescriptor: inMDCummDouble,
@@ -1049,6 +1076,7 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 	if diff, idx := requireMetricDescriptorRequestEqual(t, gotCreateMDRequest, tc.outMDR); diff != "" {
 		t.Errorf("Name[%s], MetricDescriptor[%d], Error: -got +want %s\n", tc.name, idx, diff)
 	}
+	//writeToFile(tc)
 	server.resetStackdriverMetricDescriptors()
 	server.resetStackdriverTimeSeries()
 }
@@ -1223,6 +1251,84 @@ func createGoogleMetric(md *googlemetricpb.MetricDescriptor, res *monitoredrespb
 			},
 		},
 	}
+}
+
+func writeToFile(tc *testCases) {
+	inFile, err := os.Create("/tmp/in_" + strings.Replace(tc.name, " ", "_", -1))
+	if err != nil {
+		panic("error opening in file " + tc.name)
+	}
+
+	for _, in := range tc.inMetric {
+		proto.MarshalText(inFile, in)
+		inFile.WriteString("---\n")
+	}
+	inFile.Close()
+
+	outMDFile, err := os.Create("/tmp/outMDR_" + strings.Replace(tc.name, " ", "_", -1))
+	if err != nil {
+		panic("error opening outMD file " + tc.name)
+	}
+
+	for _, outMDR := range tc.outMDR {
+		proto.MarshalText(outMDFile, outMDR)
+		outMDFile.WriteString("---\n")
+	}
+	outMDFile.Close()
+
+	outTSFile, err := os.Create("/tmp/outTSR_" + strings.Replace(tc.name, " ", "_", -1))
+	if err != nil {
+		panic("error opening outTS file " + tc.name)
+	}
+
+	for _, outTSR := range tc.outTSR {
+		proto.MarshalText(outTSFile, outTSR)
+		outTSFile.WriteString("---\n")
+	}
+	outTSFile.Close()
+}
+
+func readFromFile(filename string) *testCases {
+	tc := &testCases{
+		name: filename,
+	}
+
+	f, err := ioutil.ReadFile("testdata/" + "inMetrics_" + filename + ".txt")
+	if err != nil {
+		panic("error opening in file " + filename)
+	}
+
+	strMetrics := strings.Split(string(f), "---")
+	for _, strMetric := range strMetrics {
+		in := metricspb.Metric{}
+		err = proto.UnmarshalText(strMetric, &in)
+		tc.inMetric = append(tc.inMetric, &in)
+	}
+
+	f, err = ioutil.ReadFile("testdata/" + "outMDR_" + filename + ".txt")
+	if err != nil {
+		panic("error opening in file " + filename)
+	}
+
+	strOutMDRs := strings.Split(string(f), "---")
+	for _, strOutMDR := range strOutMDRs {
+		outMDR := monitoringpb.CreateMetricDescriptorRequest{}
+		err = proto.UnmarshalText(strOutMDR, &outMDR)
+		tc.outMDR = append(tc.outMDR, &outMDR)
+	}
+
+	f, err = ioutil.ReadFile("testdata/" + "outTSR_" + filename + ".txt")
+	if err != nil {
+		panic("error opening in file " + filename)
+	}
+
+	strOutTSRs := strings.Split(string(f), "---")
+	for _, strOutTSR := range strOutTSRs {
+		outTSR := monitoringpb.CreateTimeSeriesRequest{}
+		err = proto.UnmarshalText(strOutTSR, &outTSR)
+		tc.outTSR = append(tc.outTSR, &outTSR)
+	}
+	return tc
 }
 
 func createMetricDescriptorByType(metricName string, mt metricspb.MetricDescriptor_Type) *metricspb.MetricDescriptor {
