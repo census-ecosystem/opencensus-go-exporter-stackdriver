@@ -46,7 +46,7 @@ func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc
 		numWorkers = minNumWorkers
 	}
 	workers := make([]*worker, 0, numWorkers)
-	reqsChan := make(chan *monitoringpb.CreateTimeSeriesRequest, numWorkers)
+	reqsChan := make(chan *monitoringpb.CreateTimeSeriesRequest, 3*numWorkers)
 	respsChan := make(chan *response, numWorkers)
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
@@ -77,7 +77,7 @@ func (mb *metricsBatcher) recordDroppedTimeseries(numTimeSeries int, errs ...err
 
 func (mb *metricsBatcher) addTimeSeries(ts *monitoringpb.TimeSeries) {
 	mb.allTss = append(mb.allTss, ts)
-	if len(mb.allTss) == maxTimeSeriesPerUpload && len(mb.workers) != 0 {
+	if len(mb.allTss) == maxTimeSeriesPerUpload {
 		mb.sendReqToChan()
 		mb.allTss = make([]*monitoringpb.TimeSeries, 0, maxTimeSeriesPerUpload)
 	}
