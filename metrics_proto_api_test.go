@@ -439,6 +439,12 @@ func TestExportMetricOfDifferentType(t *testing.T) {
 							LabelValues:    []*metricspb.LabelValue{inEmptyValue, inOperTypeValue1},
 							Points:         []*metricspb.Point{inPointsSummary},
 						},
+						//  Add another time series to test https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/pull/214
+						{
+							StartTimestamp: startTimestamp,
+							LabelValues:    []*metricspb.LabelValue{inEmptyValue, inOperTypeValue2},
+							Points:         []*metricspb.Point{inPointsSummary},
+						},
 					},
 				},
 			},
@@ -599,6 +605,88 @@ func TestExportMetricOfDifferentType(t *testing.T) {
 									"percentile":     "99.000000",
 									"empty_key":      "",
 									"operation_type": "test_1",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummaryPercentile4},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummarySum.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_2",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummarySum},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryCount.Type,
+								Labels: map[string]string{
+									"empty_key":      "",
+									"operation_type": "test_2",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+							ValueType:  googlemetricpb.MetricDescriptor_INT64,
+							Points:     []*monitoringpb.Point{outPointSummaryCount},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryPercentile.Type,
+								Labels: map[string]string{
+									"percentile":     "10.000000",
+									"empty_key":      "",
+									"operation_type": "test_2",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummaryPercentile1},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryPercentile.Type,
+								Labels: map[string]string{
+									"percentile":     "50.000000",
+									"empty_key":      "",
+									"operation_type": "test_2",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummaryPercentile2},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryPercentile.Type,
+								Labels: map[string]string{
+									"percentile":     "90.000000",
+									"empty_key":      "",
+									"operation_type": "test_2",
+								},
+							},
+							Resource:   outGlobalResource,
+							MetricKind: googlemetricpb.MetricDescriptor_GAUGE,
+							ValueType:  googlemetricpb.MetricDescriptor_DOUBLE,
+							Points:     []*monitoringpb.Point{outPointSummaryPercentile3},
+						},
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: outMDSummaryPercentile.Type,
+								Labels: map[string]string{
+									"percentile":     "99.000000",
+									"empty_key":      "",
+									"operation_type": "test_2",
 								},
 							},
 							Resource:   outGlobalResource,
