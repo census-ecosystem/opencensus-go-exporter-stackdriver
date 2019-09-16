@@ -24,7 +24,10 @@ import (
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 )
 
-const minNumWorkers = 1
+const (
+	minNumWorkers   = 1
+	minReqsChanSize = 5
+)
 
 type metricsBatcher struct {
 	projectName string
@@ -46,7 +49,11 @@ func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc
 		numWorkers = minNumWorkers
 	}
 	workers := make([]*worker, 0, numWorkers)
-	reqsChan := make(chan *monitoringpb.CreateTimeSeriesRequest, 3*numWorkers)
+	reqsChanSize := numWorkers
+	if reqsChanSize < minReqsChanSize {
+		reqsChanSize = minReqsChanSize
+	}
+	reqsChan := make(chan *monitoringpb.CreateTimeSeriesRequest, reqsChanSize)
 	respsChan := make(chan *response, numWorkers)
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
