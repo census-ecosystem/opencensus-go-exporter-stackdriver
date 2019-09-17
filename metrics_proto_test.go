@@ -1083,7 +1083,7 @@ func makePercentileValue(val, percentile float64) *metricspb.SummaryValue_Snapsh
 }
 
 func protoMetricToTimeSeries(ctx context.Context, se *statsExporter, mappedRsc *monitoredrespb.MonitoredResource, metric *metricspb.Metric) ([]*monitoringpb.TimeSeries, error) {
-	mb := newMetricsBatcher(ctx, se.o.ProjectID, se.o.NumberOfWorkers, se.c)
+	mb := newMetricsBatcher(ctx, se.o.ProjectID, se.o.NumberOfWorkers, se.c, defaultTimeout)
 	se.protoMetricToTimeSeries(ctx, mappedRsc, metric, mb)
 	return mb.allTss, mb.close(ctx)
 }

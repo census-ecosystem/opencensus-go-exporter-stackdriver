@@ -54,13 +54,10 @@ func (se *statsExporter) PushMetricsProto(ctx context.Context, node *commonpb.No
 		return 0, errNilMetricOrMetricDescriptor
 	}
 
-	ctx, cancel := newContextWithTimeout(ctx, se.o.Timeout)
-	defer cancel()
-
 	// Caches the resources seen so far
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
 
-	mb := newMetricsBatcher(ctx, se.o.ProjectID, se.o.NumberOfWorkers, se.c)
+	mb := newMetricsBatcher(ctx, se.o.ProjectID, se.o.NumberOfWorkers, se.c, se.o.Timeout)
 	for _, metric := range metrics {
 		if len(metric.GetTimeseries()) == 0 {
 			// No TimeSeries to export, skip this metric.

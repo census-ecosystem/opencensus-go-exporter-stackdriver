@@ -35,13 +35,13 @@ func TestWorkers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create metric client %v", err)
 	}
-	m1 := newMetricsBatcher(ctx, "test", 1, c1) // batcher with 1 worker
+	m1 := newMetricsBatcher(ctx, "test", 1, c1, defaultTimeout) // batcher with 1 worker
 
 	c2, err := makeClient(addr)
 	if err != nil {
 		t.Fatalf("Failed to create metric client %v", err)
 	}
-	m2 := newMetricsBatcher(ctx, "test", 2, c2) // batcher with 2 workers
+	m2 := newMetricsBatcher(ctx, "test", 2, c2, defaultTimeout) // batcher with 2 workers
 
 	tss := make([]*monitoringpb.TimeSeries, 0, 500) // make 500 time series, should be split to 3 reqs
 	for i := 0; i < 500; i++ {
