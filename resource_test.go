@@ -158,24 +158,6 @@ func TestDefaultMapResource(t *testing.T) {
 				},
 			},
 		},
-		// Partial Match
-		{
-			input: &resource.Resource{
-				Type: resourcekeys.CloudType,
-				Labels: map[string]string{
-					stackdriverProjectID:          "proj1",
-					resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderGCP,
-					resourcekeys.HostKeyID:        "inst1",
-				},
-			},
-			want: &monitoredrespb.MonitoredResource{
-				Type: "gce_instance",
-				Labels: map[string]string{
-					"project_id":  "proj1",
-					"instance_id": "inst1",
-				},
-			},
-		},
 		// Convert to Global.
 		{
 			input: &resource.Resource{
