@@ -114,6 +114,69 @@ func TestMetricsWithResourcePerPushCall(t *testing.T) {
 	}
 }
 
+func TestMetricsWithResourcePerMetric(t *testing.T) {
+	server, addr, doneFn := createFakeServer(t)
+	defer doneFn()
+
+	// Now create a gRPC connection to the server.
+	conn := createConn(t, addr)
+	defer conn.Close()
+
+	inResources, outResources := readTestResourcesFiles(t, "Resources")
+	inLen := len(inResources)
+	outLen := len(outResources)
+	if inLen != outLen {
+		t.Errorf("Data invalid: input Resource len (%d) != output Resource len (%d)\n", inLen, outLen)
+		return
+	}
+
+	tcSingleMetric := readTestCaseFromFiles(t, "SingleMetric")
+
+	for i, inRes := range inResources {
+		se := createExporter(t, conn, defaultOpts)
+
+		tc := *tcSingleMetric
+		tc.name = inRes.Type
+		tc.inMetric[0].Resource = inResources[i]
+		tc.outTSR[0].TimeSeries[0].Resource = outResources[i]
+
+		executeTestCase(t, &tc, se, server, nil)
+	}
+}
+
+func TestMetricsWithResourcePerMetricTakesPrecedence(t *testing.T) {
+	server, addr, doneFn := createFakeServer(t)
+	defer doneFn()
+
+	// Now create a gRPC connection to the server.
+	conn := createConn(t, addr)
+	defer conn.Close()
+
+	inResources, outResources := readTestResourcesFiles(t, "Resources")
+	inLen := len(inResources)
+	outLen := len(outResources)
+	if inLen != outLen {
+		t.Errorf("Data invalid: input Resource len (%d) != output Resource len (%d)\n", inLen, outLen)
+		return
+	}
+
+	tcSingleMetric := readTestCaseFromFiles(t, "SingleMetric")
+
+	// use the same resource for push call. Resource per metric should take precedence.
+	perPushRes := inResources[inLen-1]
+
+	for i, inRes := range inResources {
+		se := createExporter(t, conn, defaultOpts)
+
+		tc := *tcSingleMetric
+		tc.name = inRes.Type
+		tc.inMetric[0].Resource = inResources[i]
+		tc.outTSR[0].TimeSeries[0].Resource = outResources[i]
+
+		executeTestCase(t, &tc, se, server, perPushRes)
+	}
+}
+
 func TestMetricsWithResourceWithMissingFieldsPerPushCall(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
