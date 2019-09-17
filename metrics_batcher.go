@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	monitoring "cloud.google.com/go/monitoring/apiv3"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
@@ -44,7 +45,7 @@ type metricsBatcher struct {
 	wg        *sync.WaitGroup
 }
 
-func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc *monitoring.MetricClient) *metricsBatcher {
+func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc *monitoring.MetricClient, timeout time.Duration) *metricsBatcher {
 	if numWorkers < minNumWorkers {
 		numWorkers = minNumWorkers
 	}
@@ -58,7 +59,7 @@ func newMetricsBatcher(ctx context.Context, projectID string, numWorkers int, mc
 	var wg sync.WaitGroup
 	wg.Add(numWorkers)
 	for i := 0; i < numWorkers; i++ {
-		w := newWorker(ctx, mc, reqsChan, respsChan, &wg)
+		w := newWorker(ctx, mc, reqsChan, respsChan, &wg, timeout)
 		workers = append(workers, w)
 		go w.start()
 	}
@@ -143,8 +144,9 @@ func sendReq(ctx context.Context, c *monitoring.MetricClient, req *monitoringpb.
 }
 
 type worker struct {
-	ctx context.Context
-	mc  *monitoring.MetricClient
+	ctx     context.Context
+	timeout time.Duration
+	mc      *monitoring.MetricClient
 
 	resp *response
 
@@ -159,7 +161,8 @@ func newWorker(
 	mc *monitoring.MetricClient,
 	reqsChan chan *monitoringpb.CreateTimeSeriesRequest,
 	respsChan chan *response,
-	wg *sync.WaitGroup) *worker {
+	wg *sync.WaitGroup,
+	timeout time.Duration) *worker {
 	return &worker{
 		ctx:       ctx,
 		mc:        mc,
@@ -172,10 +175,17 @@ func newWorker(
 
 func (w *worker) start() {
 	for req := range w.reqsChan {
-		w.recordDroppedTimeseries(sendReq(w.ctx, w.mc, req))
+		w.sendReqWithTimeout(req)
 	}
 	w.respsChan <- w.resp
 	w.wg.Done()
+}
+
+func (w *worker) sendReqWithTimeout(req *monitoringpb.CreateTimeSeriesRequest) {
+	ctx, cancel := newContextWithTimeout(w.ctx, w.timeout)
+	defer cancel()
+
+	w.recordDroppedTimeseries(sendReq(ctx, w.mc, req))
 }
 
 func (w *worker) recordDroppedTimeseries(numTimeSeries int, err error) {

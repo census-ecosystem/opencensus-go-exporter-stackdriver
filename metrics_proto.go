@@ -54,13 +54,10 @@ func (se *statsExporter) PushMetricsProto(ctx context.Context, node *commonpb.No
 		return 0, errNilMetricOrMetricDescriptor
 	}
 
-	ctx, cancel := newContextWithTimeout(ctx, se.o.Timeout)
-	defer cancel()
-
 	// Caches the resources seen so far
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
 
-	mb := newMetricsBatcher(ctx, se.o.ProjectID, se.o.NumberOfWorkers, se.c)
+	mb := newMetricsBatcher(ctx, se.o.ProjectID, se.o.NumberOfWorkers, se.c, se.o.Timeout)
 	for _, metric := range metrics {
 		if len(metric.GetTimeseries()) == 0 {
 			// No TimeSeries to export, skip this metric.
@@ -70,14 +67,14 @@ func (se *statsExporter) PushMetricsProto(ctx context.Context, node *commonpb.No
 		if metric.GetMetricDescriptor().GetType() == metricspb.MetricDescriptor_SUMMARY {
 			summaryMtcs := se.convertSummaryMetrics(metric)
 			for _, summaryMtc := range summaryMtcs {
-				if err := se.protoCreateMetricDescriptor(ctx, summaryMtc); err != nil {
+				if err := se.createMetricDescriptorWithTimeout(ctx, summaryMtc); err != nil {
 					mb.recordDroppedTimeseries(len(summaryMtc.GetTimeseries()), err)
 					continue
 				}
 				se.protoMetricToTimeSeries(ctx, mappedRsc, summaryMtc, mb)
 			}
 		} else {
-			if err := se.protoCreateMetricDescriptor(ctx, metric); err != nil {
+			if err := se.createMetricDescriptorWithTimeout(ctx, metric); err != nil {
 				mb.recordDroppedTimeseries(len(metric.GetTimeseries()), err)
 				continue
 			}
@@ -296,6 +293,13 @@ func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []string, lab
 	}
 
 	return labels, nil
+}
+
+func (se *statsExporter) createMetricDescriptorWithTimeout(ctx context.Context, metric *metricspb.Metric) error {
+	ctx, cancel := newContextWithTimeout(ctx, se.o.Timeout)
+	defer cancel()
+
+	return se.protoCreateMetricDescriptor(ctx, metric)
 }
 
 // createMetricDescriptor creates a metric descriptor from the OpenCensus proto metric
