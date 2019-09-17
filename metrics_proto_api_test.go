@@ -70,7 +70,7 @@ func TestVariousCasesFromFile(t *testing.T) {
 		"ExportMetricsOfAllTypes",
 	}
 	for _, file := range files {
-		tc := readTestCaseFromFiles(file)
+		tc := readTestCaseFromFiles(t, file)
 		server, addr, doneFn := createFakeServer(t)
 		defer doneFn()
 
@@ -93,7 +93,7 @@ func TestMetricsWithResourcePerPushCall(t *testing.T) {
 	conn := createConn(t, addr)
 	defer conn.Close()
 
-	inResources, outResources := readTestResourcesFiles("Resources")
+	inResources, outResources := readTestResourcesFiles(t, "Resources")
 	inLen := len(inResources)
 	outLen := len(outResources)
 	if inLen != outLen {
@@ -101,7 +101,7 @@ func TestMetricsWithResourcePerPushCall(t *testing.T) {
 		return
 	}
 
-	tcSingleMetric := readTestCaseFromFiles("SingleMetric")
+	tcSingleMetric := readTestCaseFromFiles(t, "SingleMetric")
 
 	for i, inRes := range inResources {
 		se := createExporter(t, conn, defaultOpts)
@@ -122,7 +122,7 @@ func TestMetricsWithResourceWithMissingFieldsPerPushCall(t *testing.T) {
 	conn := createConn(t, addr)
 	defer conn.Close()
 
-	inResources, outResources := readTestResourcesFiles("ResourcesWithMissingFields")
+	inResources, outResources := readTestResourcesFiles(t, "ResourcesWithMissingFields")
 	inLen := len(inResources)
 	outLen := len(outResources)
 	if inLen != outLen {
@@ -130,7 +130,7 @@ func TestMetricsWithResourceWithMissingFieldsPerPushCall(t *testing.T) {
 		return
 	}
 
-	tcSingleMetric := readTestCaseFromFiles("SingleMetric")
+	tcSingleMetric := readTestCaseFromFiles(t, "SingleMetric")
 
 	for i, inRes := range inResources {
 		se := createExporter(t, conn, defaultOpts)
@@ -154,7 +154,7 @@ func TestExportMaxTSPerRequest(t *testing.T) {
 	// Finally create the OpenCensus stats exporter
 	se := createExporter(t, conn, defaultOpts)
 
-	tcFromFile := readTestCaseFromFiles("SingleMetric")
+	tcFromFile := readTestCaseFromFiles(t, "SingleMetric")
 
 	// update tcFromFile with additional input Time-series and expected Time-Series in
 	// CreateTimeSeriesRequest(s). Replicate time-series with different label values.
@@ -198,7 +198,7 @@ func TestExportMaxTSPerRequestAcrossTwoMetrics(t *testing.T) {
 	se := createExporter(t, conn, defaultOpts)
 
 	// Read two metrics, one CreateTimeSeriesRequest and two CreateMetricDescriptorRequest.
-	tcFromFile := readTestCaseFromFiles("TwoMetrics")
+	tcFromFile := readTestCaseFromFiles(t, "TwoMetrics")
 
 	// update tcFromFile with additional input Time-series and expected Time-Series in
 	// CreateTimeSeriesRequest(s).
@@ -294,7 +294,7 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 	server.resetStackdriverTimeSeries()
 }
 
-func readTestCaseFromFiles(filename string) *testCases {
+func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
 	tc := &testCases{
 		name: filename,
 	}
@@ -302,7 +302,7 @@ func readTestCaseFromFiles(filename string) *testCases {
 	// Read input Metrics proto.
 	f, err := ioutil.ReadFile("testdata/" + "inMetrics_" + filename + ".txt")
 	if err != nil {
-		panic("error opening in file " + filename)
+		t.Fatalf("error opening in file " + filename)
 	}
 
 	strMetrics := strings.Split(string(f), "---")
@@ -310,7 +310,7 @@ func readTestCaseFromFiles(filename string) *testCases {
 		in := metricspb.Metric{}
 		err = proto.UnmarshalText(strMetric, &in)
 		if err != nil {
-			panic("error unmarshalling Metric protos from file " + filename)
+			t.Fatalf("error unmarshalling Metric protos from file " + filename)
 		}
 		tc.inMetric = append(tc.inMetric, &in)
 	}
@@ -318,7 +318,7 @@ func readTestCaseFromFiles(filename string) *testCases {
 	// Read expected output CreateMetricDescriptorRequest proto.
 	f, err = ioutil.ReadFile("testdata/" + "outMDR_" + filename + ".txt")
 	if err != nil {
-		panic("error opening in file " + filename)
+		t.Fatalf("error opening in file " + filename)
 	}
 
 	strOutMDRs := strings.Split(string(f), "---")
@@ -326,7 +326,7 @@ func readTestCaseFromFiles(filename string) *testCases {
 		outMDR := monitoringpb.CreateMetricDescriptorRequest{}
 		err = proto.UnmarshalText(strOutMDR, &outMDR)
 		if err != nil {
-			panic("error unmarshalling CreateMetricDescriptorRequest protos from file " + filename)
+			t.Fatalf("error unmarshalling CreateMetricDescriptorRequest protos from file " + filename)
 		}
 		tc.outMDR = append(tc.outMDR, &outMDR)
 	}
@@ -334,7 +334,7 @@ func readTestCaseFromFiles(filename string) *testCases {
 	// Read expected output CreateTimeSeriesRequest proto.
 	f, err = ioutil.ReadFile("testdata/" + "outTSR_" + filename + ".txt")
 	if err != nil {
-		panic("error opening in file " + filename)
+		t.Fatalf("error opening in file " + filename)
 	}
 
 	strOutTSRs := strings.Split(string(f), "---")
@@ -342,18 +342,18 @@ func readTestCaseFromFiles(filename string) *testCases {
 		outTSR := monitoringpb.CreateTimeSeriesRequest{}
 		err = proto.UnmarshalText(strOutTSR, &outTSR)
 		if err != nil {
-			panic("error unmarshalling CreateTimeSeriesRequest protos from file " + filename)
+			t.Fatalf("error unmarshalling CreateTimeSeriesRequest protos from file " + filename)
 		}
 		tc.outTSR = append(tc.outTSR, &outTSR)
 	}
 	return tc
 }
 
-func readTestResourcesFiles(filename string) ([]*resourcepb.Resource, []*monitoredrespb.MonitoredResource) {
+func readTestResourcesFiles(t *testing.T, filename string) ([]*resourcepb.Resource, []*monitoredrespb.MonitoredResource) {
 	// Read input Resource proto.
 	f, err := ioutil.ReadFile("testdata/" + "in_" + filename + ".txt")
 	if err != nil {
-		panic("error opening in file " + filename)
+		t.Fatalf("error opening in file " + filename)
 	}
 
 	inResources := []*resourcepb.Resource{}
@@ -362,7 +362,7 @@ func readTestResourcesFiles(filename string) ([]*resourcepb.Resource, []*monitor
 		inRes := resourcepb.Resource{}
 		err = proto.UnmarshalText(strRes, &inRes)
 		if err != nil {
-			panic("error unmarshalling input Resource protos from file " + filename)
+			t.Fatalf("error unmarshalling input Resource protos from file " + filename)
 		}
 		inResources = append(inResources, &inRes)
 	}
@@ -370,7 +370,7 @@ func readTestResourcesFiles(filename string) ([]*resourcepb.Resource, []*monitor
 	// Read output Resource proto.
 	f, err = ioutil.ReadFile("testdata/" + "out_" + filename + ".txt")
 	if err != nil {
-		panic("error opening out file " + filename)
+		t.Fatalf("error opening out file " + filename)
 	}
 
 	outResources := []*monitoredrespb.MonitoredResource{}
@@ -379,7 +379,7 @@ func readTestResourcesFiles(filename string) ([]*resourcepb.Resource, []*monitor
 		outRes := monitoredrespb.MonitoredResource{}
 		err = proto.UnmarshalText(strRes, &outRes)
 		if err != nil {
-			panic("error unmarshalling output Resource protos from file " + filename)
+			t.Fatalf("error unmarshalling output Resource protos from file " + filename)
 		}
 		outResources = append(outResources, &outRes)
 	}
