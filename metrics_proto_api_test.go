@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-
 	"strings"
 	"sync"
 	"testing"
@@ -155,7 +154,7 @@ func TestExportMaxTSPerRequest(t *testing.T) {
 	// Finally create the OpenCensus stats exporter
 	se := createExporter(t, conn, defaultOpts)
 
-	tcFromFile := readTestCaseFromFiles("ExportMaxTSPerRequest")
+	tcFromFile := readTestCaseFromFiles("SingleMetric")
 
 	// update tcFromFile with additional input Time-series and expected Time-Series in
 	// CreateTimeSeriesRequest(s). Replicate time-series with different label values.
@@ -199,7 +198,7 @@ func TestExportMaxTSPerRequestAcrossTwoMetrics(t *testing.T) {
 	se := createExporter(t, conn, defaultOpts)
 
 	// Read two metrics, one CreateTimeSeriesRequest and two CreateMetricDescriptorRequest.
-	tcFromFile := readTestCaseFromFiles("ExportMaxTSPerRequestAcrossTwoMetrics")
+	tcFromFile := readTestCaseFromFiles("TwoMetrics")
 
 	// update tcFromFile with additional input Time-series and expected Time-Series in
 	// CreateTimeSeriesRequest(s).
@@ -213,6 +212,9 @@ func TestExportMaxTSPerRequestAcrossTwoMetrics(t *testing.T) {
 			tcFromFile.inMetric[k].Timeseries = append(tcFromFile.inMetric[k].Timeseries, &ts)
 		}
 	}
+
+	// Don't need the second TimeSeries in TSR
+	tcFromFile.outTSR[0].TimeSeries = tcFromFile.outTSR[0].TimeSeries[:1]
 
 	// Replicate time-series in CreateTimeSeriesRequest
 	for k := 0; k < 2; k++ {
