@@ -68,6 +68,7 @@ func TestVariousCasesFromFile(t *testing.T) {
 	files := []string{
 		"ExportLabels",
 		"ExportMetricsOfAllTypes",
+		"BuiltInMetrics",
 	}
 	for _, file := range files {
 		tc := readTestCaseFromFiles(t, file)
@@ -391,7 +392,9 @@ func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
 		if err != nil {
 			t.Fatalf("error unmarshalling CreateMetricDescriptorRequest protos from file " + filename)
 		}
-		tc.outMDR = append(tc.outMDR, &outMDR)
+		if outMDR.Name != "" {
+			tc.outMDR = append(tc.outMDR, &outMDR)
+		}
 	}
 
 	// Read expected output CreateTimeSeriesRequest proto.
