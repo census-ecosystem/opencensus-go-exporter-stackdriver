@@ -41,7 +41,6 @@ import (
 	sd "contrib.go.opencensus.io/exporter/stackdriver"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
-	"go.opencensus.io/resource/resourcekeys"
 )
 
 type testCases struct {
@@ -84,6 +83,64 @@ func TestVariousCasesFromFile(t *testing.T) {
 		se := createExporter(t, conn, defaultOpts)
 		executeTestCase(t, tc, se, server, nil)
 
+	}
+}
+
+func TestMetricsWithResourcePerPushCall(t *testing.T) {
+	server, addr, doneFn := createFakeServer(t)
+	defer doneFn()
+
+	// Now create a gRPC connection to the server.
+	conn := createConn(t, addr)
+	defer conn.Close()
+
+	inResources, outResources := readTestResourcesFiles("Resources")
+	inLen := len(inResources)
+	outLen := len(outResources)
+	if inLen != outLen {
+		t.Errorf("Data invalid: input Resource len (%d) != output Resource len (%d)\n", inLen, outLen)
+		return
+	}
+
+	tcSingleMetric := readTestCaseFromFiles("SingleMetric")
+
+	for i, inRes := range inResources {
+		se := createExporter(t, conn, defaultOpts)
+
+		tc := *tcSingleMetric
+		tc.name = inRes.Type
+		tc.outTSR[0].TimeSeries[0].Resource = outResources[i]
+
+		executeTestCase(t, &tc, se, server, inRes)
+	}
+}
+
+func TestMetricsWithResourceWithMissingFieldsPerPushCall(t *testing.T) {
+	server, addr, doneFn := createFakeServer(t)
+	defer doneFn()
+
+	// Now create a gRPC connection to the server.
+	conn := createConn(t, addr)
+	defer conn.Close()
+
+	inResources, outResources := readTestResourcesFiles("ResourcesWithMissingFields")
+	inLen := len(inResources)
+	outLen := len(outResources)
+	if inLen != outLen {
+		t.Errorf("Data invalid: input Resource len (%d) != output Resource len (%d)\n", inLen, outLen)
+		return
+	}
+
+	tcSingleMetric := readTestCaseFromFiles("SingleMetric")
+
+	for i, inRes := range inResources {
+		se := createExporter(t, conn, defaultOpts)
+
+		tc := *tcSingleMetric
+		tc.name = inRes.Type
+		tc.outTSR[0].TimeSeries[0].Resource = outResources[i]
+
+		executeTestCase(t, &tc, se, server, inRes)
 	}
 }
 
@@ -235,213 +292,6 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 	server.resetStackdriverTimeSeries()
 }
 
-func createResourcePbUnknown() *resourcepb.Resource {
-	return &resourcepb.Resource{
-		Type: "Unknown",
-		Labels: map[string]string{
-			resourcekeys.K8SKeyClusterName:   "cluster1",
-			resourcekeys.K8SKeyPodName:       "pod1",
-			resourcekeys.K8SKeyNamespaceName: "namespace1",
-			resourcekeys.ContainerKeyName:    "container-name1",
-			resourcekeys.CloudKeyZone:        "zone1",
-		},
-	}
-}
-
-func createResourcePbContainer() *resourcepb.Resource {
-	return &resourcepb.Resource{
-		Type: resourcekeys.ContainerType,
-		Labels: map[string]string{
-			resourcekeys.K8SKeyClusterName:   "cluster1",
-			resourcekeys.K8SKeyPodName:       "pod1",
-			resourcekeys.K8SKeyNamespaceName: "namespace1",
-			resourcekeys.ContainerKeyName:    "container-name1",
-			resourcekeys.CloudKeyZone:        "zone1",
-		},
-	}
-}
-
-func createMonitoredResourcePbK8sContainer() *monitoredrespb.MonitoredResource {
-	return &monitoredrespb.MonitoredResource{
-		Type: "k8s_container",
-		Labels: map[string]string{
-			"location":       "zone1",
-			"cluster_name":   "cluster1",
-			"namespace_name": "namespace1",
-			"pod_name":       "pod1",
-			"container_name": "container-name1",
-		},
-	}
-
-}
-
-func createResourcePbK8sPodType() *resourcepb.Resource {
-	return &resourcepb.Resource{
-		Type: resourcekeys.K8SType,
-		Labels: map[string]string{
-			resourcekeys.K8SKeyClusterName:   "cluster1",
-			resourcekeys.K8SKeyPodName:       "pod1",
-			resourcekeys.K8SKeyNamespaceName: "namespace1",
-			resourcekeys.ContainerKeyName:    "container-name1",
-			resourcekeys.CloudKeyZone:        "zone1",
-		},
-	}
-}
-
-func createMonitoredResourcePbK8sPodType() *monitoredrespb.MonitoredResource {
-	return &monitoredrespb.MonitoredResource{
-		Type: "k8s_pod",
-		Labels: map[string]string{
-			"location":       "zone1",
-			"cluster_name":   "cluster1",
-			"namespace_name": "namespace1",
-			"pod_name":       "pod1",
-		},
-	}
-
-}
-
-func createResourcePbK8sNodType() *resourcepb.Resource {
-	return &resourcepb.Resource{
-		Type: resourcekeys.HostType,
-		Labels: map[string]string{
-			resourcekeys.K8SKeyClusterName:   "cluster1",
-			resourcekeys.K8SKeyPodName:       "pod1",
-			resourcekeys.K8SKeyNamespaceName: "namespace1",
-			resourcekeys.ContainerKeyName:    "container-name1",
-			resourcekeys.CloudKeyZone:        "zone1",
-			resourcekeys.HostKeyName:         "host1",
-		},
-	}
-}
-
-func createMonitoredResourcePbK8sNodType() *monitoredrespb.MonitoredResource {
-	return &monitoredrespb.MonitoredResource{
-		Type: "k8s_node",
-		Labels: map[string]string{
-			"location":     "zone1",
-			"cluster_name": "cluster1",
-			"node_name":    "host1",
-		},
-	}
-
-}
-
-func createResourcePbGCE() *resourcepb.Resource {
-	return &resourcepb.Resource{
-		Type: resourcekeys.CloudType,
-		Labels: map[string]string{
-			resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderGCP,
-			resourcekeys.HostKeyID:        "inst1",
-			resourcekeys.CloudKeyZone:     "zone1",
-		},
-	}
-}
-
-func createMonitoredResourcePbGCE() *monitoredrespb.MonitoredResource {
-	return &monitoredrespb.MonitoredResource{
-		Type: "gce_instance",
-		Labels: map[string]string{
-			"instance_id": "inst1",
-			"zone":        "zone1",
-		},
-	}
-}
-
-func createResourcePbAWS() *resourcepb.Resource {
-	return &resourcepb.Resource{
-		Type: resourcekeys.CloudType,
-		Labels: map[string]string{
-			resourcekeys.CloudKeyProvider:  resourcekeys.CloudProviderAWS,
-			resourcekeys.HostKeyID:         "inst1",
-			resourcekeys.CloudKeyRegion:    "region1",
-			resourcekeys.CloudKeyAccountID: "account1",
-		},
-	}
-}
-
-func createMonitoredResourcePbAWS() *monitoredrespb.MonitoredResource {
-	return &monitoredrespb.MonitoredResource{
-		Type: "aws_ec2_instance",
-		Labels: map[string]string{
-			"instance_id": "inst1",
-			"region":      "aws:region1",
-			"aws_account": "account1",
-		},
-	}
-}
-
-//func createMetric(md *metricspb.MetricDescriptor, points []*metricspb.Point, labelValues ...*metricspb.LabelValue) *metricspb.Metric {
-//	lvs := []*metricspb.LabelValue{}
-//	lvs = append(lvs, labelValues...)
-//	return &metricspb.Metric{
-//		MetricDescriptor: md,
-//		Timeseries: []*metricspb.TimeSeries{
-//			{
-//				StartTimestamp: startTimestamp,
-//				LabelValues:    lvs,
-//				Points:         points,
-//			},
-//		},
-//	}
-//}
-//
-func createGoogleMetric(md *googlemetricpb.MetricDescriptor, res *monitoredrespb.MonitoredResource, mk googlemetricpb.MetricDescriptor_MetricKind, mt googlemetricpb.MetricDescriptor_ValueType, points []*monitoringpb.Point) *monitoringpb.CreateTimeSeriesRequest {
-	return &monitoringpb.CreateTimeSeriesRequest{
-		Name: "projects/metrics_proto_test",
-		TimeSeries: []*monitoringpb.TimeSeries{
-			{
-				Metric: &googlemetricpb.Metric{
-					Type: md.Type,
-					Labels: map[string]string{
-						"empty_key":      "",
-						"operation_type": "test_1",
-					},
-				},
-				Resource:   res,
-				MetricKind: mk,
-				ValueType:  mt,
-				Points:     points,
-			},
-		},
-	}
-}
-
-//func writeToFile(tc *testCases) {
-//	inFile, err := os.Create("/tmp/in_" + strings.Replace(tc.name, " ", "_", -1))
-//	if err != nil {
-//		panic("error opening in file " + tc.name)
-//	}
-//
-//	for _, in := range tc.inMetric {
-//		proto.MarshalText(inFile, in)
-//		inFile.WriteString("---\n")
-//	}
-//	inFile.Close()
-//
-//	outMDFile, err := os.Create("/tmp/outMDR_" + strings.Replace(tc.name, " ", "_", -1))
-//	if err != nil {
-//		panic("error opening outMD file " + tc.name)
-//	}
-//
-//	for _, outMDR := range tc.outMDR {
-//		proto.MarshalText(outMDFile, outMDR)
-//		outMDFile.WriteString("---\n")
-//	}
-//	outMDFile.Close()
-//
-//	outTSFile, err := os.Create("/tmp/outTSR_" + strings.Replace(tc.name, " ", "_", -1))
-//	if err != nil {
-//		panic("error opening outTS file " + tc.name)
-//	}
-//
-//	for _, outTSR := range tc.outTSR {
-//		proto.MarshalText(outTSFile, outTSR)
-//		outTSFile.WriteString("---\n")
-//	}
-//	outTSFile.Close()
-//}
-
 func readTestCaseFromFiles(filename string) *testCases {
 	tc := &testCases{
 		name: filename,
@@ -495,6 +345,44 @@ func readTestCaseFromFiles(filename string) *testCases {
 		tc.outTSR = append(tc.outTSR, &outTSR)
 	}
 	return tc
+}
+
+func readTestResourcesFiles(filename string) ([]*resourcepb.Resource, []*monitoredrespb.MonitoredResource) {
+	// Read input Resource proto.
+	f, err := ioutil.ReadFile("testdata/" + "in_" + filename + ".txt")
+	if err != nil {
+		panic("error opening in file " + filename)
+	}
+
+	inResources := []*resourcepb.Resource{}
+	strResources := strings.Split(string(f), "---")
+	for _, strRes := range strResources {
+		inRes := resourcepb.Resource{}
+		err = proto.UnmarshalText(strRes, &inRes)
+		if err != nil {
+			panic("error unmarshalling input Resource protos from file " + filename)
+		}
+		inResources = append(inResources, &inRes)
+	}
+
+	// Read output Resource proto.
+	f, err = ioutil.ReadFile("testdata/" + "out_" + filename + ".txt")
+	if err != nil {
+		panic("error opening out file " + filename)
+	}
+
+	outResources := []*monitoredrespb.MonitoredResource{}
+	strResources = strings.Split(string(f), "---")
+	for _, strRes := range strResources {
+		outRes := monitoredrespb.MonitoredResource{}
+		err = proto.UnmarshalText(strRes, &outRes)
+		if err != nil {
+			panic("error unmarshalling output Resource protos from file " + filename)
+		}
+		outResources = append(outResources, &outRes)
+	}
+
+	return inResources, outResources
 }
 
 type fakeMetricsServer struct {

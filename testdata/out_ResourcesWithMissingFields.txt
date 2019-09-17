@@ -1,0 +1,12 @@
+type: "global"
+---
+type: "global"
+---
+type: "global"
+---
+type: "global"
+---
+type: "global"
+---
+type: "global"
+
