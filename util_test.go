@@ -12,13 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package internal
+package stackdriver_test
 
 import (
 	"io/ioutil"
 )
 
-// ReadFile is a wrapper to read a file. It is meant for internal use for testing.
-func ReadFile(filename string) ([]byte, error) {
+// readFile is a wrapper to read a file. It is meant for internal use for testing.
+func readFile(filename string) ([]byte, error) {
 	return ioutil.ReadFile(filename)
 }

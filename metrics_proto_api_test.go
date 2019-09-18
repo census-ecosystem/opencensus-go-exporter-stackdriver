@@ -37,7 +37,6 @@ import (
 	"google.golang.org/grpc"
 
 	sd "contrib.go.opencensus.io/exporter/stackdriver"
-	"contrib.go.opencensus.io/exporter/stackdriver/internal"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 )
@@ -427,7 +426,7 @@ func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
 	}
 
 	// Read input Metrics proto.
-	f, err := internal.ReadFile("testdata/" + filename + "/inMetrics.txt")
+	f, err := readFile("testdata/" + filename + "/inMetrics.txt")
 	if err != nil {
 		t.Fatalf("error opening in file " + filename)
 	}
@@ -443,7 +442,7 @@ func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
 	}
 
 	// Read expected output CreateMetricDescriptorRequest proto.
-	f, err = internal.ReadFile("testdata/" + filename + "/outMDR.txt")
+	f, err = readFile("testdata/" + filename + "/outMDR.txt")
 	if err != nil {
 		t.Fatalf("error opening in file " + filename)
 	}
@@ -461,7 +460,7 @@ func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
 	}
 
 	// Read expected output CreateTimeSeriesRequest proto.
-	f, err = internal.ReadFile("testdata/" + filename + "/outTSR.txt")
+	f, err = readFile("testdata/" + filename + "/outTSR.txt")
 	if err != nil {
 		t.Fatalf("error opening in file " + filename)
 	}
@@ -480,7 +479,7 @@ func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
 
 func readTestResourcesFiles(t *testing.T, filename string) ([]*resourcepb.Resource, []*monitoredrespb.MonitoredResource) {
 	// Read input Resource proto.
-	f, err := internal.ReadFile("testdata/" + filename + "/in.txt")
+	f, err := readFile("testdata/" + filename + "/in.txt")
 	if err != nil {
 		t.Fatalf("error opening in file " + filename)
 	}
@@ -497,7 +496,7 @@ func readTestResourcesFiles(t *testing.T, filename string) ([]*resourcepb.Resour
 	}
 
 	// Read output Resource proto.
-	f, err = internal.ReadFile("testdata/" + filename + "/out.txt")
+	f, err = readFile("testdata/" + filename + "/out.txt")
 	if err != nil {
 		t.Fatalf("error opening out file " + filename)
 	}
