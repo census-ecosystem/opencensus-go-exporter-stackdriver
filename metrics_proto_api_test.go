@@ -86,6 +86,74 @@ func TestVariousCasesFromFile(t *testing.T) {
 	}
 }
 
+func TestMetricsWithPrefix(t *testing.T) {
+	server, addr, doneFn := createFakeServer(t)
+	defer doneFn()
+
+	// Now create a gRPC connection to the server.
+	conn := createConn(t, addr)
+	defer conn.Close()
+
+	tc := readTestCaseFromFiles(t, "SingleMetric")
+
+	prefixes := []string{
+		"example.com/",
+		"example.com/foo/",
+	}
+	metricName := "ocagent.io"
+	saveMetricType := tc.outTSR[0].TimeSeries[0].Metric.Type
+	saveMDRName := tc.outMDR[0].MetricDescriptor.Name
+	saveMDRDispName := tc.outMDR[0].MetricDescriptor.DisplayName
+
+	for _, prefix := range prefixes {
+		opts := defaultOpts
+		opts.MetricPrefix = prefix
+		se := createExporter(t, conn, opts)
+
+		mt := strings.Replace(saveMetricType, metricName, (prefix + metricName), -1)
+		tc.outMDR[0].MetricDescriptor.Name = strings.Replace(saveMDRName, metricName, (prefix + metricName), -1)
+		tc.outMDR[0].MetricDescriptor.Type = mt
+		tc.outMDR[0].MetricDescriptor.DisplayName = strings.Replace(saveMDRDispName, "OpenCensus/"+metricName, (prefix + metricName), -1)
+
+		tc.outTSR[0].TimeSeries[0].Metric.Type = mt
+
+		executeTestCase(t, tc, se, server, nil)
+	}
+}
+
+func TestBuiltInMetricsUsingPrefix(t *testing.T) {
+	server, addr, doneFn := createFakeServer(t)
+	defer doneFn()
+
+	// Now create a gRPC connection to the server.
+	conn := createConn(t, addr)
+	defer conn.Close()
+
+	tc := readTestCaseFromFiles(t, "SingleMetric")
+
+	prefixes := []string{
+		"googleapis.com/",
+		"kubernetes.io/",
+		"istio.io/",
+	}
+	metricName := "ocagent.io"
+	saveMetricType := tc.outTSR[0].TimeSeries[0].Metric.Type
+
+	for _, prefix := range prefixes {
+		opts := defaultOpts
+		opts.MetricPrefix = prefix
+		se := createExporter(t, conn, opts)
+
+		// no CreateMetricDescriptorRequest expected.
+		tc.outMDR = nil
+
+		mt := strings.Replace(saveMetricType, "custom.googleapis.com/opencensus/"+metricName, (prefix + metricName), -1)
+		tc.outTSR[0].TimeSeries[0].Metric.Type = mt
+
+		executeTestCase(t, tc, se, server, nil)
+	}
+}
+
 func TestMetricsWithResourcePerPushCall(t *testing.T) {
 	server, addr, doneFn := createFakeServer(t)
 	defer doneFn()
