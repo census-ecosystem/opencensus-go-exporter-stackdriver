@@ -538,9 +538,9 @@ func createFakeServerConn(t *testing.T) (*fakeMetricsServer, *grpc.ClientConn, f
 	conn := createConn(t, "localhost:"+serverPortStr)
 
 	stop := func() {
+		conn.Close()
 		srv.Stop()
 		_ = ln.Close()
-		conn.Close()
 	}
 	return server, conn, stop
 }
