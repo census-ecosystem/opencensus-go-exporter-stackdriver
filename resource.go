@@ -81,7 +81,7 @@ var genericResourceMap = map[string]string{
 }
 
 // returns transformed label map and true if all labels in match are found
-// in input except optional project_id. It returns false it at lease one label
+// in input except optional project_id. It returns false if at least one label
 // other than project_id is missing.
 func transformResource(match, input map[string]string) (map[string]string, bool) {
 	output := make(map[string]string, len(input))
