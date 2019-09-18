@@ -72,12 +72,8 @@ func TestVariousCasesFromFile(t *testing.T) {
 	}
 	for _, file := range files {
 		tc := readTestCaseFromFiles(t, file)
-		server, addr, doneFn := createFakeServer(t)
+		server, conn, doneFn := createFakeServerConn(t)
 		defer doneFn()
-
-		// Now create a gRPC connection to the agent.
-		conn := createConn(t, addr)
-		defer conn.Close()
 
 		// Finally create the OpenCensus stats exporter
 		se := createExporter(t, conn, defaultOpts)
@@ -87,12 +83,8 @@ func TestVariousCasesFromFile(t *testing.T) {
 }
 
 func TestMetricsWithPrefix(t *testing.T) {
-	server, addr, doneFn := createFakeServer(t)
+	server, conn, doneFn := createFakeServerConn(t)
 	defer doneFn()
-
-	// Now create a gRPC connection to the server.
-	conn := createConn(t, addr)
-	defer conn.Close()
 
 	tc := readTestCaseFromFiles(t, "SingleMetric")
 
@@ -121,13 +113,40 @@ func TestMetricsWithPrefix(t *testing.T) {
 	}
 }
 
-func TestBuiltInMetricsUsingPrefix(t *testing.T) {
-	server, addr, doneFn := createFakeServer(t)
+func TestMetricsWithPrefixWithDomain(t *testing.T) {
+	server, conn, doneFn := createFakeServerConn(t)
 	defer doneFn()
 
-	// Now create a gRPC connection to the server.
-	conn := createConn(t, addr)
-	defer conn.Close()
+	tc := readTestCaseFromFiles(t, "SingleMetric")
+
+	prefixes := []string{
+		"custom.googleapis.com/prometheus/",
+		"external.googleapis.com/prometheus/",
+	}
+	metricName := "ocagent.io"
+	saveMetricType := strings.Replace(tc.outTSR[0].TimeSeries[0].Metric.Type, "custom.googleapis.com/opencensus/", "", -1)
+	saveMDRName := strings.Replace(tc.outMDR[0].MetricDescriptor.Name, "custom.googleapis.com/opencensus/", "", -1)
+	saveMDRDispName := tc.outMDR[0].MetricDescriptor.DisplayName
+
+	for _, prefix := range prefixes {
+		opts := defaultOpts
+		opts.MetricPrefix = prefix
+		se := createExporter(t, conn, opts)
+
+		mt := strings.Replace(saveMetricType, metricName, (prefix + metricName), -1)
+		tc.outMDR[0].MetricDescriptor.Name = strings.Replace(saveMDRName, metricName, (prefix + metricName), -1)
+		tc.outMDR[0].MetricDescriptor.Type = mt
+		tc.outMDR[0].MetricDescriptor.DisplayName = strings.Replace(saveMDRDispName, "OpenCensus/"+metricName, (prefix + metricName), -1)
+
+		tc.outTSR[0].TimeSeries[0].Metric.Type = mt
+
+		executeTestCase(t, tc, se, server, nil)
+	}
+}
+
+func TestBuiltInMetricsUsingPrefix(t *testing.T) {
+	server, conn, doneFn := createFakeServerConn(t)
+	defer doneFn()
 
 	tc := readTestCaseFromFiles(t, "SingleMetric")
 
@@ -155,12 +174,8 @@ func TestBuiltInMetricsUsingPrefix(t *testing.T) {
 }
 
 func TestMetricsWithResourcePerPushCall(t *testing.T) {
-	server, addr, doneFn := createFakeServer(t)
+	server, conn, doneFn := createFakeServerConn(t)
 	defer doneFn()
-
-	// Now create a gRPC connection to the server.
-	conn := createConn(t, addr)
-	defer conn.Close()
 
 	inResources, outResources := readTestResourcesFiles(t, "Resources")
 	inLen := len(inResources)
@@ -184,12 +199,8 @@ func TestMetricsWithResourcePerPushCall(t *testing.T) {
 }
 
 func TestMetricsWithResourcePerMetric(t *testing.T) {
-	server, addr, doneFn := createFakeServer(t)
+	server, conn, doneFn := createFakeServerConn(t)
 	defer doneFn()
-
-	// Now create a gRPC connection to the server.
-	conn := createConn(t, addr)
-	defer conn.Close()
 
 	inResources, outResources := readTestResourcesFiles(t, "Resources")
 	inLen := len(inResources)
@@ -214,12 +225,8 @@ func TestMetricsWithResourcePerMetric(t *testing.T) {
 }
 
 func TestMetricsWithResourcePerMetricTakesPrecedence(t *testing.T) {
-	server, addr, doneFn := createFakeServer(t)
+	server, conn, doneFn := createFakeServerConn(t)
 	defer doneFn()
-
-	// Now create a gRPC connection to the server.
-	conn := createConn(t, addr)
-	defer conn.Close()
 
 	inResources, outResources := readTestResourcesFiles(t, "Resources")
 	inLen := len(inResources)
@@ -247,12 +254,8 @@ func TestMetricsWithResourcePerMetricTakesPrecedence(t *testing.T) {
 }
 
 func TestMetricsWithResourceWithMissingFieldsPerPushCall(t *testing.T) {
-	server, addr, doneFn := createFakeServer(t)
+	server, conn, doneFn := createFakeServerConn(t)
 	defer doneFn()
-
-	// Now create a gRPC connection to the server.
-	conn := createConn(t, addr)
-	defer conn.Close()
 
 	inResources, outResources := readTestResourcesFiles(t, "ResourcesWithMissingFields")
 	inLen := len(inResources)
@@ -276,12 +279,8 @@ func TestMetricsWithResourceWithMissingFieldsPerPushCall(t *testing.T) {
 }
 
 func TestExportMaxTSPerRequest(t *testing.T) {
-	server, addr, doneFn := createFakeServer(t)
+	server, conn, doneFn := createFakeServerConn(t)
 	defer doneFn()
-
-	// Now create a gRPC connection to the server.
-	conn := createConn(t, addr)
-	defer conn.Close()
 
 	// Finally create the OpenCensus stats exporter
 	se := createExporter(t, conn, defaultOpts)
@@ -319,12 +318,8 @@ func TestExportMaxTSPerRequest(t *testing.T) {
 }
 
 func TestExportMaxTSPerRequestAcrossTwoMetrics(t *testing.T) {
-	server, addr, doneFn := createFakeServer(t)
+	server, conn, doneFn := createFakeServerConn(t)
 	defer doneFn()
-
-	// Now create a gRPC connection to the server.
-	conn := createConn(t, addr)
-	defer conn.Close()
 
 	// Finally create the OpenCensus stats exporter
 	se := createExporter(t, conn, defaultOpts)
@@ -528,7 +523,7 @@ type fakeMetricsServer struct {
 	stackdriverMetricDescriptors []*monitoringpb.CreateMetricDescriptorRequest
 }
 
-func createFakeServer(t *testing.T) (*fakeMetricsServer, string, func()) {
+func createFakeServerConn(t *testing.T) (*fakeMetricsServer, *grpc.ClientConn, func()) {
 	ln, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatalf("Failed to bind to an available address: %v", err)
@@ -539,12 +534,15 @@ func createFakeServer(t *testing.T) (*fakeMetricsServer, string, func()) {
 	go func() {
 		_ = srv.Serve(ln)
 	}()
+	_, serverPortStr, _ := net.SplitHostPort(ln.Addr().String())
+	conn := createConn(t, "localhost:"+serverPortStr)
+
 	stop := func() {
 		srv.Stop()
 		_ = ln.Close()
+		conn.Close()
 	}
-	_, serverPortStr, _ := net.SplitHostPort(ln.Addr().String())
-	return server, "localhost:" + serverPortStr, stop
+	return server, conn, stop
 }
 
 func (server *fakeMetricsServer) forEachStackdriverTimeSeries(fn func(sdt *monitoringpb.CreateTimeSeriesRequest)) {
