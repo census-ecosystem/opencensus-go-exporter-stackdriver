@@ -18,7 +18,7 @@ import (
 	"io/ioutil"
 )
 
-// ReadFromFile is a wrapper to read a file. It is meant for internal use for testing.
-func ReadFromFile(filename string) ([]byte, error) {
+// ReadFile is a wrapper to read a file. It is meant for internal use for testing.
+func ReadFile(filename string) ([]byte, error) {
 	return ioutil.ReadFile(filename)
 }
