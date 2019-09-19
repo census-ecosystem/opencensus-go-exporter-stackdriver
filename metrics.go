@@ -132,7 +132,7 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 	metricName := metric.Descriptor.Name
 	metricType := se.metricTypeFromProto(metricName)
 	metricLabelKeys := metric.Descriptor.LabelKeys
-	metricKind, _ := metricDescriptorTypeToMetricKind(metric)
+	metricKind, valueType := metricDescriptorTypeToMetricKind(metric)
 
 	if metricKind == googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED {
 		// ignore these Timeserieses. TODO [rghetia] log errors.
@@ -159,8 +159,10 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 				Type:   metricType,
 				Labels: labels,
 			},
-			Resource: resource,
-			Points:   sdPoints,
+			MetricKind: metricKind,
+			ValueType:  valueType,
+			Resource:   resource,
+			Points:     sdPoints,
 		})
 	}
 

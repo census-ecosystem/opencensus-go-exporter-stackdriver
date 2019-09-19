@@ -34,6 +34,18 @@ func cmpResource(got, want *monitoredrespb.MonitoredResource) string {
 	return cmp.Diff(got, want, cmpopts.IgnoreUnexported(monitoredrespb.MonitoredResource{}))
 }
 
+func requireTimeSeriesEqual(t *testing.T, got, want []*monitoringpb.TimeSeries) {
+	if len(got) != len(want) {
+		t.Fatalf("Unexpected slice len got: %d want: %d", len(got), len(want))
+	}
+	for i, g := range got {
+		w := want[i]
+		if !proto.Equal(g, w) {
+			t.Fatalf("Unexpected proto difference got: %s want: %s", proto.MarshalTextString(g), proto.MarshalTextString(w))
+		}
+	}
+}
+
 func requireTimeSeriesRequestEqual(t *testing.T, got, want []*monitoringpb.CreateTimeSeriesRequest) {
 	if len(got) != len(want) {
 		t.Fatalf("Unexpected slice len got: %d want: %d", len(got), len(want))

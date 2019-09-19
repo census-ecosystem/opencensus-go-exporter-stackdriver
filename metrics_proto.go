@@ -31,6 +31,7 @@ import (
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	"github.com/golang/protobuf/proto"
 	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
@@ -208,7 +209,7 @@ func (se *statsExporter) getResource(rsc *resourcepb.Resource, metric *metricspb
 	}
 	mappedRsc, ok := seenRscs[resource]
 	if !ok {
-		mappedRsc = se.o.MapResource(resourcepbToResource(resource))
+		mappedRsc = marshalMonitoredResource(se.o.MapResource(resourcepbToResource(resource)))
 		seenRscs[resource] = mappedRsc
 	}
 	return mappedRsc
@@ -561,4 +562,15 @@ func protoMetricDescriptorTypeToMetricKind(m *metricspb.Metric) (googlemetricpb.
 	default:
 		return googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED, googlemetricpb.MetricDescriptor_VALUE_TYPE_UNSPECIFIED
 	}
+}
+
+func marshalMonitoredResource(mr *monitoredrespb.MonitoredResource) *monitoredrespb.MonitoredResource {
+	mb, me := proto.Marshal(mr)
+	if me == nil {
+		return mr
+	}
+	mr.XXX_unrecognized = mb
+	mr.Type = ""
+	mr.Labels = nil
+	return mr
 }

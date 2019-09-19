@@ -115,9 +115,7 @@ func TestStatsAndMetricsEquivalence(t *testing.T) {
 		sctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(stss)
 		allTss, _ := protoMetricToTimeSeries(ctx, se, se.getResource(nil, metricPbs[i], seenResources), metricPbs[i])
 		pctreql := se.combineTimeSeriesToCreateTimeSeriesRequest(allTss)
-		if diff := cmpTSReqs(pctreql, sctreql); diff != "" {
-			t.Fatalf("TimeSeries Mismatch -FromMetricsPb +FromMetrics: %s", diff)
-		}
+		requireTimeSeriesRequestEqual(t, pctreql, sctreql)
 	}
 }
 
@@ -358,9 +356,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 	}
 
 	// The results should be equal now
-	if diff := cmpTSReqs(stackdriverTimeSeriesFromMetricsPb, stackdriverTimeSeriesFromMetrics); diff != "" {
-		t.Fatalf("Unexpected CreateTimeSeriesRequests -FromMetricsPb +FromMetrics: %s", diff)
-	}
+	requireTimeSeriesRequestEqual(t, stackdriverTimeSeriesFromMetricsPb, stackdriverTimeSeriesFromMetrics)
 
 	// Examining the metric descriptors too.
 	if diff := cmpMDReqs(stackdriverMetricDescriptorsFromMetricsPb, stackdriverMetricDescriptorsFromMetrics); diff != "" {

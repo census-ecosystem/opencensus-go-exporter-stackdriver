@@ -218,7 +218,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 	tests := []struct {
 		name          string
 		in            *metricspb.Metric
-		want          []*monitoringpb.CreateTimeSeriesRequest
+		want          *monitoringpb.CreateTimeSeriesRequest
 		wantErr       string
 		statsExporter *statsExporter
 	}{
@@ -262,38 +262,34 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 			statsExporter: &statsExporter{
 				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
 			},
-			want: []*monitoringpb.CreateTimeSeriesRequest{
-				{
-					Name: "projects/foo",
-					TimeSeries: []*monitoringpb.TimeSeries{
-						{
-							Metric: &googlemetricpb.Metric{
-								Type:   "custom.googleapis.com/opencensus/with_metric_descriptor",
-								Labels: map[string]string{},
-							},
-							Resource: &monitoredrespb.MonitoredResource{
-								Type: "global",
-							},
-							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
-							ValueType:  googlemetricpb.MetricDescriptor_DISTRIBUTION,
-							Points: []*monitoringpb.Point{
-								{
-									Interval: &monitoringpb.TimeInterval{
-										StartTime: startTimestamp,
-										EndTime:   endTimestamp,
-									},
-									Value: &monitoringpb.TypedValue{
-										Value: &monitoringpb.TypedValue_DistributionValue{
-											DistributionValue: &distributionpb.Distribution{
-												Count:                 1,
-												Mean:                  11.9,
-												SumOfSquaredDeviation: 0,
-												BucketCounts:          []int64{0, 1, 0, 0, 0},
-												BucketOptions: &distributionpb.Distribution_BucketOptions{
-													Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
-														ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
-															Bounds: []float64{0, 10, 20, 30, 40},
-														},
+			want: &monitoringpb.CreateTimeSeriesRequest{
+				Name: "projects/foo",
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &googlemetricpb.Metric{
+							Type:   "custom.googleapis.com/opencensus/with_metric_descriptor",
+							Labels: map[string]string{},
+						},
+						Resource: &monitoredrespb.MonitoredResource{
+							Type: "global",
+						},
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: startTimestamp,
+									EndTime:   endTimestamp,
+								},
+								Value: &monitoringpb.TypedValue{
+									Value: &monitoringpb.TypedValue_DistributionValue{
+										DistributionValue: &distributionpb.Distribution{
+											Count:                 1,
+											Mean:                  11.9,
+											SumOfSquaredDeviation: 0,
+											BucketCounts:          []int64{0, 1, 0, 0, 0},
+											BucketOptions: &distributionpb.Distribution_BucketOptions{
+												Options: &distributionpb.Distribution_BucketOptions_ExplicitBuckets{
+													ExplicitBuckets: &distributionpb.Distribution_BucketOptions_Explicit{
+														Bounds: []float64{0, 10, 20, 30, 40},
 													},
 												},
 											},
@@ -333,30 +329,26 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 			statsExporter: &statsExporter{
 				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
 			},
-			want: []*monitoringpb.CreateTimeSeriesRequest{
-				{
-					Name: "projects/foo",
-					TimeSeries: []*monitoringpb.TimeSeries{
-						{
-							Metric: &googlemetricpb.Metric{
-								Type:   "custom.googleapis.com/opencensus/with_metric_descriptor_2",
-								Labels: map[string]string{"key3": "val3"},
-							},
-							Resource: &monitoredrespb.MonitoredResource{
-								Type: "global",
-							},
-							MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
-							ValueType:  googlemetricpb.MetricDescriptor_DISTRIBUTION,
-							Points: []*monitoringpb.Point{
-								{
-									Interval: &monitoringpb.TimeInterval{
-										StartTime: startTimestamp,
-										EndTime:   endTimestamp,
-									},
-									Value: &monitoringpb.TypedValue{
-										Value: &monitoringpb.TypedValue_DoubleValue{
-											DoubleValue: 25.0,
-										},
+			want: &monitoringpb.CreateTimeSeriesRequest{
+				Name: "projects/foo",
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &googlemetricpb.Metric{
+							Type:   "custom.googleapis.com/opencensus/with_metric_descriptor_2",
+							Labels: map[string]string{"key3": "val3"},
+						},
+						Resource: &monitoredrespb.MonitoredResource{
+							Type: "global",
+						},
+						Points: []*monitoringpb.Point{
+							{
+								Interval: &monitoringpb.TimeInterval{
+									StartTime: startTimestamp,
+									EndTime:   endTimestamp,
+								},
+								Value: &monitoringpb.TypedValue{
+									Value: &monitoringpb.TypedValue_DoubleValue{
+										DoubleValue: 25.0,
 									},
 								},
 							},
@@ -369,7 +361,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
 
-	for i, tt := range tests {
+	for _, tt := range tests {
 		se := tt.statsExporter
 		if se == nil {
 			se = new(statsExporter)
@@ -386,12 +378,9 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 			continue
 		}
 
-		got := se.combineTimeSeriesToCreateTimeSeriesRequest(allTss)
 		// Our saving grace is serialization equality since some
 		// unexported fields could be present in the various values.
-		if diff := cmpTSReqs(got, tt.want); diff != "" {
-			t.Fatalf("Test %d failed. Unexpected CreateTimeSeriesRequests -got +want: %s", i, diff)
-		}
+		requireTimeSeriesEqual(t, allTss, tt.want.GetTimeSeries())
 	}
 }
 
@@ -578,9 +567,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 		got := se.combineTimeSeriesToCreateTimeSeriesRequest(allTss)
 		// Our saving grace is serialization equality since some
 		// unexported fields could be present in the various values.
-		if diff := cmpTSReqs(got, tt.want); diff != "" {
-			t.Fatalf("Test %d failed. Unexpected CreateTimeSeriesRequests -got +want: %s", i, diff)
-		}
+		requireTimeSeriesRequestEqual(t, got, tt.want)
 	}
 
 	if len(seenResources) != 2 {
