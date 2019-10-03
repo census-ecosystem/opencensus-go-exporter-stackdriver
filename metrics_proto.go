@@ -236,8 +236,7 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, mappedRsc 
 		mb.recordDroppedTimeseries(len(metric.GetTimeseries()), errNilMetricOrMetricDescriptor)
 	}
 
-	metricName := metric.GetMetricDescriptor().GetName()
-	metricType := se.metricTypeFromProto(metricName)
+	metricType := se.metricTypeFromProto(metric.GetMetricDescriptor().GetName())
 	metricLabelKeys := metric.GetMetricDescriptor().GetLabelKeys()
 	metricKind, valueType := protoMetricDescriptorTypeToMetricKind(metric)
 	labelKeys := make([]string, 0, len(metricLabelKeys))
@@ -246,6 +245,11 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, mappedRsc 
 	}
 
 	for _, protoTimeSeries := range metric.Timeseries {
+		if len(protoTimeSeries.Points) == 0 {
+			// No points to send just move forward.
+			continue
+		}
+
 		sdPoints, err := se.protoTimeSeriesToMonitoringPoints(protoTimeSeries, metricKind)
 		if err != nil {
 			mb.recordDroppedTimeseries(1, err)
@@ -273,15 +277,19 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, mappedRsc 
 }
 
 func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []string, labelValues []*metricspb.LabelValue) (map[string]string, error) {
+	if len(labelKeys) != len(labelValues) {
+		return nil, fmt.Errorf("length mismatch: len(labelKeys)=%d len(labelValues)=%d", len(labelKeys), len(labelValues))
+	}
+
+	if len(defaults)+len(labelKeys) == 0 {
+		// No labels for this metric
+		return nil, nil
+	}
+
 	labels := make(map[string]string)
 	// Fill in the defaults firstly, irrespective of if the labelKeys and labelValues are mismatched.
 	for key, label := range defaults {
 		labels[key] = label.val
-	}
-
-	// Perform this sanity check now.
-	if len(labelKeys) != len(labelValues) {
-		return labels, fmt.Errorf("length mismatch: len(labelKeys)=%d len(labelValues)=%d", len(labelKeys), len(labelValues))
 	}
 
 	for i, labelKey := range labelKeys {
@@ -296,19 +304,13 @@ func labelsPerTimeSeries(defaults map[string]labelValue, labelKeys []string, lab
 }
 
 func (se *statsExporter) createMetricDescriptorWithTimeout(ctx context.Context, metric *metricspb.Metric) error {
-	ctx, cancel := newContextWithTimeout(ctx, se.o.Timeout)
-	defer cancel()
-
-	return se.protoCreateMetricDescriptor(ctx, metric)
-}
-
-// createMetricDescriptor creates a metric descriptor from the OpenCensus proto metric
-// and then creates it remotely using Stackdriver's API.
-func (se *statsExporter) protoCreateMetricDescriptor(ctx context.Context, metric *metricspb.Metric) error {
 	// Skip create metric descriptor if configured
 	if se.o.SkipCMD {
 		return nil
 	}
+
+	ctx, cancel := newContextWithTimeout(ctx, se.o.Timeout)
+	defer cancel()
 
 	se.protoMu.Lock()
 	defer se.protoMu.Unlock()
@@ -338,7 +340,8 @@ func (se *statsExporter) protoCreateMetricDescriptor(ctx context.Context, metric
 	return nil
 }
 
-func (se *statsExporter) protoTimeSeriesToMonitoringPoints(ts *metricspb.TimeSeries, metricKind googlemetricpb.MetricDescriptor_MetricKind) (sptl []*monitoringpb.Point, err error) {
+func (se *statsExporter) protoTimeSeriesToMonitoringPoints(ts *metricspb.TimeSeries, metricKind googlemetricpb.MetricDescriptor_MetricKind) ([]*monitoringpb.Point, error) {
+	sptl := make([]*monitoringpb.Point, 0, len(ts.Points))
 	for _, pt := range ts.Points {
 		// If we have a last value aggregation point i.e. MetricDescriptor_GAUGE
 		// StartTime should be nil.
@@ -346,7 +349,6 @@ func (se *statsExporter) protoTimeSeriesToMonitoringPoints(ts *metricspb.TimeSer
 		if metricKind == googlemetricpb.MetricDescriptor_GAUGE {
 			startTime = nil
 		}
-
 		spt, err := fromProtoPoint(startTime, pt)
 		if err != nil {
 			return nil, err

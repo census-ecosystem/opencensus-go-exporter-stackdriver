@@ -168,15 +168,19 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 }
 
 func metricLabelsToTsLabels(defaults map[string]labelValue, labelKeys []metricdata.LabelKey, labelValues []metricdata.LabelValue) (map[string]string, error) {
+	// Perform this sanity check now.
+	if len(labelKeys) != len(labelValues) {
+		return nil, fmt.Errorf("length mismatch: len(labelKeys)=%d len(labelValues)=%d", len(labelKeys), len(labelValues))
+	}
+
+	if len(defaults)+len(labelKeys) == 0 {
+		return nil, nil
+	}
+
 	labels := make(map[string]string)
 	// Fill in the defaults firstly, irrespective of if the labelKeys and labelValues are mismatched.
 	for key, label := range defaults {
 		labels[sanitize(key)] = label.val
-	}
-
-	// Perform this sanity check now.
-	if len(labelKeys) != len(labelValues) {
-		return labels, fmt.Errorf("length mismatch: len(labelKeys)=%d len(labelValues)=%d", len(labelKeys), len(labelValues))
 	}
 
 	for i, labelKey := range labelKeys {
