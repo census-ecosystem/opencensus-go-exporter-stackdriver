@@ -145,7 +145,7 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 						{
 							Metric: &googlemetricpb.Metric{
 								Type:   "custom.googleapis.com/opencensus/with_metric_descriptor",
-								Labels: map[string]string{},
+								Labels: nil,
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "global",
@@ -229,7 +229,7 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 						{
 							Metric: &googlemetricpb.Metric{
 								Type:   "custom.googleapis.com/opencensus/with_metric_descriptor",
-								Labels: map[string]string{},
+								Labels: nil,
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "global",

@@ -597,11 +597,12 @@ func newLabelDescriptors(defaults map[string]labelValue, keys []tag.Key) []*labe
 }
 
 func (e *statsExporter) createMetricDescriptor(ctx context.Context, md *metric.MetricDescriptor) error {
+	ctx, cancel := newContextWithTimeout(ctx, e.o.Timeout)
+	defer cancel()
 	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
 		Name:             fmt.Sprintf("projects/%s", e.o.ProjectID),
 		MetricDescriptor: md,
 	}
-
 	_, err := createMetricDescriptor(ctx, e.c, cmrdesc)
 	return err
 }

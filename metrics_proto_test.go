@@ -269,7 +269,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 						{
 							Metric: &googlemetricpb.Metric{
 								Type:   "custom.googleapis.com/opencensus/with_metric_descriptor",
-								Labels: map[string]string{},
+								Labels: nil,
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "global",
@@ -455,7 +455,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 						{
 							Metric: &googlemetricpb.Metric{
 								Type:   "custom.googleapis.com/opencensus/with_container_resource",
-								Labels: map[string]string{},
+								Labels: nil,
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "k8s_container",
@@ -527,7 +527,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 						{
 							Metric: &googlemetricpb.Metric{
 								Type:   "custom.googleapis.com/opencensus/with_gce_resource",
-								Labels: map[string]string{},
+								Labels: nil,
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "gce_instance",
