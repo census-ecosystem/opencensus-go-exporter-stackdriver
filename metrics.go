@@ -126,8 +126,18 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 	if metric == nil {
 		return nil, errNilMetricOrMetricDescriptor
 	}
-
-	resource := se.metricRscToMpbRsc(metric.Resource)
+	var resource *monitoredrespb.MonitoredResource
+	if get := se.o.ResourceByDescriptor; get != nil {
+		mr := get(&metric.Descriptor)
+		// TODO(rghetia): optimize this. It is inefficient to convert this for all metrics.
+		resource = convertMonitoredResourceToPB(mr)
+		if resource.Type == "" {
+			resource.Type = "global"
+			resource.Labels = nil
+		}
+	} else {
+		resource = se.metricRscToMpbRsc(metric.Resource)
+	}
 
 	metricName := metric.Descriptor.Name
 	metricType := se.metricTypeFromProto(metricName)

@@ -255,6 +255,17 @@ type Options struct {
 	// to Stackdriver Monitoring. This is only used for Proto metrics export
 	// for now. The minimum number of workers is 1.
 	NumberOfWorkers int
+
+	// ResourceByDescriptor may be provided to supply monitored resource dynamically
+	// based on the metric Descriptor. Most users will not need to set this,
+	// but should instead set ResourceDetector.
+	//
+	// The MonitoredResource and ResourceDetector fields are ignored if this
+	// field is set to a non-nil value.
+	//
+	// If the func set to this field does not return valid resource even for one
+	// metric then it will result into an error for the entire CreateTimeSeries request.
+	ResourceByDescriptor func(*metricdata.Descriptor) monitoredresource.Interface
 }
 
 const defaultTimeout = 5 * time.Second

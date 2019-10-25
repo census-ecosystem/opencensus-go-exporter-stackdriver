@@ -31,6 +31,7 @@ import (
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/resource"
 	"go.opencensus.io/trace"
@@ -557,5 +558,240 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 		if diff := cmpPoint(mpt, tt.want); diff != "" {
 			t.Fatalf("Test %d failed. Unexpected Point -got +want: %s", i, diff)
 		}
+	}
+}
+
+func TestGetMonitorResource(t *testing.T) {
+	startTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000090,
+	}
+	startTime, _ := ptypes.Timestamp(startTimestamp)
+	endTimestamp := &timestamp.Timestamp{
+		Seconds: 1543160298,
+		Nanos:   100000997,
+	}
+	endTime, _ := ptypes.Timestamp(endTimestamp)
+
+	tests := []struct {
+		in      *metricdata.Metric
+		want    []*monitoringpb.CreateTimeSeriesRequest
+		wantErr string
+	}{
+		{
+			in: &metricdata.Metric{
+				Descriptor: metricdata.Descriptor{
+					Name:        "custom_resource_one",
+					Description: "This is a test",
+					Unit:        metricdata.UnitBytes,
+					Type:        metricdata.TypeCumulativeInt64,
+				},
+				Resource: nil,
+				TimeSeries: []*metricdata.TimeSeries{
+					{
+						StartTime: startTime,
+						Points: []metricdata.Point{
+							{
+								Time:  endTime,
+								Value: int64(5),
+							},
+						},
+					},
+				},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/foo",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type:   "custom.googleapis.com/opencensus/custom_resource_one",
+								Labels: nil,
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "one",
+								Labels: map[string]string{
+									"k11": "v11",
+									"k12": "v12",
+								},
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: startTimestamp,
+										EndTime:   endTimestamp,
+									},
+									Value: &monitoringpb.TypedValue{
+										Value: &monitoringpb.TypedValue_Int64Value{
+											Int64Value: 5,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			in: &metricdata.Metric{
+				Descriptor: metricdata.Descriptor{
+					Name:        "custom_resource_two",
+					Description: "This is a test",
+					Unit:        metricdata.UnitBytes,
+					Type:        metricdata.TypeCumulativeInt64,
+				},
+				Resource: nil,
+				TimeSeries: []*metricdata.TimeSeries{
+					{
+						StartTime: startTime,
+						Points: []metricdata.Point{
+							{
+								Time:  endTime,
+								Value: int64(5),
+							},
+						},
+					},
+				},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/foo",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type:   "custom.googleapis.com/opencensus/custom_resource_two",
+								Labels: nil,
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "two",
+								Labels: map[string]string{
+									"k21": "v21",
+									"k22": "v22",
+								},
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: startTimestamp,
+										EndTime:   endTimestamp,
+									},
+									Value: &monitoringpb.TypedValue{
+										Value: &monitoringpb.TypedValue_Int64Value{
+											Int64Value: 5,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			in: &metricdata.Metric{
+				Descriptor: metricdata.Descriptor{
+					Name:        "custom_resource_other",
+					Description: "This is a test",
+					Unit:        metricdata.UnitBytes,
+					Type:        metricdata.TypeCumulativeInt64,
+				},
+				Resource: nil,
+				TimeSeries: []*metricdata.TimeSeries{
+					{
+						StartTime: startTime,
+						Points: []metricdata.Point{
+							{
+								Time:  endTime,
+								Value: int64(5),
+							},
+						},
+					},
+				},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/foo",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type:   "custom.googleapis.com/opencensus/custom_resource_other",
+								Labels: nil,
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "global",
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: startTimestamp,
+										EndTime:   endTimestamp,
+									},
+									Value: &monitoringpb.TypedValue{
+										Value: &monitoringpb.TypedValue_Int64Value{
+											Int64Value: 5,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	var se = &statsExporter{
+		o: Options{
+			ProjectID:            "foo",
+			ResourceByDescriptor: testGetMonitoringResource,
+		},
+	}
+
+	for i, tt := range tests {
+		tsl, err := se.metricToMpbTs(context.Background(), tt.in)
+		if tt.wantErr != "" {
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("#%d: unmatched error. Got\n\t%v\nWant\n\t%v", i, err, tt.wantErr)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("#%d: unexpected error: %v", i, err)
+			continue
+		}
+
+		got := se.combineTimeSeriesToCreateTimeSeriesRequest(tsl)
+		// Our saving grace is serialization equality since some
+		// unexported fields could be present in the various values.
+		if diff := cmpTSReqs(got, tt.want); diff != "" {
+			t.Fatalf("Test %d failed. Unexpected CreateTimeSeriesRequests -got +want: %s", i, diff)
+		}
+	}
+}
+
+type customResource struct {
+	rt string
+	rm map[string]string
+}
+
+var _ monitoredresource.Interface = customResource{}
+
+func (cr customResource) MonitoredResource() (resType string, labels map[string]string) {
+	return cr.rt, cr.rm
+}
+
+var crOne = customResource{rt: "one", rm: map[string]string{"k11": "v11", "k12": "v12"}}
+var crTwo = customResource{rt: "two", rm: map[string]string{"k21": "v21", "k22": "v22"}}
+var crEmpty = customResource{rt: ""}
+
+func testGetMonitoringResource(md *metricdata.Descriptor) monitoredresource.Interface {
+	switch md.Name {
+	case "custom_resource_one":
+		return crOne
+	case "custom_resource_two":
+		return crTwo
+	default:
+		return crEmpty
 	}
 }
