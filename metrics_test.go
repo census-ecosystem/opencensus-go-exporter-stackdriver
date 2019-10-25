@@ -585,6 +585,14 @@ func TestGetMonitorResource(t *testing.T) {
 					Description: "This is a test",
 					Unit:        metricdata.UnitBytes,
 					Type:        metricdata.TypeCumulativeInt64,
+					LabelKeys: []metricdata.LabelKey{
+						{
+							Key: "k11",
+						},
+						{
+							Key: "k12",
+						},
+					},
 				},
 				Resource: nil,
 				TimeSeries: []*metricdata.TimeSeries{
@@ -596,6 +604,14 @@ func TestGetMonitorResource(t *testing.T) {
 								Value: int64(5),
 							},
 						},
+						LabelValues: []metricdata.LabelValue{
+							{
+								Value: "v11",
+							},
+							{
+								Value: "v12",
+							},
+						},
 					},
 				},
 			},
@@ -605,14 +621,15 @@ func TestGetMonitorResource(t *testing.T) {
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &googlemetricpb.Metric{
-								Type:   "custom.googleapis.com/opencensus/custom_resource_one",
-								Labels: nil,
+								Type: "custom.googleapis.com/opencensus/custom_resource_one",
+								Labels: map[string]string{
+									"k12": "v12",
+								},
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "one",
 								Labels: map[string]string{
 									"k11": "v11",
-									"k12": "v12",
 								},
 							},
 							Points: []*monitoringpb.Point{
@@ -640,6 +657,14 @@ func TestGetMonitorResource(t *testing.T) {
 					Description: "This is a test",
 					Unit:        metricdata.UnitBytes,
 					Type:        metricdata.TypeCumulativeInt64,
+					LabelKeys: []metricdata.LabelKey{
+						{
+							Key: "k21",
+						},
+						{
+							Key: "k22",
+						},
+					},
 				},
 				Resource: nil,
 				TimeSeries: []*metricdata.TimeSeries{
@@ -651,6 +676,14 @@ func TestGetMonitorResource(t *testing.T) {
 								Value: int64(5),
 							},
 						},
+						LabelValues: []metricdata.LabelValue{
+							{
+								Value: "v21",
+							},
+							{
+								Value: "v22",
+							},
+						},
 					},
 				},
 			},
@@ -660,13 +693,14 @@ func TestGetMonitorResource(t *testing.T) {
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &googlemetricpb.Metric{
-								Type:   "custom.googleapis.com/opencensus/custom_resource_two",
-								Labels: nil,
+								Type: "custom.googleapis.com/opencensus/custom_resource_two",
+								Labels: map[string]string{
+									"k21": "v21",
+								},
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "two",
 								Labels: map[string]string{
-									"k21": "v21",
 									"k22": "v22",
 								},
 							},
@@ -695,6 +729,14 @@ func TestGetMonitorResource(t *testing.T) {
 					Description: "This is a test",
 					Unit:        metricdata.UnitBytes,
 					Type:        metricdata.TypeCumulativeInt64,
+					LabelKeys: []metricdata.LabelKey{
+						{
+							Key: "k31",
+						},
+						{
+							Key: "k32",
+						},
+					},
 				},
 				Resource: nil,
 				TimeSeries: []*metricdata.TimeSeries{
@@ -706,6 +748,14 @@ func TestGetMonitorResource(t *testing.T) {
 								Value: int64(5),
 							},
 						},
+						LabelValues: []metricdata.LabelValue{
+							{
+								Value: "v31",
+							},
+							{
+								Value: "v32",
+							},
+						},
 					},
 				},
 			},
@@ -715,8 +765,11 @@ func TestGetMonitorResource(t *testing.T) {
 					TimeSeries: []*monitoringpb.TimeSeries{
 						{
 							Metric: &googlemetricpb.Metric{
-								Type:   "custom.googleapis.com/opencensus/custom_resource_other",
-								Labels: nil,
+								Type: "custom.googleapis.com/opencensus/custom_resource_other",
+								Labels: map[string]string{
+									"k31": "v31",
+									"k32": "v32",
+								},
 							},
 							Resource: &monitoredrespb.MonitoredResource{
 								Type: "global",
@@ -775,23 +828,45 @@ type customResource struct {
 	rm map[string]string
 }
 
-var _ monitoredresource.Interface = customResource{}
+var _ monitoredresource.Interface = (*customResource)(nil)
 
-func (cr customResource) MonitoredResource() (resType string, labels map[string]string) {
+func (cr *customResource) MonitoredResource() (resType string, labels map[string]string) {
 	return cr.rt, cr.rm
 }
 
-var crOne = customResource{rt: "one", rm: map[string]string{"k11": "v11", "k12": "v12"}}
-var crTwo = customResource{rt: "two", rm: map[string]string{"k21": "v21", "k22": "v22"}}
-var crEmpty = customResource{rt: ""}
+var crEmpty = &customResource{rt: ""}
 
-func testGetMonitoringResource(md *metricdata.Descriptor) monitoredresource.Interface {
+func testGetMonitoringResource(md *metricdata.Descriptor, labels map[string]string) (map[string]string, monitoredresource.Interface) {
 	switch md.Name {
 	case "custom_resource_one":
-		return crOne
+		cr := &customResource{
+			rt: "one",
+			rm: map[string]string{
+				"k11": labels["k11"],
+			},
+		}
+		newLabels := removeLabel(labels, cr.rm)
+		return newLabels, cr
 	case "custom_resource_two":
-		return crTwo
+		cr := &customResource{
+			rt: "two",
+			rm: map[string]string{
+				"k22": labels["k22"],
+			},
+		}
+		newLabels := removeLabel(labels, cr.rm)
+		return newLabels, cr
 	default:
-		return crEmpty
+		return labels, crEmpty
 	}
+}
+
+func removeLabel(m map[string]string, remove map[string]string) map[string]string {
+	newM := make(map[string]string)
+	for k, v := range m {
+		if _, ok := remove[k]; !ok {
+			newM[k] = v
+		}
+	}
+	return newM
 }

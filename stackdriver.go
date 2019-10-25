@@ -263,9 +263,15 @@ type Options struct {
 	// The MonitoredResource and ResourceDetector fields are ignored if this
 	// field is set to a non-nil value.
 	//
+	// The ResourceByDescriptor is called to derive monitored resources from
+	// metric.Descriptor and label map associated with the metric. If any label is
+	// used for the derived resource then it will be removed the label map.
+	// Returned label map would then be a subset of the original map.
+	//
 	// If the func set to this field does not return valid resource even for one
-	// metric then it will result into an error for the entire CreateTimeSeries request.
-	ResourceByDescriptor func(*metricdata.Descriptor) monitoredresource.Interface
+	// time-series then it will result into an error for the entire CreateTimeSeries request
+	// which may contain more than one time-series.
+	ResourceByDescriptor func(*metricdata.Descriptor, map[string]string) (map[string]string, monitoredresource.Interface)
 }
 
 const defaultTimeout = 5 * time.Second
