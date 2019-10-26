@@ -561,7 +561,7 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 	}
 }
 
-func TestGetMonitorResource(t *testing.T) {
+func TestResourceByDescriptor(t *testing.T) {
 	startTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
 		Nanos:   100000090,
@@ -797,7 +797,7 @@ func TestGetMonitorResource(t *testing.T) {
 	var se = &statsExporter{
 		o: Options{
 			ProjectID:            "foo",
-			ResourceByDescriptor: testGetMonitoringResource,
+			ResourceByDescriptor: getResourceByDescriptor,
 		},
 	}
 
@@ -836,7 +836,7 @@ func (cr *customResource) MonitoredResource() (resType string, labels map[string
 
 var crEmpty = &customResource{rt: ""}
 
-func testGetMonitoringResource(md *metricdata.Descriptor, labels map[string]string) (map[string]string, monitoredresource.Interface) {
+func getResourceByDescriptor(md *metricdata.Descriptor, labels map[string]string) (map[string]string, monitoredresource.Interface) {
 	switch md.Name {
 	case "custom_resource_one":
 		cr := &customResource{

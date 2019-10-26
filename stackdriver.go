@@ -264,9 +264,10 @@ type Options struct {
 	// field is set to a non-nil value.
 	//
 	// The ResourceByDescriptor is called to derive monitored resources from
-	// metric.Descriptor and label map associated with the metric. If any label is
-	// used for the derived resource then it will be removed the label map.
-	// Returned label map would then be a subset of the original map.
+	// metric.Descriptor and the label map associated with the time-series.
+	// If any label is used for the derived resource then it will be removed
+	// from the label map. The remaining labels in the map are returned to
+	// be used with the time-series.
 	//
 	// If the func set to this field does not return valid resource even for one
 	// time-series then it will result into an error for the entire CreateTimeSeries request
