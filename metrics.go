@@ -34,6 +34,7 @@ import (
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/resource"
 )
@@ -154,12 +155,26 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 			// TODO: (@rghetia) perhaps log this error from labels extraction, if non-nil.
 			continue
 		}
+
+		var rsc *monitoredrespb.MonitoredResource
+		var mr monitoredresource.Interface
+		if se.o.ResourceByDescriptor != nil {
+			labels, mr = se.o.ResourceByDescriptor(&metric.Descriptor, labels)
+			// TODO(rghetia): optimize this. It is inefficient to convert this for all metrics.
+			rsc = convertMonitoredResourceToPB(mr)
+			if rsc.Type == "" {
+				rsc.Type = "global"
+				rsc.Labels = nil
+			}
+		} else {
+			rsc = resource
+		}
 		timeSeries = append(timeSeries, &monitoringpb.TimeSeries{
 			Metric: &googlemetricpb.Metric{
 				Type:   metricType,
 				Labels: labels,
 			},
-			Resource: resource,
+			Resource: rsc,
 			Points:   sdPoints,
 		})
 	}
