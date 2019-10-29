@@ -158,8 +158,8 @@ func (se *statsExporter) metricToMpbTs(ctx context.Context, metric *metricdata.M
 
 		var rsc *monitoredrespb.MonitoredResource
 		var mr monitoredresource.Interface
-		if get := se.o.ResourceByDescriptor; get != nil {
-			labels, mr = get(&metric.Descriptor, labels)
+		if se.o.ResourceByDescriptor != nil {
+			labels, mr = se.o.ResourceByDescriptor(&metric.Descriptor, labels)
 			// TODO(rghetia): optimize this. It is inefficient to convert this for all metrics.
 			rsc = convertMonitoredResourceToPB(mr)
 			if rsc.Type == "" {
