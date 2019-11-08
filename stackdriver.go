@@ -186,9 +186,8 @@ type Options struct {
 	// conversions from auto-detected resources to well-known Stackdriver monitored resources.
 	MapResource func(*resource.Resource) *monitoredrespb.MonitoredResource
 
-	// MetricPrefix overrides the prefix of a Stackdriver metric display names.
-	// Optional. If unset defaults to "OpenCensus/".
-	// Provide GetMetricPrefix to change the prefix of the metric.
+	// MetricPrefix overrides the prefix of a Stackdriver metric names.
+	// Optional. If unset defaults to "custom.googleapis.com/opencensus/".
 	// If GetMetricPrefix is non-nil, this option is ignored.
 	MetricPrefix string
 
@@ -202,6 +201,7 @@ type Options struct {
 	//   "custom.googleapis.com/opencensus/" + view.Name
 	//
 	// See: https://cloud.google.com/monitoring/api/ref_v3/rest/v3/projects.metricDescriptors#MetricDescriptor
+	// Depreacted. Use GetMetricPrefix instead.
 	GetMetricType func(view *view.View) string
 
 	// GetMetricPrefix allows customizing the metric prefix for the given metric name.
