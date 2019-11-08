@@ -1005,12 +1005,57 @@ func TestMetricPrefix(t *testing.T) {
 			want: "custom.googleapis.com/opencensus/prefix/my_metric",
 		},
 		{
+			name: "Has a prefix without `/` ending but prefix doesn't have a domain",
+			in:   "my_metric",
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo", MetricPrefix: "prefix"},
+			},
+			want: "custom.googleapis.com/opencensus/prefix/my_metric",
+		},
+		{
 			name: "Has a prefix and prefix has a domain",
 			in:   "my_metric",
 			statsExporter: &statsExporter{
 				o: Options{ProjectID: "foo", MetricPrefix: "appengine.googleapis.com/"},
 			},
 			want: "appengine.googleapis.com/my_metric",
+		},
+		{
+			name: "Has a GetMetricPrefix func but result doesn't have a domain",
+			in:   "my_metric",
+			statsExporter: &statsExporter{
+				o: Options{
+					ProjectID: "foo",
+					GetMetricPrefix: func(name string) string {
+						return "prefix"
+					}},
+			},
+			want: "custom.googleapis.com/opencensus/prefix/my_metric",
+		},
+		{
+			name: "Has a GetMetricPrefix func and result has have a domain",
+			in:   "my_metric",
+			statsExporter: &statsExporter{
+				o: Options{
+					ProjectID: "foo",
+					GetMetricPrefix: func(name string) string {
+						return "knative.dev/serving"
+					}},
+			},
+			want: "knative.dev/serving/my_metric",
+		},
+		{
+			name: "Has both a prefix and GetMetricPrefix func",
+			in:   "my_metric",
+			statsExporter: &statsExporter{
+				o: Options{
+					ProjectID:    "foo",
+					MetricPrefix: "appengine.googleapis.com/",
+					GetMetricPrefix: func(name string) string {
+						return "knative.dev/serving"
+					}},
+			},
+			want: "knative.dev/serving/my_metric",
 		},
 	}
 
