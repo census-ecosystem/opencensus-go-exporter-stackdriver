@@ -94,7 +94,6 @@ func TestMetricsWithPrefix(t *testing.T) {
 	metricName := "ocagent.io"
 	saveMetricType := tc.outTSR[0].TimeSeries[0].Metric.Type
 	saveMDRName := tc.outMDR[0].MetricDescriptor.Name
-	saveMDRDispName := tc.outMDR[0].MetricDescriptor.DisplayName
 
 	for _, prefix := range prefixes {
 		opts := defaultOpts
@@ -104,7 +103,6 @@ func TestMetricsWithPrefix(t *testing.T) {
 		mt := strings.Replace(saveMetricType, metricName, (prefix + metricName), -1)
 		tc.outMDR[0].MetricDescriptor.Name = strings.Replace(saveMDRName, metricName, (prefix + metricName), -1)
 		tc.outMDR[0].MetricDescriptor.Type = mt
-		tc.outMDR[0].MetricDescriptor.DisplayName = strings.Replace(saveMDRDispName, "OpenCensus/"+metricName, (prefix + metricName), -1)
 
 		tc.outTSR[0].TimeSeries[0].Metric.Type = mt
 
@@ -125,7 +123,6 @@ func TestMetricsWithPrefixWithDomain(t *testing.T) {
 	metricName := "ocagent.io"
 	saveMetricType := strings.Replace(tc.outTSR[0].TimeSeries[0].Metric.Type, "custom.googleapis.com/opencensus/", "", -1)
 	saveMDRName := strings.Replace(tc.outMDR[0].MetricDescriptor.Name, "custom.googleapis.com/opencensus/", "", -1)
-	saveMDRDispName := tc.outMDR[0].MetricDescriptor.DisplayName
 
 	for _, prefix := range prefixes {
 		opts := defaultOpts
@@ -135,7 +132,6 @@ func TestMetricsWithPrefixWithDomain(t *testing.T) {
 		mt := strings.Replace(saveMetricType, metricName, (prefix + metricName), -1)
 		tc.outMDR[0].MetricDescriptor.Name = strings.Replace(saveMDRName, metricName, (prefix + metricName), -1)
 		tc.outMDR[0].MetricDescriptor.Type = mt
-		tc.outMDR[0].MetricDescriptor.DisplayName = strings.Replace(saveMDRDispName, "OpenCensus/"+metricName, (prefix + metricName), -1)
 
 		tc.outTSR[0].TimeSeries[0].Metric.Type = mt
 
