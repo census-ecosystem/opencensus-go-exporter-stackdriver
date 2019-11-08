@@ -1033,7 +1033,7 @@ func TestMetricPrefix(t *testing.T) {
 			want: "custom.googleapis.com/opencensus/prefix/my_metric",
 		},
 		{
-			name: "Has a GetMetricPrefix func and result has have a domain",
+			name: "Has a GetMetricPrefix func and result has a domain",
 			in:   "my_metric",
 			statsExporter: &statsExporter{
 				o: Options{
