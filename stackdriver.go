@@ -61,6 +61,7 @@ import (
 	traceapi "cloud.google.com/go/trace/apiv2"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/resource"
+	"go.opencensus.io/resource/resourcekeys"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
 	"golang.org/x/oauth2/google"
@@ -347,12 +348,14 @@ func NewExporter(o Options) (*Exporter, error) {
 		// Populate internal resource labels for defaulting project_id, location, and
 		// generic resource labels of applicable monitored resources.
 		res.Labels[stackdriverProjectID] = o.ProjectID
-		res.Labels[stackdriverLocation] = o.Location
+		res.Labels[resourcekeys.CloudKeyZone] = o.Location
 		res.Labels[stackdriverGenericTaskNamespace] = "default"
 		res.Labels[stackdriverGenericTaskJob] = path.Base(os.Args[0])
 		res.Labels[stackdriverGenericTaskID] = getTaskValue()
+		log.Printf("OpenCensus detected resource: %v", res)
 
 		o.Resource = o.MapResource(res)
+		log.Printf("OpenCensus using monitored resource: %v", o.Resource)
 	}
 	if o.MetricPrefix != "" && !strings.HasSuffix(o.MetricPrefix, "/") {
 		o.MetricPrefix = o.MetricPrefix + "/"

@@ -164,7 +164,7 @@ func TestDefaultMapResource(t *testing.T) {
 				Type: "",
 				Labels: map[string]string{
 					stackdriverProjectID:            "proj1",
-					stackdriverLocation:             "zone1",
+					resourcekeys.CloudKeyZone:       "zone1",
 					stackdriverGenericTaskNamespace: "namespace1",
 					stackdriverGenericTaskJob:       "job1",
 					stackdriverGenericTaskID:        "task_id1",
