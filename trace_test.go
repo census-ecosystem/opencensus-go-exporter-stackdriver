@@ -66,10 +66,11 @@ func TestBundling(t *testing.T) {
 
 func TestBundling_ConcurrentExports(t *testing.T) {
 	workers := 2
+	spansPerWorker := 10
 	delay := 2 * time.Second
 	exporter := newTraceExporterWithClient(Options{
 		ProjectID:            "fakeProjectID",
-		BundleCountThreshold: 10,
+		BundleCountThreshold: spansPerWorker,
 		BundleDelayThreshold: delay,
 		NumberOfWorkers:      workers,
 	}, nil)
@@ -78,7 +79,11 @@ func TestBundling_ConcurrentExports(t *testing.T) {
 	waitCh := make(chan struct{})
 	wg.Add(workers)
 
+	exportedSpans := make(map[string]bool) // maintain a collection of the spans exported
 	exporter.uploadFn = func(spans []*tracepb.Span) {
+		for _, s := range spans {
+			exportedSpans[s.SpanId] = true
+		}
 		wg.Done()
 
 		// Don't complete the function until the WaitGroup is done.
@@ -88,10 +93,13 @@ func TestBundling_ConcurrentExports(t *testing.T) {
 	}
 	trace.RegisterExporter(exporter)
 
+	totalSpans := workers * spansPerWorker
+	var expectedSpanIDs []string
 	go func() {
 		// Release enough spans to form two bundles
-		for i := 0; i < 20; i++ {
+		for i := 0; i < totalSpans; i++ {
 			_, span := trace.StartSpan(context.Background(), "span", trace.WithSampler(trace.AlwaysSample()))
+			expectedSpanIDs = append(expectedSpanIDs, span.SpanContext().SpanID.String())
 			span.End()
 		}
 
@@ -104,6 +112,16 @@ func TestBundling_ConcurrentExports(t *testing.T) {
 	case <-waitCh:
 	case <-time.After(delay / 2): // fail before a time-based flush is triggered
 		t.Fatal("timed out waiting for concurrent uploads")
+	}
+
+	// all the spans are accounted for
+	if len(exportedSpans) != totalSpans {
+		t.Errorf("got %d spans, want %d", len(exportedSpans), totalSpans)
+	}
+	for _, id := range expectedSpanIDs {
+		if _, ok := exportedSpans[id]; !ok {
+			t.Errorf("want %s; missing from exported spans", id)
+		}
 	}
 }
 
