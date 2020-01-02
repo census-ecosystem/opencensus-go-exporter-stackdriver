@@ -79,10 +79,10 @@ func TestBundling_ConcurrentExports(t *testing.T) {
 	waitCh := make(chan struct{})
 	wg.Add(workers)
 
-	exportedSpans := make(map[string]bool) // maintain a collection of the spans exported
+	var exportMap sync.Map // maintain a collection of the spans exported
 	exporter.uploadFn = func(spans []*tracepb.Span) {
 		for _, s := range spans {
-			exportedSpans[s.SpanId] = true
+			exportMap.Store(s.SpanId, true)
 		}
 		wg.Done()
 
@@ -115,11 +115,16 @@ func TestBundling_ConcurrentExports(t *testing.T) {
 	}
 
 	// all the spans are accounted for
+	var exportedSpans []string
+	exportMap.Range(func(key, value interface{}) bool {
+		exportedSpans = append(exportedSpans, key.(string))
+		return true
+	})
 	if len(exportedSpans) != totalSpans {
 		t.Errorf("got %d spans, want %d", len(exportedSpans), totalSpans)
 	}
 	for _, id := range expectedSpanIDs {
-		if _, ok := exportedSpans[id]; !ok {
+		if _, ok := exportMap.Load(id); !ok {
 			t.Errorf("want %s; missing from exported spans", id)
 		}
 	}
