@@ -259,8 +259,7 @@ type Options struct {
 	ReportingInterval time.Duration
 
 	// NumberOfWorkers sets the number of go rountines that send requests
-	// to Stackdriver Monitoring. This is only used for Proto metrics export
-	// for now. The minimum number of workers is 1.
+	// to Stackdriver Monitoring and Trace. The minimum number of workers is 1.
 	NumberOfWorkers int
 
 	// ResourceByDescriptor may be provided to supply monitored resource dynamically
