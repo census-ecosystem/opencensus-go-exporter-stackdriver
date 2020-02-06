@@ -26,6 +26,12 @@ import (
 	"go.opencensus.io/trace"
 	"google.golang.org/api/support/bundler"
 	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
+
+	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
+	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
+	octracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
+	"github.com/open-telemetry/opentelemetry-collector/oterr"
+	spandatatranslator "github.com/open-telemetry/opentelemetry-collector/translator/spandata"
 )
 
 // traceExporter is an implementation of trace.Exporter that uploads spans to
@@ -115,6 +121,45 @@ func (e *traceExporter) ExportSpan(s *trace.SpanData) {
 // spans.
 func (e *traceExporter) Flush() {
 	e.bundler.Flush()
+}
+
+func (e *traceExporter) PushTraceProto(ctx context.Context, node *commonpb.Node, r *resourcepb.Resource, spans []*octracepb.Span) (int, error) {
+	ctx, span := trace.StartSpan(
+		ctx,
+		"contrib.go.opencensus.io/exporter/stackdriver.PushTraceProto",
+		trace.WithSampler(trace.NeverSample()),
+	)
+	defer span.End()
+	span.AddAttributes(trace.Int64Attribute("num_spans", int64(len(spans))))
+
+	protoSpans := make([]*tracepb.Span, 0, len(spans))
+	goodSpans := 0
+	var errs []error
+
+	for _, span := range spans {
+		sd, err := spandatatranslator.ProtoSpanToOCSpanData(span)
+		if err != nil {
+			errs = append(errs, err)
+		} else {
+			protoSpans = append(protoSpans, protoFromSpanData(sd, e.projectID, e.o.Resource))
+			goodSpans++
+		}
+	}
+
+	req := tracepb.BatchWriteSpansRequest{
+		Name:  "projects/" + e.projectID,
+		Spans: protoSpans,
+	}
+	// Create a never-sampled span to prevent traces associated with exporter.
+	ctx, cancel := newContextWithTimeout(ctx, e.o.Timeout)
+	defer cancel()
+
+	err := e.client.BatchWriteSpans(ctx, &req)
+	if err != nil {
+		return 0, err
+	}
+
+	return goodSpans, oterr.CombineErrors(errs)
 }
 
 // uploadSpans uploads a set of spans to Stackdriver.
