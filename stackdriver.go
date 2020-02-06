@@ -430,6 +430,7 @@ func (e *Exporter) ExportSpan(sd *trace.SpanData) {
 	e.traceExporter.ExportSpan(sd)
 }
 
+// PushTraceProto exports a bundle of OpenCensus Spans
 func (e *Exporter) PushTraceProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, spans []*octracepb.Span) (int, error) {
 	return e.traceExporter.pushTraceProto(ctx, node, rsc, spans)
 }
