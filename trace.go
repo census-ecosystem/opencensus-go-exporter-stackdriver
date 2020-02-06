@@ -123,7 +123,7 @@ func (e *traceExporter) Flush() {
 	e.bundler.Flush()
 }
 
-func (e *traceExporter) PushTraceProto(ctx context.Context, node *commonpb.Node, r *resourcepb.Resource, spans []*octracepb.Span) (int, error) {
+func (e *traceExporter) pushTraceProto(ctx context.Context, node *commonpb.Node, r *resourcepb.Resource, spans []*octracepb.Span) (int, error) {
 	ctx, span := trace.StartSpan(
 		ctx,
 		"contrib.go.opencensus.io/exporter/stackdriver.PushTraceProto",
