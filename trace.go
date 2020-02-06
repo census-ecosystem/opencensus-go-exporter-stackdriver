@@ -31,7 +31,7 @@ import (
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	octracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
 	"github.com/open-telemetry/opentelemetry-collector/oterr"
-	spandatatranslator "github.com/open-telemetry/opentelemetry-collector/translator/spandata"
+	spandatatranslator "github.com/open-telemetry/opentelemetry-collector/translator/trace/spandata"
 )
 
 // traceExporter is an implementation of trace.Exporter that uploads spans to
