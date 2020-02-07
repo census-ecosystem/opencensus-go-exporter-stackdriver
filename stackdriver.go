@@ -71,7 +71,6 @@ import (
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
-	octracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
 	"go.opencensus.io/metric/metricdata"
 )
 
@@ -430,9 +429,9 @@ func (e *Exporter) ExportSpan(sd *trace.SpanData) {
 	e.traceExporter.ExportSpan(sd)
 }
 
-// PushTraceProto exports a bundle of OpenCensus Spans
-func (e *Exporter) PushTraceProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, spans []*octracepb.Span) (int, error) {
-	return e.traceExporter.pushTraceProto(ctx, node, rsc, spans)
+// PushTraceSpans exports a bundle of OpenCensus Spans
+func (e *Exporter) PushTraceSpans(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, spans []*trace.SpanData) (int, error) {
+	return len(spans), e.traceExporter.pushTraceSpans(ctx, node, rsc, spans)
 }
 
 func (e *Exporter) sdWithDefaultTraceAttributes(sd *trace.SpanData) *trace.SpanData {

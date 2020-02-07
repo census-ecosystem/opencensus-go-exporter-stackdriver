@@ -29,9 +29,6 @@ import (
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
-	octracepb "github.com/census-instrumentation/opencensus-proto/gen-go/trace/v1"
-	"github.com/open-telemetry/opentelemetry-collector/oterr"
-	spandatatranslator "github.com/open-telemetry/opentelemetry-collector/translator/trace/spandata"
 )
 
 // traceExporter is an implementation of trace.Exporter that uploads spans to
@@ -123,27 +120,24 @@ func (e *traceExporter) Flush() {
 	e.bundler.Flush()
 }
 
-func (e *traceExporter) pushTraceProto(ctx context.Context, node *commonpb.Node, r *resourcepb.Resource, spans []*octracepb.Span) (int, error) {
+func (e *traceExporter) pushTraceSpans(ctx context.Context, node *commonpb.Node, r *resourcepb.Resource, spans []*trace.SpanData) error {
 	ctx, span := trace.StartSpan(
 		ctx,
-		"contrib.go.opencensus.io/exporter/stackdriver.PushTraceProto",
+		"contrib.go.opencensus.io/exporter/stackdriver.PushTraceSpans",
 		trace.WithSampler(trace.NeverSample()),
 	)
 	defer span.End()
 	span.AddAttributes(trace.Int64Attribute("num_spans", int64(len(spans))))
 
 	protoSpans := make([]*tracepb.Span, 0, len(spans))
-	goodSpans := 0
-	var errs []error
+
+	res := e.o.Resource
+	if r != nil {
+		res = e.o.MapResource(resourcepbToResource(r))
+	}
 
 	for _, span := range spans {
-		sd, err := spandatatranslator.ProtoSpanToOCSpanData(span)
-		if err != nil {
-			errs = append(errs, err)
-		} else {
-			protoSpans = append(protoSpans, protoFromSpanData(sd, e.projectID, e.o.Resource))
-			goodSpans++
-		}
+		protoSpans = append(protoSpans, protoFromSpanData(span, e.projectID, res))
 	}
 
 	req := tracepb.BatchWriteSpansRequest{
@@ -154,12 +148,7 @@ func (e *traceExporter) pushTraceProto(ctx context.Context, node *commonpb.Node,
 	ctx, cancel := newContextWithTimeout(ctx, e.o.Timeout)
 	defer cancel()
 
-	err := e.client.BatchWriteSpans(ctx, &req)
-	if err != nil {
-		return 0, err
-	}
-
-	return goodSpans, oterr.CombineErrors(errs)
+	return e.client.BatchWriteSpans(ctx, &req)
 }
 
 // uploadSpans uploads a set of spans to Stackdriver.
