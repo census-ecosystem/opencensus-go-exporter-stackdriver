@@ -149,7 +149,11 @@ func (e *traceExporter) pushTraceSpans(ctx context.Context, node *commonpb.Node,
 	defer cancel()
 
 	err := e.client.BatchWriteSpans(ctx, &req)
-	return 0, err
+
+	if err != nil {
+		return len(spans), err
+	}
+	return 0, nil
 }
 
 // uploadSpans uploads a set of spans to Stackdriver.
