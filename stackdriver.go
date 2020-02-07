@@ -429,9 +429,10 @@ func (e *Exporter) ExportSpan(sd *trace.SpanData) {
 	e.traceExporter.ExportSpan(sd)
 }
 
-// PushTraceSpans exports a bundle of OpenCensus Spans
+// PushTraceSpans exports a bundle of OpenCensus Spans.
+// Returns number of dropped spans.
 func (e *Exporter) PushTraceSpans(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, spans []*trace.SpanData) (int, error) {
-	return len(spans), e.traceExporter.pushTraceSpans(ctx, node, rsc, spans)
+	return e.traceExporter.pushTraceSpans(ctx, node, rsc, spans)
 }
 
 func (e *Exporter) sdWithDefaultTraceAttributes(sd *trace.SpanData) *trace.SpanData {

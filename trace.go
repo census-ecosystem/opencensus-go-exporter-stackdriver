@@ -120,7 +120,7 @@ func (e *traceExporter) Flush() {
 	e.bundler.Flush()
 }
 
-func (e *traceExporter) pushTraceSpans(ctx context.Context, node *commonpb.Node, r *resourcepb.Resource, spans []*trace.SpanData) error {
+func (e *traceExporter) pushTraceSpans(ctx context.Context, node *commonpb.Node, r *resourcepb.Resource, spans []*trace.SpanData) (int, error) {
 	ctx, span := trace.StartSpan(
 		ctx,
 		"contrib.go.opencensus.io/exporter/stackdriver.PushTraceSpans",
@@ -148,7 +148,8 @@ func (e *traceExporter) pushTraceSpans(ctx context.Context, node *commonpb.Node,
 	ctx, cancel := newContextWithTimeout(ctx, e.o.Timeout)
 	defer cancel()
 
-	return e.client.BatchWriteSpans(ctx, &req)
+	err := e.client.BatchWriteSpans(ctx, &req)
+	return 0, err
 }
 
 // uploadSpans uploads a set of spans to Stackdriver.
