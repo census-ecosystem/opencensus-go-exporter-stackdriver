@@ -1,4 +1,4 @@
-// Copyright 2018, OpenCensus Authors
+// Copyright 2020, OpenCensus Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,11 +24,24 @@ import (
 	"time"
 
 	"contrib.go.opencensus.io/exporter/stackdriver/internal/testpb"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/plugin/ochttp"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
 	"golang.org/x/net/context/ctxhttp"
 )
+
+var (
+	dummyAutodetect = func() monitoredresource.Interface {
+		return nil
+	}
+)
+
+func init() {
+	// monitoredresource.Autodetect() takes a few seconds to return when
+	// run outside of a cloud environment, so use a dummy autodetect for tests
+	autodetectFunc = dummyAutodetect
+}
 
 func TestExport(t *testing.T) {
 	projectID, ok := os.LookupEnv("STACKDRIVER_TEST_PROJECT_ID")
