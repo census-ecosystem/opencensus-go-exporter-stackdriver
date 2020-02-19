@@ -24,7 +24,7 @@ import (
 	"time"
 
 	"contrib.go.opencensus.io/exporter/stackdriver/internal/testpb"
-	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp"
 	"go.opencensus.io/plugin/ochttp"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	dummyAutodetect = func() monitoredresource.Interface {
+	dummyAutodetect = func() gcp.Interface {
 		return nil
 	}
 )

@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"sync"
 
-	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp"
 	"go.opencensus.io/resource"
 	"go.opencensus.io/resource/resourcekeys"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
@@ -45,7 +45,7 @@ const (
 var (
 	// autodetectFunc returns a monitored resource that is autodetected.
 	// from the cloud environment at runtime.
-	autodetectFunc func() monitoredresource.Interface
+	autodetectFunc func() gcp.Interface
 
 	// autodetectOnce is used to lazy initialize autodetectedLabels.
 	autodetectOnce *sync.Once
@@ -55,7 +55,7 @@ var (
 )
 
 func init() {
-	autodetectFunc = monitoredresource.Autodetect
+	autodetectFunc = gcp.Autodetect
 	// monitoredresource.Autodetect only makes calls to the metadata APIs once
 	// and caches the results
 	autodetectOnce = new(sync.Once)

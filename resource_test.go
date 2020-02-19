@@ -20,6 +20,7 @@ import (
 	"testing"
 
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp"
 	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/resource"
 	"go.opencensus.io/resource/resourcekeys"
@@ -30,7 +31,7 @@ func TestDefaultMapResource(t *testing.T) {
 	cases := []struct {
 		input *resource.Resource
 		// used to replace the resource returned by monitoredresource.Autodetect
-		autoRes monitoredresource.Interface
+		autoRes gcp.Interface
 		want    *monitoredrespb.MonitoredResource
 	}{
 		// Verify that the mapping works and that we skip over the
@@ -346,7 +347,7 @@ func TestDefaultMapResource(t *testing.T) {
 			}()
 
 			if c.autoRes != nil {
-				autodetectFunc = func() monitoredresource.Interface { return c.autoRes }
+				autodetectFunc = func() gcp.Interface { return c.autoRes }
 			}
 
 			got := defaultMapResource(c.input)
