@@ -19,10 +19,10 @@ import (
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp"
 )
 
-// GKEContainer is DEPRECATED, please use gcp.GKEContainer from "contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp".
 // GKEContainer represents gke_container type monitored resource.
 // For definition refer to
 // https://cloud.google.com/monitoring/api/resources#tag_gke_container
+// Deprecated: please use gcp.GKEContainer from "contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp".
 type GKEContainer struct {
 	// ProjectID is the identifier of the GCP project associated with this resource, such as "my-project".
 	ProjectID string
@@ -55,10 +55,10 @@ func (gke *GKEContainer) MonitoredResource() (resType string, labels map[string]
 	return gcpGKE.MonitoredResource()
 }
 
-// GCEInstance is DEPRECATED, please use gcp.GCEInstance from "contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp".
 // GCEInstance represents gce_instance type monitored resource.
 // For definition refer to
 // https://cloud.google.com/monitoring/api/resources#tag_gce_instance
+// Deprecated: please use gcp.GCEInstance from "contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp".
 type GCEInstance struct {
 
 	// ProjectID is the identifier of the GCP project associated with this resource, such as "my-project".
@@ -77,10 +77,10 @@ func (gce *GCEInstance) MonitoredResource() (resType string, labels map[string]s
 	return gcpGCE.MonitoredResource()
 }
 
-// AWSEC2Instance is DEPRECATED, please use aws.EC2Container from "contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/aws".
 // AWSEC2Instance represents aws_ec2_instance type monitored resource.
 // For definition refer to
 // https://cloud.google.com/monitoring/api/resources#tag_aws_ec2_instance
+// Deprecated: please use aws.EC2Container from "contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/aws".
 type AWSEC2Instance struct {
 	// AWSAccount is the AWS account number for the VM.
 	AWSAccount string
