@@ -1,4 +1,4 @@
-// Copyright 2019, OpenCensus Authors
+// Copyright 2020, OpenCensus Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,8 +16,11 @@ package stackdriver // import "contrib.go.opencensus.io/exporter/stackdriver"
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp"
 	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/resource"
 	"go.opencensus.io/resource/resourcekeys"
@@ -27,7 +30,9 @@ import (
 func TestDefaultMapResource(t *testing.T) {
 	cases := []struct {
 		input *resource.Resource
-		want  *monitoredrespb.MonitoredResource
+		// used to replace the resource returned by monitoredresource.Autodetect
+		autoRes gcp.Interface
+		want    *monitoredrespb.MonitoredResource
 	}{
 		// Verify that the mapping works and that we skip over the
 		// first mapping that doesn't apply.
@@ -158,6 +163,81 @@ func TestDefaultMapResource(t *testing.T) {
 				},
 			},
 		},
+		// Test autodecting missing Resource labels
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.CloudType,
+				Labels: map[string]string{
+					stackdriverProjectID:          "proj1",
+					resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderAWS,
+					"extra_key":                   "must be ignored",
+				},
+			},
+			autoRes: &monitoredresource.AWSEC2Instance{
+				AWSAccount: "account1",
+				InstanceID: "inst1",
+				Region:     "region1",
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "aws_ec2_instance",
+				Labels: map[string]string{
+					"project_id":  "proj1",
+					"instance_id": "inst1",
+					"region":      "aws:region1",
+					"aws_account": "account1",
+				},
+			},
+		},
+		// Test autodetecting partial missing Resource labels
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.CloudType,
+				Labels: map[string]string{
+					stackdriverProjectID:          "proj1",
+					resourcekeys.CloudKeyProvider: resourcekeys.CloudProviderGCP,
+					resourcekeys.CloudKeyZone:     "zone1",
+				},
+			},
+			autoRes: &monitoredresource.GCEInstance{
+				ProjectID:  "proj1",
+				InstanceID: "inst2",
+				Zone:       "zone2",
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "gce_instance",
+				Labels: map[string]string{
+					"project_id":  "proj1",
+					"instance_id": "inst2",
+					"zone":        "zone1", // incoming labels take precedent over autodetected
+				},
+			},
+		},
+		// Test GCP "zone" label is accepted for "location"
+		{
+			input: &resource.Resource{
+				Type: resourcekeys.K8SType,
+				Labels: map[string]string{
+					resourcekeys.K8SKeyPodName:       "pod1",
+					resourcekeys.K8SKeyNamespaceName: "namespace1",
+				},
+			},
+			autoRes: &monitoredresource.GKEContainer{
+				ProjectID:                  "proj1",
+				ClusterName:                "cluster1",
+				Zone:                       "zone1",
+				LoggingMonitoringV2Enabled: false,
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "k8s_pod",
+				Labels: map[string]string{
+					"project_id":     "proj1",
+					"location":       "zone1",
+					"cluster_name":   "cluster1",
+					"namespace_name": "namespace1",
+					"pod_name":       "pod1",
+				},
+			},
+		},
 		// Convert to Global.
 		{
 			input: &resource.Resource{
@@ -200,9 +280,76 @@ func TestDefaultMapResource(t *testing.T) {
 				Labels: nil,
 			},
 		},
+		// mapping for knative_revision with autodetected GCP metadata labels
+		{
+			input: &resource.Resource{
+				Type: "knative_revision",
+				Labels: map[string]string{
+					knativeServiceName:       "helloworld-go",
+					knativeRevisionName:      "helloworld-go-hfc7j",
+					knativeConfigurationName: "helloworld-go",
+					knativeNamespaceName:     "namespace1",
+				},
+			},
+			autoRes: &monitoredresource.GKEContainer{
+				ProjectID:   "proj1",
+				Zone:        "zone1",
+				ClusterName: "cluster1",
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "knative_revision",
+				Labels: map[string]string{
+					"project_id":         "proj1",
+					"service_name":       "helloworld-go",
+					"revision_name":      "helloworld-go-hfc7j",
+					"location":           "zone1",
+					"configuration_name": "helloworld-go",
+					"cluster_name":       "cluster1",
+					"namespace_name":     "namespace1",
+				},
+			},
+		},
+		// mapping for knative_revision with explicit GCP metadata labels
+		{
+			input: &resource.Resource{
+				Type: "knative_revision",
+				Labels: map[string]string{
+					stackdriverProjectID:           "proj1",
+					resourcekeys.CloudKeyZone:      "zone1",
+					resourcekeys.K8SKeyClusterName: "cluster1",
+					knativeServiceName:             "helloworld-go",
+					knativeRevisionName:            "helloworld-go-hfc7j",
+					knativeConfigurationName:       "helloworld-go",
+					knativeNamespaceName:           "namespace1",
+				},
+			},
+			autoRes: &monitoredresource.GKEContainer{},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "knative_revision",
+				Labels: map[string]string{
+					"project_id":         "proj1",
+					"service_name":       "helloworld-go",
+					"revision_name":      "helloworld-go-hfc7j",
+					"location":           "zone1",
+					"configuration_name": "helloworld-go",
+					"cluster_name":       "cluster1",
+					"namespace_name":     "namespace1",
+				},
+			},
+		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
+			// defer test cleanup
+			defer func() {
+				autodetectOnce = new(sync.Once)
+				autodetectFunc = dummyAutodetect
+			}()
+
+			if c.autoRes != nil {
+				autodetectFunc = func() gcp.Interface { return c.autoRes }
+			}
+
 			got := defaultMapResource(c.input)
 			if diff := cmp.Diff(got, c.want); diff != "" {
 				t.Errorf("Values differ -got +want: %s", diff)

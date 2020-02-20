@@ -1,4 +1,4 @@
-// Copyright 2019, OpenCensus Authors
+// Copyright 2020, OpenCensus Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,7 +16,9 @@ package stackdriver // import "contrib.go.opencensus.io/exporter/stackdriver"
 
 import (
 	"fmt"
+	"sync"
 
+	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp"
 	"go.opencensus.io/resource"
 	"go.opencensus.io/resource/resourcekeys"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
@@ -27,12 +29,40 @@ import (
 // for customization.
 const (
 	stackdriverProjectID            = "contrib.opencensus.io/exporter/stackdriver/project_id"
+	stackdriverLocation             = "contrib.opencensus.io/exporter/stackdriver/location"
+	stackdriverClusterName          = "contrib.opencesus.io/exporter/stackdriver/cluster_name"
 	stackdriverGenericTaskNamespace = "contrib.opencensus.io/exporter/stackdriver/generic_task/namespace"
 	stackdriverGenericTaskJob       = "contrib.opencensus.io/exporter/stackdriver/generic_task/job"
 	stackdriverGenericTaskID        = "contrib.opencensus.io/exporter/stackdriver/generic_task/task_id"
+
+	knativeResType           = "knative_revision"
+	knativeServiceName       = "service_name"
+	knativeRevisionName      = "revision_name"
+	knativeConfigurationName = "configuration_name"
+	knativeNamespaceName     = "namespace_name"
 )
 
-// Mappings for the well-known OpenCensus resources to applicable Stackdriver resources.
+var (
+	// autodetectFunc returns a monitored resource that is autodetected.
+	// from the cloud environment at runtime.
+	autodetectFunc func() gcp.Interface
+
+	// autodetectOnce is used to lazy initialize autodetectedLabels.
+	autodetectOnce *sync.Once
+	// autodetectedLabels stores all the labels from the autodetected monitored resource
+	// with a possible additional label for the GCP "location".
+	autodetectedLabels map[string]string
+)
+
+func init() {
+	autodetectFunc = gcp.Autodetect
+	// monitoredresource.Autodetect only makes calls to the metadata APIs once
+	// and caches the results
+	autodetectOnce = new(sync.Once)
+}
+
+// Mappings for the well-known OpenCensus resource label keys
+// to applicable Stackdriver Monitored Resource label keys.
 var k8sContainerMap = map[string]string{
 	"project_id":     stackdriverProjectID,
 	"location":       resourcekeys.CloudKeyZone,
@@ -79,16 +109,58 @@ var genericResourceMap = map[string]string{
 	"task_id":    stackdriverGenericTaskID,
 }
 
+var knativeRevisionResourceMap = map[string]string{
+	"project_id":             stackdriverProjectID,
+	"location":               resourcekeys.CloudKeyZone,
+	"cluster_name":           resourcekeys.K8SKeyClusterName,
+	knativeServiceName:       knativeServiceName,
+	knativeRevisionName:      knativeRevisionName,
+	knativeConfigurationName: knativeConfigurationName,
+	knativeNamespaceName:     knativeNamespaceName,
+}
+
+// getAutodetectedLabels returns all the labels from the Monitored Resource detected
+// from the environment by calling monitoredresource.Autodetect. If a "zone" label is detected,
+// a "location" label is added with the same value to account for differences between
+// Legacy Stackdriver and Stackdriver Kubernetes Engine Monitoring,
+// see https://cloud.google.com/monitoring/kubernetes-engine/migration.
+func getAutodetectedLabels() map[string]string {
+	autodetectOnce.Do(func() {
+		autodetectedLabels = map[string]string{}
+		if mr := autodetectFunc(); mr != nil {
+			_, labels := mr.MonitoredResource()
+			// accept "zone" value for "location" because values for location can be a zone
+			// or region, see https://cloud.google.com/docs/geography-and-regions
+			if _, ok := labels["zone"]; ok {
+				labels["location"] = labels["zone"]
+			}
+
+			autodetectedLabels = labels
+		}
+	})
+
+	return autodetectedLabels
+}
+
 // returns transformed label map and true if all labels in match are found
 // in input except optional project_id. It returns false if at least one label
 // other than project_id is missing.
 func transformResource(match, input map[string]string) (map[string]string, bool) {
 	output := make(map[string]string, len(input))
 	for dst, src := range match {
-		v, ok := input[src]
-		if ok {
+		if v, ok := input[src]; ok {
 			output[dst] = v
-		} else if dst != "project_id" {
+			continue
+		}
+
+		// attempt to autodetect missing labels, autodetected label keys should
+		// match destination label keys
+		if v, ok := getAutodetectedLabels()[dst]; ok {
+			output[dst] = v
+			continue
+		}
+
+		if dst != "project_id" {
 			return nil, true
 		}
 	}
@@ -120,6 +192,9 @@ func defaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResourc
 	case res.Labels[resourcekeys.CloudKeyProvider] == resourcekeys.CloudProviderAWS:
 		result.Type = "aws_ec2_instance"
 		match = awsResourceMap
+	case res.Type == knativeResType:
+		result.Type = res.Type
+		match = knativeRevisionResourceMap
 	}
 
 	var missing bool
