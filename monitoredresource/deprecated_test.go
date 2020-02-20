@@ -1,4 +1,4 @@
-// Copyright 2018, OpenCensus Authors
+// Copyright 2020, OpenCensus Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,20 +31,16 @@ const (
 
 func TestGKEContainerMonitoredResources(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
-	gcpMetadata := gcpMetadata{
-		instanceID:    GCPInstanceIDStr,
-		projectID:     GCPProjectIDStr,
-		zone:          GCPZoneStr,
-		clusterName:   GKEClusterNameStr,
-		containerName: GKEContainerNameStr,
-		namespaceID:   GKENamespaceStr,
-		podID:         GKEPodIDStr,
+	autoDetected := GKEContainer{
+		InstanceID:    GCPInstanceIDStr,
+		ProjectID:     GCPProjectIDStr,
+		Zone:          GCPZoneStr,
+		ClusterName:   GKEClusterNameStr,
+		ContainerName: GKEContainerNameStr,
+		NamespaceID:   GKENamespaceStr,
+		PodID:         GKEPodIDStr,
 	}
-	autoDetected := detectResourceType(nil, &gcpMetadata)
 
-	if autoDetected == nil {
-		t.Fatal("GKEContainerMonitoredResource nil")
-	}
 	resType, labels := autoDetected.MonitoredResource()
 	if resType != "gke_container" ||
 		labels["instance_id"] != GCPInstanceIDStr ||
@@ -60,21 +56,17 @@ func TestGKEContainerMonitoredResources(t *testing.T) {
 
 func TestGKEContainerMonitoredResourcesV2(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
-	gcpMetadata := gcpMetadata{
-		instanceID:    GCPInstanceIDStr,
-		projectID:     GCPProjectIDStr,
-		zone:          GCPZoneStr,
-		clusterName:   GKEClusterNameStr,
-		containerName: GKEContainerNameStr,
-		namespaceID:   GKENamespaceStr,
-		podID:         GKEPodIDStr,
-		monitoringV2:  true,
+	autoDetected := GKEContainer{
+		InstanceID:                 GCPInstanceIDStr,
+		ProjectID:                  GCPProjectIDStr,
+		Zone:                       GCPZoneStr,
+		ClusterName:                GKEClusterNameStr,
+		ContainerName:              GKEContainerNameStr,
+		NamespaceID:                GKENamespaceStr,
+		PodID:                      GKEPodIDStr,
+		LoggingMonitoringV2Enabled: true,
 	}
-	autoDetected := detectResourceType(nil, &gcpMetadata)
 
-	if autoDetected == nil {
-		t.Fatal("GKEContainerMonitoredResource nil")
-	}
 	resType, labels := autoDetected.MonitoredResource()
 	if resType != "k8s_container" ||
 		labels["project_id"] != GCPProjectIDStr ||
@@ -89,16 +81,12 @@ func TestGKEContainerMonitoredResourcesV2(t *testing.T) {
 
 func TestGCEInstanceMonitoredResources(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "")
-	gcpMetadata := gcpMetadata{
-		instanceID: GCPInstanceIDStr,
-		projectID:  GCPProjectIDStr,
-		zone:       GCPZoneStr,
+	autoDetected := GCEInstance{
+		InstanceID: GCPInstanceIDStr,
+		ProjectID:  GCPProjectIDStr,
+		Zone:       GCPZoneStr,
 	}
-	autoDetected := detectResourceType(nil, &gcpMetadata)
 
-	if autoDetected == nil {
-		t.Fatal("GCEInstanceMonitoredResource nil")
-	}
 	resType, labels := autoDetected.MonitoredResource()
 	if resType != "gce_instance" ||
 		labels["instance_id"] != GCPInstanceIDStr ||
@@ -109,19 +97,12 @@ func TestGCEInstanceMonitoredResources(t *testing.T) {
 }
 
 func TestAWSEC2InstanceMonitoredResources(t *testing.T) {
-	os.Setenv("KUBERNETES_SERVICE_HOST", "")
-	gcpMetadata := gcpMetadata{}
-
-	awsIdentityDoc := &awsIdentityDocument{
-		"123456789012",
-		"i-1234567890abcdef0",
-		"us-west-2",
+	autoDetected := AWSEC2Instance{
+		AWSAccount: "123456789012",
+		InstanceID: "i-1234567890abcdef0",
+		Region:     "aws:us-west-2",
 	}
-	autoDetected := detectResourceType(awsIdentityDoc, &gcpMetadata)
 
-	if autoDetected == nil {
-		t.Fatal("AWSEC2InstanceMonitoredResource nil")
-	}
 	resType, labels := autoDetected.MonitoredResource()
 	if resType != "aws_ec2_instance" ||
 		labels["instance_id"] != "i-1234567890abcdef0" ||
