@@ -238,6 +238,29 @@ func TestDefaultMapResource(t *testing.T) {
 				},
 			},
 		},
+		// Convert to App Engine Instance.
+		{
+			input: &resource.Resource{
+				Type: appEngineInstanceType,
+				Labels: map[string]string{
+					stackdriverProjectID:        "proj1",
+					resourcekeys.CloudKeyRegion: "region1",
+					appEngineService:            "default",
+					appEngineVersion:            "version1",
+					appEngineInstance:           "inst1",
+				},
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "gae_instance",
+				Labels: map[string]string{
+					"project_id":  "proj1",
+					"location":    "region1",
+					"module_id":   "default",
+					"version_id":  "version1",
+					"instance_id": "inst1",
+				},
+			},
+		},
 		// Convert to Global.
 		{
 			input: &resource.Resource{

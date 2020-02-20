@@ -40,6 +40,12 @@ const (
 	knativeRevisionName      = "revision_name"
 	knativeConfigurationName = "configuration_name"
 	knativeNamespaceName     = "namespace_name"
+
+	appEngineInstanceType = "gae_instance"
+
+	appEngineService  = "appengine.service.id"
+	appEngineVersion  = "appengine.version.id"
+	appEngineInstance = "appengine.instance.id"
 )
 
 var (
@@ -98,6 +104,14 @@ var awsResourceMap = map[string]string{
 	"instance_id": resourcekeys.HostKeyID,
 	"region":      resourcekeys.CloudKeyRegion,
 	"aws_account": resourcekeys.CloudKeyAccountID,
+}
+
+var appEngineInstanceMap = map[string]string{
+	"project_id":  stackdriverProjectID,
+	"location":    resourcekeys.CloudKeyRegion,
+	"module_id":   appEngineService,
+	"version_id":  appEngineVersion,
+	"instance_id": appEngineInstance,
 }
 
 // Generic task resource.
@@ -186,6 +200,9 @@ func defaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResourc
 	case res.Type == resourcekeys.HostType && res.Labels[resourcekeys.K8SKeyClusterName] != "":
 		result.Type = "k8s_node"
 		match = k8sNodeMap
+	case res.Type == appEngineInstanceType:
+		result.Type = appEngineInstanceType
+		match = appEngineInstanceMap
 	case res.Labels[resourcekeys.CloudKeyProvider] == resourcekeys.CloudProviderGCP:
 		result.Type = "gce_instance"
 		match = gcpResourceMap
