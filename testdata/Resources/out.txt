@@ -77,4 +77,21 @@ labels: <
 >
 ---
 type: "global"
-
+---
+type: "gae_instance"
+labels: <
+  key: "module_id"
+  value: "default"
+>
+labels: <
+  key: "version_id"
+  value: "version1"
+>
+labels: <
+  key: "instance_id"
+  value: "inst1"
+>
+labels: <
+  key: "location"
+  value: "region1"
+>

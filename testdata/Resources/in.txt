@@ -121,3 +121,21 @@ labels: <
   key: "k8s.pod.name"
   value: "pod1"
 >
+---
+type: "gae_instance"
+labels: <
+  key: "appengine.service.id"
+  value: "default"
+>
+labels: <
+  key: "appengine.version.id"
+  value: "version1"
+>
+labels: <
+  key: "appengine.instance.id"
+  value: "inst1"
+>
+labels: <
+  key: "cloud.region"
+  value: "region1"
+>

@@ -17,6 +17,7 @@ package stackdriver
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -60,6 +61,72 @@ func TestBundling(t *testing.T) {
 	case <-ch:
 		t.Errorf("too many bundles sent")
 	case <-time.After(time.Second / 5):
+	}
+}
+
+func TestBundling_ConcurrentExports(t *testing.T) {
+	workers := 2
+	spansPerWorker := 10
+	delay := 2 * time.Second
+	exporter := newTraceExporterWithClient(Options{
+		ProjectID:            "fakeProjectID",
+		BundleCountThreshold: spansPerWorker,
+		BundleDelayThreshold: delay,
+		NumberOfWorkers:      workers,
+	}, nil)
+
+	wg := sync.WaitGroup{}
+	waitCh := make(chan struct{})
+	wg.Add(workers)
+
+	var exportMap sync.Map // maintain a collection of the spans exported
+	exporter.uploadFn = func(spans []*tracepb.Span) {
+		for _, s := range spans {
+			exportMap.Store(s.SpanId, true)
+		}
+		wg.Done()
+
+		// Don't complete the function until the WaitGroup is done.
+		// This ensures the semaphore limiting the concurrent uploads is not
+		// released by one goroutine completing before the other.
+		wg.Wait()
+	}
+	trace.RegisterExporter(exporter)
+
+	totalSpans := workers * spansPerWorker
+	var expectedSpanIDs []string
+	go func() {
+		// Release enough spans to form two bundles
+		for i := 0; i < totalSpans; i++ {
+			_, span := trace.StartSpan(context.Background(), "span", trace.WithSampler(trace.AlwaysSample()))
+			expectedSpanIDs = append(expectedSpanIDs, span.SpanContext().SpanID.String())
+			span.End()
+		}
+
+		// Wait for the desired concurrency before completing
+		wg.Wait()
+		close(waitCh)
+	}()
+
+	select {
+	case <-waitCh:
+	case <-time.After(delay / 2): // fail before a time-based flush is triggered
+		t.Fatal("timed out waiting for concurrent uploads")
+	}
+
+	// all the spans are accounted for
+	var exportedSpans []string
+	exportMap.Range(func(key, value interface{}) bool {
+		exportedSpans = append(exportedSpans, key.(string))
+		return true
+	})
+	if len(exportedSpans) != totalSpans {
+		t.Errorf("got %d spans, want %d", len(exportedSpans), totalSpans)
+	}
+	for _, id := range expectedSpanIDs {
+		if _, ok := exportMap.Load(id); !ok {
+			t.Errorf("want %s; missing from exported spans", id)
+		}
 	}
 }
 
