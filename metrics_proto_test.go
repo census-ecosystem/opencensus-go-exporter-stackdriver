@@ -54,7 +54,7 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 
 		// Set empty labels to avoid the opencensus-task
 		DefaultMonitoringLabels: &Labels{},
-		MapResource:             defaultMapResource,
+		MapResource:             DefaultMapResource,
 	}
 	se, err := newStatsExporter(exporterOptions)
 	if err != nil {
@@ -260,7 +260,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 				},
 			},
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+				o: Options{ProjectID: "foo", MapResource: DefaultMapResource},
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
@@ -331,7 +331,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 				},
 			},
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+				o: Options{ProjectID: "foo", MapResource: DefaultMapResource},
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
@@ -446,7 +446,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 				},
 			},
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+				o: Options{ProjectID: "foo", MapResource: DefaultMapResource},
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
@@ -518,7 +518,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 				},
 			},
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+				o: Options{ProjectID: "foo", MapResource: DefaultMapResource},
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
