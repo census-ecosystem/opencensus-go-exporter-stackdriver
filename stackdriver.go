@@ -183,7 +183,7 @@ type Options struct {
 
 	// MapResource converts a OpenCensus resource to a Stackdriver monitored resource.
 	//
-	// If this field is unset, defaultMapResource will be used which encodes a set of default
+	// If this field is unset, DefaultMapResource will be used which encodes a set of default
 	// conversions from auto-detected resources to well-known Stackdriver monitored resources.
 	MapResource func(*resource.Resource) *monitoredrespb.MonitoredResource
 
@@ -333,7 +333,7 @@ func NewExporter(o Options) (*Exporter, error) {
 		o.Resource = convertMonitoredResourceToPB(o.MonitoredResource)
 	}
 	if o.MapResource == nil {
-		o.MapResource = defaultMapResource
+		o.MapResource = DefaultMapResource
 	}
 	if o.ResourceDetector != nil {
 		// For backwards-compatibility we still respect the deprecated resource field.
