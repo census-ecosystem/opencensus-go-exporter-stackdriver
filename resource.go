@@ -181,7 +181,8 @@ func transformResource(match, input map[string]string) (map[string]string, bool)
 	return output, false
 }
 
-func defaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResource {
+// DefaultMapResource implements default resource mapping for well-known resource types
+func DefaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResource {
 	match := genericResourceMap
 	result := &monitoredrespb.MonitoredResource{
 		Type: "global",

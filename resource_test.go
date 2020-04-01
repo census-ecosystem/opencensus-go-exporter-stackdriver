@@ -373,7 +373,7 @@ func TestDefaultMapResource(t *testing.T) {
 				autodetectFunc = func() gcp.Interface { return c.autoRes }
 			}
 
-			got := defaultMapResource(c.input)
+			got := DefaultMapResource(c.input)
 			if diff := cmp.Diff(got, c.want); diff != "" {
 				t.Errorf("Values differ -got +want: %s", diff)
 			}
