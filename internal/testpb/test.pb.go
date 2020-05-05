@@ -10,6 +10,8 @@ import (
 
 	proto "github.com/golang/protobuf/proto"
 	grpc "google.golang.org/grpc"
+	codes "google.golang.org/grpc/codes"
+	status "google.golang.org/grpc/status"
 )
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -191,6 +193,17 @@ func (x *fooMultipleClient) Recv() (*FooResponse, error) {
 type FooServer interface {
 	Single(context.Context, *FooRequest) (*FooResponse, error)
 	Multiple(Foo_MultipleServer) error
+}
+
+// UnimplementedFooServer can be embedded to have forward compatible implementations.
+type UnimplementedFooServer struct {
+}
+
+func (*UnimplementedFooServer) Single(ctx context.Context, req *FooRequest) (*FooResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Single not implemented")
+}
+func (*UnimplementedFooServer) Multiple(srv Foo_MultipleServer) error {
+	return status.Errorf(codes.Unimplemented, "method Multiple not implemented")
 }
 
 func RegisterFooServer(s *grpc.Server, srv FooServer) {
