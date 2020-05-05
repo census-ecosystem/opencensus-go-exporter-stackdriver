@@ -9,7 +9,6 @@ require (
 	github.com/golang/protobuf v1.4.0
 	github.com/google/go-cmp v0.4.0
 	github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
-	github.com/rakyll/embedmd v0.0.0-20171029212350-c8060a0752a2 // indirect
 	github.com/stretchr/testify v1.4.0 // indirect
 	go.opencensus.io v0.22.1
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
