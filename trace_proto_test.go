@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -27,11 +26,13 @@ import (
 	"github.com/golang/protobuf/proto"
 	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"
+	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/trace"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
 	codepb "google.golang.org/genproto/googleapis/rpc/code"
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 var (
@@ -321,7 +322,7 @@ func TestExportTrace(t *testing.T) {
 
 	expectedSpans := createExpectedSpans()
 
-	if !reflect.DeepEqual(spbs, expectedSpans) {
+	if !cmp.Equal(spbs, expectedSpans, protocmp.Transform()) {
 		var got, want []string
 		for _, s := range spbs {
 			got = append(got, proto.MarshalTextString(s))
