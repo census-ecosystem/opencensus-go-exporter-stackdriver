@@ -606,10 +606,12 @@ func TestResourceByDescriptor(t *testing.T) {
 						},
 						LabelValues: []metricdata.LabelValue{
 							{
-								Value: "v11",
+								Present: true,
+								Value:   "v11",
 							},
 							{
-								Value: "v12",
+								Present: true,
+								Value:   "v12",
 							},
 						},
 					},
@@ -678,10 +680,12 @@ func TestResourceByDescriptor(t *testing.T) {
 						},
 						LabelValues: []metricdata.LabelValue{
 							{
-								Value: "v21",
+								Present: true,
+								Value:   "v21",
 							},
 							{
-								Value: "v22",
+								Present: true,
+								Value:   "v22",
 							},
 						},
 					},
@@ -750,10 +754,12 @@ func TestResourceByDescriptor(t *testing.T) {
 						},
 						LabelValues: []metricdata.LabelValue{
 							{
-								Value: "v31",
+								Present: true,
+								Value:   "v31",
 							},
 							{
-								Value: "v32",
+								Present: true,
+								Value:   "v32",
 							},
 						},
 					},
