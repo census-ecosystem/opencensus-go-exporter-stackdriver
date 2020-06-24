@@ -655,6 +655,152 @@ func TestResourceByDescriptor(t *testing.T) {
 		{
 			in: &metricdata.Metric{
 				Descriptor: metricdata.Descriptor{
+					Name:        "custom_resource_one",
+					Description: "This is a test when resource labels are not present",
+					Unit:        metricdata.UnitBytes,
+					Type:        metricdata.TypeCumulativeInt64,
+					LabelKeys: []metricdata.LabelKey{
+						{
+							Key: "k11",
+						},
+						{
+							Key: "k12",
+						},
+					},
+				},
+				Resource: nil,
+				TimeSeries: []*metricdata.TimeSeries{
+					{
+						StartTime: startTime,
+						Points: []metricdata.Point{
+							{
+								Time:  endTime,
+								Value: int64(5),
+							},
+						},
+						LabelValues: []metricdata.LabelValue{
+							{
+								Present: false,
+								Value:   "v11",
+							},
+							{
+								Present: true,
+								Value:   "v12",
+							},
+						},
+					},
+				},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/foo",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type: "custom.googleapis.com/opencensus/custom_resource_one",
+								Labels: map[string]string{
+									"k12": "v12",
+								},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "one",
+								Labels: map[string]string{
+									"k11": "",
+								},
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: startTimestamp,
+										EndTime:   endTimestamp,
+									},
+									Value: &monitoringpb.TypedValue{
+										Value: &monitoringpb.TypedValue_Int64Value{
+											Int64Value: 5,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			in: &metricdata.Metric{
+				Descriptor: metricdata.Descriptor{
+					Name:        "custom_resource_one",
+					Description: "This is a test when metric labels are not present",
+					Unit:        metricdata.UnitBytes,
+					Type:        metricdata.TypeCumulativeInt64,
+					LabelKeys: []metricdata.LabelKey{
+						{
+							Key: "k11",
+						},
+						{
+							Key: "k12",
+						},
+					},
+				},
+				Resource: nil,
+				TimeSeries: []*metricdata.TimeSeries{
+					{
+						StartTime: startTime,
+						Points: []metricdata.Point{
+							{
+								Time:  endTime,
+								Value: int64(5),
+							},
+						},
+						LabelValues: []metricdata.LabelValue{
+							{
+								Present: true,
+								Value:   "v11",
+							},
+							{
+								Present: false,
+								Value:   "v12",
+							},
+						},
+					},
+				},
+			},
+			want: []*monitoringpb.CreateTimeSeriesRequest{
+				{
+					Name: "projects/foo",
+					TimeSeries: []*monitoringpb.TimeSeries{
+						{
+							Metric: &googlemetricpb.Metric{
+								Type:   "custom.googleapis.com/opencensus/custom_resource_one",
+								Labels: map[string]string{},
+							},
+							Resource: &monitoredrespb.MonitoredResource{
+								Type: "one",
+								Labels: map[string]string{
+									"k11": "v11",
+								},
+							},
+							Points: []*monitoringpb.Point{
+								{
+									Interval: &monitoringpb.TimeInterval{
+										StartTime: startTimestamp,
+										EndTime:   endTimestamp,
+									},
+									Value: &monitoringpb.TypedValue{
+										Value: &monitoringpb.TypedValue_Int64Value{
+											Int64Value: 5,
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			in: &metricdata.Metric{
+				Descriptor: metricdata.Descriptor{
 					Name:        "custom_resource_two",
 					Description: "This is a test",
 					Unit:        metricdata.UnitBytes,
