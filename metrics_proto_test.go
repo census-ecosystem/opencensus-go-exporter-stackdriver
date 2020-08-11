@@ -621,6 +621,26 @@ func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
 				Unit:        "By",
 			},
 		},
+		{
+			in: &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "external.googleapis.com/user/with_domain",
+					Description: "With metric descriptor and domain prefix",
+					Unit:        "By",
+				},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "test"},
+			},
+			want: &googlemetricpb.MetricDescriptor{
+				Name:        "projects/test/metricDescriptors/external.googleapis.com/user/with_domain",
+				Type:        "external.googleapis.com/user/with_domain",
+				Labels:      []*labelpb.LabelDescriptor{},
+				DisplayName: "external.googleapis.com/user/with_domain",
+				Description: "With metric descriptor and domain prefix",
+				Unit:        "By",
+			},
+		},
 	}
 
 	for i, tt := range tests {

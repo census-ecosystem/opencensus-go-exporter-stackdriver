@@ -365,6 +365,10 @@ func (e *statsExporter) createMetricDescriptorFromView(ctx context.Context, v *v
 }
 
 func (e *statsExporter) displayName(suffix string) string {
+	if hasDomain(suffix) {
+		// If the display name suffix is already prefixed with domain, skip adding extra prefix
+		return suffix
+	}
 	return path.Join(defaultDisplayNamePrefix, suffix)
 }
 
