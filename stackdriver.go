@@ -60,6 +60,7 @@ import (
 	metadataapi "cloud.google.com/go/compute/metadata"
 	traceapi "cloud.google.com/go/trace/apiv2"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
+	opencensus "go.opencensus.io"
 	"go.opencensus.io/resource"
 	"go.opencensus.io/resource/resourcekeys"
 	"go.opencensus.io/stats/view"
@@ -279,11 +280,18 @@ type Options struct {
 	// time-series then it will result into an error for the entire CreateTimeSeries request
 	// which may contain more than one time-series.
 	ResourceByDescriptor func(*metricdata.Descriptor, map[string]string) (map[string]string, monitoredresource.Interface)
+
+	// Override the user agent value supplied to Monitoring APIs and included as an
+	// attribute in trace data. {{sdk-version}} & {{exporter-version}} will be
+	// replaced with the respective version numbers.
+	UserAgent string
 }
 
 const defaultTimeout = 5 * time.Second
 
 var defaultDomain = path.Join("custom.googleapis.com", "opencensus")
+
+var defaultUserAgent = fmt.Sprintf("opencensus-go %s; stackdriver-exporter %s", opencensus.Version(), version)
 
 // Exporter is a stats and trace exporter that uploads data to Stackdriver.
 //
@@ -361,6 +369,12 @@ func NewExporter(o Options) (*Exporter, error) {
 	}
 	if o.MetricPrefix != "" && !strings.HasSuffix(o.MetricPrefix, "/") {
 		o.MetricPrefix = o.MetricPrefix + "/"
+	}
+	if o.UserAgent == "" {
+		o.UserAgent = defaultUserAgent
+	} else {
+		o.UserAgent = strings.Replace(o.UserAgent, "{{sdk-version}}", opencensus.Version(), -1)
+		o.UserAgent = strings.Replace(o.UserAgent, "{{exporter-version}}", version, -1)
 	}
 
 	se, err := newStatsExporter(o)

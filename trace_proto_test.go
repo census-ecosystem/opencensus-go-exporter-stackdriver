@@ -109,7 +109,7 @@ func generateSpan() {
 }
 
 func createExpectedSpans() spans {
-	ua := trunc(userAgent, len(userAgent))
+	ua := trunc(defaultUserAgent, len(defaultUserAgent))
 	expectedSpans := spans{
 		&tracepb.Span{
 			DisplayName:             trunc("span0", 128),
@@ -284,7 +284,7 @@ func TestExportTrace(t *testing.T) {
 
 	var spbs spans
 	for _, s := range te.spans {
-		spbs = append(spbs, protoFromSpanData(s, "testproject", nil))
+		spbs = append(spbs, protoFromSpanData(s, "testproject", nil, defaultUserAgent))
 	}
 	sort.Sort(spbs)
 
@@ -396,7 +396,7 @@ func TestExportTraceWithMonitoredResource(t *testing.T) {
 	mr := createGCEInstanceMonitoredResource()
 
 	for _, s := range te.spans {
-		gceSpbs = append(gceSpbs, protoFromSpanData(s, "testproject", mr))
+		gceSpbs = append(gceSpbs, protoFromSpanData(s, "testproject", mr, defaultUserAgent))
 	}
 
 	for _, span := range gceSpbs {
@@ -410,7 +410,7 @@ func TestExportTraceWithMonitoredResource(t *testing.T) {
 	mr = createGKEContainerMonitoredResource()
 
 	for _, s := range te.spans {
-		gkeSpbs = append(gkeSpbs, protoFromSpanData(s, "testproject", mr))
+		gkeSpbs = append(gkeSpbs, protoFromSpanData(s, "testproject", mr, defaultUserAgent))
 	}
 
 	for _, span := range gkeSpbs {
@@ -427,7 +427,7 @@ func TestExportTraceWithMonitoredResource(t *testing.T) {
 	var awsEc2Spbs spans
 	mr = createAWSEC2MonitoredResource()
 	for _, s := range te.spans {
-		awsEc2Spbs = append(awsEc2Spbs, protoFromSpanData(s, "testproject", mr))
+		awsEc2Spbs = append(awsEc2Spbs, protoFromSpanData(s, "testproject", mr, defaultUserAgent))
 	}
 
 	for _, span := range awsEc2Spbs {
@@ -500,7 +500,7 @@ func BenchmarkProto(b *testing.B) {
 	}
 	var x int
 	for i := 0; i < b.N; i++ {
-		s := protoFromSpanData(sd, `testproject`, nil)
+		s := protoFromSpanData(sd, `testproject`, nil, defaultUserAgent)
 		x += len(s.Name)
 	}
 	if x == 0 {

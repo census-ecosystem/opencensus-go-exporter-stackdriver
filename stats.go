@@ -26,7 +26,6 @@ import (
 	"sync"
 	"time"
 
-	opencensus "go.opencensus.io"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
@@ -54,8 +53,6 @@ const (
 	defaultDisplayNamePrefix  = "OpenCensus"
 	version                   = "0.10.0"
 )
-
-var userAgent = fmt.Sprintf("opencensus-go %s; stackdriver-exporter %s", opencensus.Version(), version)
 
 // statsExporter exports stats to the Stackdriver Monitoring.
 type statsExporter struct {
@@ -89,7 +86,7 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		return nil, errBlankProjectID
 	}
 
-	opts := append(o.MonitoringClientOptions, option.WithUserAgent(userAgent))
+	opts := append(o.MonitoringClientOptions, option.WithUserAgent(o.UserAgent))
 	ctx := o.Context
 	if ctx == nil {
 		ctx = context.Background()
