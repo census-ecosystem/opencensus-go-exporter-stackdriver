@@ -25,7 +25,6 @@ import (
 
 	"contrib.go.opencensus.io/exporter/stackdriver/internal/testpb"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource/gcp"
-	opencensus "go.opencensus.io"
 	"go.opencensus.io/plugin/ochttp"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
@@ -139,21 +138,12 @@ func TestGRPC(t *testing.T) {
 }
 
 func TestUserAgent(t *testing.T) {
-	e, err := NewExporter(Options{UserAgent: "test"})
+	e, err := NewExporter(Options{UserAgent: "OpenCensus Service"})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if want, got := "test", e.statsExporter.o.UserAgent; want != got {
-		t.Fatalf("UserAgent = %q; want %q", got, want)
-	}
-
-	e, err = NewExporter(Options{UserAgent: "test {{sdk-version}}{{exporter-version}}"})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if want, got := "test "+opencensus.Version()+version, e.statsExporter.o.UserAgent; want != got {
+	if want, got := "OpenCensus Service", e.statsExporter.o.UserAgent; want != got {
 		t.Fatalf("UserAgent = %q; want %q", got, want)
 	}
 }

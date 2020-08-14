@@ -282,8 +282,7 @@ type Options struct {
 	ResourceByDescriptor func(*metricdata.Descriptor, map[string]string) (map[string]string, monitoredresource.Interface)
 
 	// Override the user agent value supplied to Monitoring APIs and included as an
-	// attribute in trace data. {{sdk-version}} & {{exporter-version}} will be
-	// replaced with the respective version numbers.
+	// attribute in trace data.
 	UserAgent string
 }
 
@@ -372,9 +371,6 @@ func NewExporter(o Options) (*Exporter, error) {
 	}
 	if o.UserAgent == "" {
 		o.UserAgent = defaultUserAgent
-	} else {
-		o.UserAgent = strings.Replace(o.UserAgent, "{{sdk-version}}", opencensus.Version(), -1)
-		o.UserAgent = strings.Replace(o.UserAgent, "{{exporter-version}}", version, -1)
 	}
 
 	se, err := newStatsExporter(o)

@@ -167,7 +167,7 @@ func TestTraceSpansBufferMaxBytes(t *testing.T) {
 
 func TestTraceSpansUserAgent(t *testing.T) {
 	e := newTraceExporterWithClient(Options{
-		UserAgent: "test",
+		UserAgent: "OpenCensus Service",
 		Context:   context.Background(),
 		Timeout:   10 * time.Millisecond,
 	}, nil)
@@ -179,7 +179,7 @@ func TestTraceSpansUserAgent(t *testing.T) {
 	}
 	e.ExportSpan(makeSampleSpanData(""))
 	e.Flush()
-	if want := "test"; want != got {
+	if want := "OpenCensus Service"; want != got {
 		t.Fatalf("UserAgent Attribute = %q; want %q", got, want)
 	}
 
@@ -187,9 +187,9 @@ func TestTraceSpansUserAgent(t *testing.T) {
 	e.uploadFn = func(spans []*tracepb.Span) {
 		got = spans[0].Attributes.AttributeMap[agentLabel].GetStringValue().Value
 	}
-	e.ExportSpan(makeSampleSpanData("test2"))
+	e.ExportSpan(makeSampleSpanData("My Test Application"))
 	e.Flush()
-	if want := "test2"; want != got {
+	if want := "My Test Application"; want != got {
 		t.Fatalf("UserAgent Attribute = %q; want %q", got, want)
 	}
 }
