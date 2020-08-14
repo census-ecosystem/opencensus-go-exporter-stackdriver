@@ -51,7 +51,7 @@ const (
 	opencensusTaskKey         = "opencensus_task"
 	opencensusTaskDescription = "Opencensus task identifier"
 	defaultDisplayNamePrefix  = "OpenCensus"
-	version                   = "0.10.0"
+	version                   = "0.12.3"
 )
 
 // statsExporter exports stats to the Stackdriver Monitoring.
