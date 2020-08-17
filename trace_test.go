@@ -156,7 +156,7 @@ func TestTraceSpansBufferMaxBytes(t *testing.T) {
 		exported++
 	}
 	for i := 0; i < 10; i++ {
-		e.ExportSpan(makeSampleSpanData())
+		e.ExportSpan(makeSampleSpanData(""))
 	}
 	close(waitCh)
 	e.Flush()
@@ -165,13 +165,47 @@ func TestTraceSpansBufferMaxBytes(t *testing.T) {
 	}
 }
 
-func makeSampleSpanData() *trace.SpanData {
+func TestTraceSpansUserAgent(t *testing.T) {
+	e := newTraceExporterWithClient(Options{
+		UserAgent: "OpenCensus Service",
+		Context:   context.Background(),
+		Timeout:   10 * time.Millisecond,
+	}, nil)
+
+	var got string
+	// set user-agent attribute based on provided option
+	e.uploadFn = func(spans []*tracepb.Span) {
+		got = spans[0].Attributes.AttributeMap[agentLabel].GetStringValue().Value
+	}
+	e.ExportSpan(makeSampleSpanData(""))
+	e.Flush()
+	if want := "OpenCensus Service"; want != got {
+		t.Fatalf("UserAgent Attribute = %q; want %q", got, want)
+	}
+
+	// if user-agent is already set, do not override
+	e.uploadFn = func(spans []*tracepb.Span) {
+		got = spans[0].Attributes.AttributeMap[agentLabel].GetStringValue().Value
+	}
+	e.ExportSpan(makeSampleSpanData("My Test Application"))
+	e.Flush()
+	if want := "My Test Application"; want != got {
+		t.Fatalf("UserAgent Attribute = %q; want %q", got, want)
+	}
+}
+
+func makeSampleSpanData(userAgent string) *trace.SpanData {
 	sd := &trace.SpanData{
 		Annotations:   make([]trace.Annotation, 32),
 		Links:         make([]trace.Link, 32),
 		MessageEvents: make([]trace.MessageEvent, 128),
 		Attributes:    make(map[string]interface{}),
 	}
+
+	if userAgent != "" {
+		sd.Attributes[agentLabel] = userAgent
+	}
+
 	for i := 0; i < 32; i++ {
 		sd.Attributes[fmt.Sprintf("attribute-%d", i)] = ""
 	}

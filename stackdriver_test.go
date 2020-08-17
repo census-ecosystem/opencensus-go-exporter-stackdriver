@@ -136,3 +136,14 @@ func TestGRPC(t *testing.T) {
 
 	client.Single(context.Background(), &testpb.FooRequest{SleepNanos: int64(42 * time.Millisecond)})
 }
+
+func TestUserAgent(t *testing.T) {
+	e, err := NewExporter(Options{UserAgent: "OpenCensus Service"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if want, got := "OpenCensus Service", e.statsExporter.o.UserAgent; want != got {
+		t.Fatalf("UserAgent = %q; want %q", got, want)
+	}
+}
