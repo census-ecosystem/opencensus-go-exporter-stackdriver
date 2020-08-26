@@ -16,6 +16,7 @@ package stackdriver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
@@ -107,5 +108,75 @@ func makeTs(i int) *monitoringpb.TimeSeries {
 				},
 			},
 		},
+	}
+}
+
+func TestSendReqAndParseDropped(t *testing.T) {
+	type testCase struct {
+		name                 string
+		timeseriesCount      int
+		createTimeSeriesFunc func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error
+		expectedErr          bool
+		expectedDropped      int
+	}
+
+	testCases := []testCase{
+		{
+			name:            "No error",
+			timeseriesCount: 75,
+			createTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+				return nil
+			},
+			expectedErr:     false,
+			expectedDropped: 0,
+		},
+		{
+			name:            "Partial error",
+			timeseriesCount: 75,
+			createTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+				return errors.New("One or more TimeSeries could not be written: Internal error encountered. Please retry after a few seconds. If internal errors persist, contact support at https://cloud.google.com/support/docs.: timeSeries[0-16,25-44,46-74]; Unknown metric: agent.googleapis.com/system.swap.page_faults: timeSeries[45]")
+			},
+			expectedErr:     true,
+			expectedDropped: 67,
+		},
+		{
+			name:            "Incorrectly formatted error",
+			timeseriesCount: 75,
+			createTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+				return errors.New("One or more TimeSeries could not be written: Internal error encountered. Please retry after a few seconds. If internal errors persist, contact support at https://cloud.google.com/support/docs.: timeSeries[0-16,25-44,,46-74]; Unknown metric: agent.googleapis.com/system.swap.page_faults: timeSeries[45x]")
+			},
+			expectedErr:     true,
+			expectedDropped: 75,
+		},
+		{
+			name:            "Unexpected error format",
+			timeseriesCount: 75,
+			createTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+				return errors.New("err1")
+			},
+			expectedErr:     true,
+			expectedDropped: 75,
+		},
+	}
+
+	for _, test := range testCases {
+		t.Run(test.name, func(t *testing.T) {
+			persistedCreateTimeSeries := createTimeSeries
+			createTimeSeries = test.createTimeSeriesFunc
+
+			mc, _ := monitoring.NewMetricClient(context.Background())
+			d, err := sendReq(context.Background(), mc, &monitoringpb.CreateTimeSeriesRequest{TimeSeries: make([]*monitoringpb.TimeSeries, test.timeseriesCount)})
+			if !test.expectedErr && err != nil {
+				t.Fatal("Expected no err")
+			}
+			if test.expectedErr && err == nil {
+				t.Fatal("Expected noerr")
+			}
+			if d != test.expectedDropped {
+				t.Fatalf("Want %v dropped, got %v", test.expectedDropped, d)
+			}
+
+			createTimeSeries = persistedCreateTimeSeries
+		})
 	}
 }
