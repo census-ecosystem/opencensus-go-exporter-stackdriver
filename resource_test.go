@@ -360,6 +360,108 @@ func TestDefaultMapResource(t *testing.T) {
 				},
 			},
 		},
+		// Mapping for knative_broker with autodetected GCP metadata labels.
+		{
+			input: &resource.Resource{
+				Type: "knative_broker",
+				Labels: map[string]string{
+					knativeNamespaceName: "namespace1",
+					knativeBrokerName:    "default",
+				},
+			},
+			autoRes: &monitoredresource.GKEContainer{
+				ProjectID:   "proj1",
+				Zone:        "zone1",
+				ClusterName: "cluster1",
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "knative_broker",
+				Labels: map[string]string{
+					"project_id":     "proj1",
+					"location":       "zone1",
+					"cluster_name":   "cluster1",
+					"namespace_name": "namespace1",
+					"broker_name":    "default",
+				},
+			},
+		},
+		// Mapping for knative_broker with explicit GCP metadata labels.
+		{
+			input: &resource.Resource{
+				Type: "knative_broker",
+				Labels: map[string]string{
+					stackdriverProjectID:           "proj1",
+					resourcekeys.CloudKeyZone:      "zone1",
+					resourcekeys.K8SKeyClusterName: "cluster1",
+					knativeNamespaceName:           "namespace1",
+					knativeBrokerName:              "default",
+				},
+			},
+			autoRes: &monitoredresource.GKEContainer{},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "knative_broker",
+				Labels: map[string]string{
+					"project_id":     "proj1",
+					"location":       "zone1",
+					"cluster_name":   "cluster1",
+					"namespace_name": "namespace1",
+					"broker_name":    "default",
+				},
+			},
+		},
+		// Mapping for knative_trigger with autodetected GCP metadata labels.
+		{
+			input: &resource.Resource{
+				Type: "knative_trigger",
+				Labels: map[string]string{
+					knativeNamespaceName: "namespace1",
+					knativeBrokerName:    "default",
+					knativeTriggerName:   "trigger-storage",
+				},
+			},
+			autoRes: &monitoredresource.GKEContainer{
+				ProjectID:   "proj1",
+				Zone:        "zone1",
+				ClusterName: "cluster1",
+			},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "knative_trigger",
+				Labels: map[string]string{
+					"project_id":     "proj1",
+					"location":       "zone1",
+					"cluster_name":   "cluster1",
+					"namespace_name": "namespace1",
+					"broker_name":    "default",
+					"trigger_name":   "trigger-storage",
+				},
+			},
+		},
+		// Mapping for knative_trigger with explicit GCP metadata labels.
+		{
+			input: &resource.Resource{
+				Type: "knative_trigger",
+				Labels: map[string]string{
+					stackdriverProjectID:           "proj1",
+					resourcekeys.CloudKeyZone:      "zone1",
+					resourcekeys.K8SKeyClusterName: "cluster1",
+					knativeNamespaceName:           "namespace1",
+					knativeBrokerName:              "default",
+					knativeTriggerName:             "trigger-storage",
+				},
+			},
+			autoRes: &monitoredresource.GKEContainer{},
+			want: &monitoredrespb.MonitoredResource{
+				Type: "knative_trigger",
+				Labels: map[string]string{
+					"project_id":     "proj1",
+					"location":       "zone1",
+					"cluster_name":   "cluster1",
+					"namespace_name": "namespace1",
+					"broker_name":    "default",
+					"trigger_name":   "trigger-storage",
+				},
+			},
+		},
 	}
 	for i, c := range cases {
 		t.Run(fmt.Sprintf("case-%d", i), func(t *testing.T) {
