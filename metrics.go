@@ -64,6 +64,7 @@ func (se *statsExporter) ExportMetrics(ctx context.Context, metrics []*metricdat
 
 func (se *statsExporter) handleMetricsUpload(metrics []*metricdata.Metric) {
 	err := se.uploadMetrics(metrics)
+	se.o.handleExportResult(err)
 	if err != nil {
 		se.o.handleError(err)
 	}

@@ -102,6 +102,13 @@ type Options struct {
 	// Optional.
 	OnError func(err error)
 
+	// OnExport is the hook to be called when an export happened. If the export
+	// is a success, the err will be nil.
+	// By default this is set to nil.
+	// Note OnError is used in places when no export happens, whereas OnExport
+	// is only called when export happens.
+	OnExport func(err error)
+
 	// MonitoringClientOptions are additional options to be passed
 	// to the underlying Stackdriver Monitoring API client.
 	// Optional.
@@ -467,6 +474,12 @@ func (e *Exporter) sdWithDefaultTraceAttributes(sd *trace.SpanData) *trace.SpanD
 func (e *Exporter) Flush() {
 	e.statsExporter.Flush()
 	e.traceExporter.Flush()
+}
+
+func (o Options) handleExportResult(err error) {
+	if o.OnExport != nil {
+		o.OnExport(err)
+	}
 }
 
 func (o Options) handleError(err error) {
