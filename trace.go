@@ -101,6 +101,7 @@ func (e *traceExporter) ExportSpan(s *trace.SpanData) {
 	protoSpan := protoFromSpanData(s, e.projectID, e.o.Resource, e.o.UserAgent)
 	protoSize := proto.Size(protoSpan)
 	err := e.bundler.Add(protoSpan, protoSize)
+	e.o.handleExportResult(err)
 	switch err {
 	case nil:
 		return
@@ -174,6 +175,7 @@ func (e *traceExporter) uploadSpans(spans []*tracepb.Span) {
 	span.AddAttributes(trace.Int64Attribute("num_spans", int64(len(spans))))
 
 	err := e.client.BatchWriteSpans(ctx, &req)
+	e.o.handleExportResult(err)
 	if err != nil {
 		span.SetStatus(trace.Status{Code: 2, Message: err.Error()})
 		e.o.handleError(err)

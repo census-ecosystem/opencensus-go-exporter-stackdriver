@@ -138,7 +138,14 @@ func TestGRPC(t *testing.T) {
 }
 
 func TestUserAgent(t *testing.T) {
-	e, err := NewExporter(Options{UserAgent: "OpenCensus Service"})
+	projectID, ok := os.LookupEnv("STACKDRIVER_TEST_PROJECT_ID")
+	if !ok {
+		t.Skip("STACKDRIVER_TEST_PROJECT_ID not set")
+	}
+	e, err := NewExporter(Options{
+		UserAgent: "OpenCensus Service",
+		ProjectID: projectID,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}

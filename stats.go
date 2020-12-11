@@ -167,6 +167,7 @@ func (e *statsExporter) ExportView(vd *view.Data) {
 		return
 	}
 	err := e.viewDataBundler.Add(vd, 1)
+	e.o.handleExportResult(err)
 	switch err {
 	case nil:
 		return
@@ -190,7 +191,9 @@ func getTaskValue() string {
 // handleUpload handles uploading a slice
 // of Data, as well as error handling.
 func (e *statsExporter) handleUpload(vds ...*view.Data) {
-	if err := e.uploadStats(vds); err != nil {
+	err := e.uploadStats(vds)
+	e.o.handleExportResult(err)
+	if err != nil {
 		e.o.handleError(err)
 	}
 }
