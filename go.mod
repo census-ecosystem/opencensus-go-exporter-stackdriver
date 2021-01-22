@@ -6,8 +6,8 @@ require (
 	cloud.google.com/go v0.45.1
 	github.com/aws/aws-sdk-go v1.23.20
 	github.com/census-instrumentation/opencensus-proto v0.2.1
-	github.com/golang/protobuf v1.3.2
-	github.com/google/go-cmp v0.3.1
+	github.com/golang/protobuf v1.4.0
+	github.com/google/go-cmp v0.4.0
 	github.com/jstemmer/go-junit-report v0.0.0-20190106144839-af01ea7f8024
 	go.opencensus.io v0.22.4
 	golang.org/x/lint v0.0.0-20190409202823-959b441ac422
@@ -19,5 +19,6 @@ require (
 	google.golang.org/appengine v1.6.2 // indirect
 	google.golang.org/genproto v0.0.0-20190911173649-1774047e7e51
 	google.golang.org/grpc v1.23.1
+	google.golang.org/protobuf v1.22.0
 	honnef.co/go/tools v0.0.1-2019.2.3
 )
