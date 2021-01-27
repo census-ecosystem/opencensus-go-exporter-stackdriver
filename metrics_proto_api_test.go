@@ -23,14 +23,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"google.golang.org/api/option"
+	"google.golang.org/protobuf/testing/protocmp"
 
-	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
@@ -593,7 +591,7 @@ func requireTimeSeriesRequestEqual(t *testing.T, got, want []*monitoringpb.Creat
 	}
 	for i, g := range got {
 		w := want[i]
-		diff = cmp.Diff(g, w, cmpopts.IgnoreFields(timestamp.Timestamp{}, "XXX_sizecache"))
+		diff = cmp.Diff(g, w, protocmp.Transform())
 		if diff != "" {
 			return diff, i
 		}
@@ -610,9 +608,7 @@ func requireMetricDescriptorRequestEqual(t *testing.T, got, want []*monitoringpb
 	}
 	for i, g := range got {
 		w := want[i]
-		diff = cmp.Diff(g, w,
-			cmpopts.IgnoreFields(labelpb.LabelDescriptor{}, "XXX_sizecache"),
-			cmpopts.IgnoreFields(googlemetricpb.MetricDescriptor{}, "XXX_sizecache"))
+		diff = cmp.Diff(g, w, protocmp.Transform())
 		if diff != "" {
 			return diff, i
 		}

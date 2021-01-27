@@ -39,8 +39,6 @@ import (
 	"google.golang.org/api/support/bundler"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
-	"google.golang.org/genproto/googleapis/api/metric"
-	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	metricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
@@ -147,6 +145,7 @@ func (e *statsExporter) startMetricsReader() error {
 func (e *statsExporter) stopMetricsReader() {
 	if e.ir != nil {
 		e.ir.Stop()
+		e.ir.Flush()
 	}
 }
 
@@ -433,7 +432,7 @@ func (e *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monitor
 // metricSignature creates a unique signature consisting of a
 // metric's type and its lexicographically sorted label values
 // See https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/120
-func metricSignature(metric *googlemetricpb.Metric) string {
+func metricSignature(metric *metricpb.Metric) string {
 	labels := metric.GetLabels()
 	labelValues := make([]string, 0, len(labels))
 
@@ -593,7 +592,7 @@ func newLabelDescriptors(defaults map[string]labelValue, keys []tag.Key) []*labe
 	return labelDescriptors
 }
 
-func (e *statsExporter) createMetricDescriptor(ctx context.Context, md *metric.MetricDescriptor) error {
+func (e *statsExporter) createMetricDescriptor(ctx context.Context, md *metricpb.MetricDescriptor) error {
 	ctx, cancel := newContextWithTimeout(ctx, e.o.Timeout)
 	defer cancel()
 	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
@@ -604,7 +603,7 @@ func (e *statsExporter) createMetricDescriptor(ctx context.Context, md *metric.M
 	return err
 }
 
-var createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
+var createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metricpb.MetricDescriptor, error) {
 	return c.CreateMetricDescriptor(ctx, mdr)
 }
 

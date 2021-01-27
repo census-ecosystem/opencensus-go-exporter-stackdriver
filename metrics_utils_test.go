@@ -28,6 +28,7 @@ import (
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func cmpResource(got, want *monitoredrespb.MonitoredResource) string {
@@ -47,21 +48,21 @@ func requireTimeSeriesRequestEqual(t *testing.T, got, want []*monitoringpb.Creat
 }
 
 func cmpTSReqs(got, want []*monitoringpb.CreateTimeSeriesRequest) string {
-	return cmp.Diff(got, want, cmpopts.IgnoreUnexported(monitoringpb.CreateTimeSeriesRequest{}), cmpopts.IgnoreTypes(googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED, googlemetricpb.MetricDescriptor_VALUE_TYPE_UNSPECIFIED))
+	return cmp.Diff(got, want, protocmp.Transform(), protocmp.IgnoreEnums(googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED, googlemetricpb.MetricDescriptor_VALUE_TYPE_UNSPECIFIED))
 }
 
 func cmpMD(got, want *googlemetricpb.MetricDescriptor) string {
-	return cmp.Diff(got, want, cmpopts.IgnoreUnexported(googlemetricpb.MetricDescriptor{}))
+	return cmp.Diff(got, want, protocmp.Transform())
 }
 
 func cmpMDReq(got, want *monitoringpb.CreateMetricDescriptorRequest) string {
-	return cmp.Diff(got, want, cmpopts.IgnoreUnexported(monitoringpb.CreateMetricDescriptorRequest{}))
+	return cmp.Diff(got, want, protocmp.Transform())
 }
 
 func cmpMDReqs(got, want []*monitoringpb.CreateMetricDescriptorRequest) string {
-	return cmp.Diff(got, want, cmpopts.IgnoreUnexported(monitoringpb.CreateMetricDescriptorRequest{}))
+	return cmp.Diff(got, want, protocmp.Transform())
 }
 
 func cmpPoint(got, want *monitoringpb.Point) string {
-	return cmp.Diff(got, want, cmpopts.IgnoreUnexported(monitoringpb.Point{}))
+	return cmp.Diff(got, want, protocmp.Transform())
 }
