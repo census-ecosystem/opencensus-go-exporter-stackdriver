@@ -31,7 +31,7 @@ import (
 	"go.opencensus.io/tag"
 	"go.opencensus.io/trace"
 
-	monitoring "cloud.google.com/go/monitoring/apiv3"
+	monitoring "cloud.google.com/go/monitoring/apiv3/v2"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/metric/metricexport"

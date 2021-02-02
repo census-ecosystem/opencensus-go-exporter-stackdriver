@@ -21,9 +21,10 @@ Common test utilities for comparing Stackdriver metrics.
 import (
 	"testing"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/proto"
 
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
@@ -42,7 +43,15 @@ func requireTimeSeriesRequestEqual(t *testing.T, got, want []*monitoringpb.Creat
 	for i, g := range got {
 		w := want[i]
 		if !proto.Equal(g, w) {
-			t.Fatalf("Unexpected proto difference got: %s want: %s", proto.MarshalTextString(g), proto.MarshalTextString(w))
+			gBytes, err := prototext.Marshal(g)
+			if err != nil {
+				t.Fatalf("Error marshaling time series: %s", err)
+			}
+			wBytes, err := prototext.Marshal(w)
+			if err != nil {
+				t.Fatalf("Error marshaling time series: %s", err)
+			}
+			t.Fatalf("Unexpected proto difference got: %s want: %s", string(gBytes), string(wBytes))
 		}
 	}
 }

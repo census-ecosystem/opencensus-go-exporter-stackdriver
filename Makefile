@@ -114,7 +114,7 @@ goimports:
 
 .PHONY: staticcheck
 staticcheck:
-	$(STATICCHECK) -checks "inherit,-SA1019" ./...
+	$(STATICCHECK) ./...
 
 .PHONY: install-tools
 install-tools:
