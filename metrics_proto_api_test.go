@@ -23,14 +23,12 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/golang/protobuf/ptypes/timestamp"
 	"google.golang.org/api/option"
+	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/testing/protocmp"
 
-	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
@@ -430,7 +428,7 @@ func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
 	strMetrics := strings.Split(string(f), "---")
 	for _, strMetric := range strMetrics {
 		in := metricspb.Metric{}
-		err = proto.UnmarshalText(strMetric, &in)
+		err = prototext.Unmarshal([]byte(strMetric), &in)
 		if err != nil {
 			t.Fatalf("error unmarshalling Metric protos from file " + filename)
 		}
@@ -446,7 +444,7 @@ func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
 	strOutMDRs := strings.Split(string(f), "---")
 	for _, strOutMDR := range strOutMDRs {
 		outMDR := monitoringpb.CreateMetricDescriptorRequest{}
-		err = proto.UnmarshalText(strOutMDR, &outMDR)
+		err = prototext.Unmarshal([]byte(strOutMDR), &outMDR)
 		if err != nil {
 			t.Fatalf("error unmarshalling CreateMetricDescriptorRequest protos from file " + filename)
 		}
@@ -464,7 +462,7 @@ func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
 	strOutTSRs := strings.Split(string(f), "---")
 	for _, strOutTSR := range strOutTSRs {
 		outTSR := monitoringpb.CreateTimeSeriesRequest{}
-		err = proto.UnmarshalText(strOutTSR, &outTSR)
+		err = prototext.Unmarshal([]byte(strOutTSR), &outTSR)
 		if err != nil {
 			t.Fatalf("error unmarshalling CreateTimeSeriesRequest protos from file " + filename)
 		}
@@ -484,7 +482,7 @@ func readTestResourcesFiles(t *testing.T, filename string) ([]*resourcepb.Resour
 	strResources := strings.Split(string(f), "---")
 	for _, strRes := range strResources {
 		inRes := resourcepb.Resource{}
-		err = proto.UnmarshalText(strRes, &inRes)
+		err = prototext.Unmarshal([]byte(strRes), &inRes)
 		if err != nil {
 			t.Fatalf("error unmarshalling input Resource protos from file " + filename)
 		}
@@ -501,7 +499,7 @@ func readTestResourcesFiles(t *testing.T, filename string) ([]*resourcepb.Resour
 	strResources = strings.Split(string(f), "---")
 	for _, strRes := range strResources {
 		outRes := monitoredrespb.MonitoredResource{}
-		err = proto.UnmarshalText(strRes, &outRes)
+		err = prototext.Unmarshal([]byte(strRes), &outRes)
 		if err != nil {
 			t.Fatalf("error unmarshalling output Resource protos from file " + filename)
 		}
@@ -593,7 +591,7 @@ func requireTimeSeriesRequestEqual(t *testing.T, got, want []*monitoringpb.Creat
 	}
 	for i, g := range got {
 		w := want[i]
-		diff = cmp.Diff(g, w, cmpopts.IgnoreFields(timestamp.Timestamp{}, "XXX_sizecache"))
+		diff = cmp.Diff(g, w, protocmp.Transform())
 		if diff != "" {
 			return diff, i
 		}
@@ -610,9 +608,7 @@ func requireMetricDescriptorRequestEqual(t *testing.T, got, want []*monitoringpb
 	}
 	for i, g := range got {
 		w := want[i]
-		diff = cmp.Diff(g, w,
-			cmpopts.IgnoreFields(labelpb.LabelDescriptor{}, "XXX_sizecache"),
-			cmpopts.IgnoreFields(googlemetricpb.MetricDescriptor{}, "XXX_sizecache"))
+		diff = cmp.Diff(g, w, protocmp.Transform())
 		if diff != "" {
 			return diff, i
 		}

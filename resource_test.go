@@ -25,6 +25,7 @@ import (
 	"go.opencensus.io/resource"
 	"go.opencensus.io/resource/resourcekeys"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func TestDefaultMapResource(t *testing.T) {
@@ -476,7 +477,7 @@ func TestDefaultMapResource(t *testing.T) {
 			}
 
 			got := DefaultMapResource(c.input)
-			if diff := cmp.Diff(got, c.want); diff != "" {
+			if diff := cmp.Diff(got, c.want, protocmp.Transform()); diff != "" {
 				t.Errorf("Values differ -got +want: %s", diff)
 			}
 		})

@@ -24,7 +24,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"
 	"go.opencensus.io/trace"
@@ -32,6 +31,7 @@ import (
 	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
 	codepb "google.golang.org/genproto/googleapis/rpc/code"
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
+	"google.golang.org/protobuf/encoding/prototext"
 )
 
 var (
@@ -324,10 +324,18 @@ func TestExportTrace(t *testing.T) {
 	if !reflect.DeepEqual(spbs, expectedSpans) {
 		var got, want []string
 		for _, s := range spbs {
-			got = append(got, proto.MarshalTextString(s))
+			bytes, err := prototext.Marshal(s)
+			if err != nil {
+				t.Fatalf("Error marshalling span: %s", err)
+			}
+			got = append(got, string(bytes))
 		}
 		for _, s := range expectedSpans {
-			want = append(want, proto.MarshalTextString(s))
+			bytes, err := prototext.Marshal(s)
+			if err != nil {
+				t.Fatalf("Error marshalling span: %s", err)
+			}
+			want = append(want, string(bytes))
 		}
 		t.Errorf("got spans:\n%s\nwant:\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}

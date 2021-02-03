@@ -29,6 +29,7 @@ import (
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	"github.com/golang/protobuf/ptypes/wrappers"
@@ -995,7 +996,7 @@ func TestConvertSummaryMetrics(t *testing.T) {
 			se = new(statsExporter)
 		}
 		got := se.convertSummaryMetrics(tt.in)
-		if !cmp.Equal(got, tt.want) {
+		if !cmp.Equal(got, tt.want, protocmp.Transform()) {
 			t.Fatalf("conversion failed:\n  got=%v\n want=%v\n", got, tt.want)
 		}
 	}
