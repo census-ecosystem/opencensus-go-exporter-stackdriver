@@ -423,7 +423,7 @@ func (e *Exporter) ExportMetrics(ctx context.Context, metrics []*metricdata.Metr
 //    exporter.StartMetricsExporter()
 //    defer exporter.StopMetricsExporter()
 //
-// Both approach should not be used simultaenously. Otherwise it may result into unknown behavior.
+// Both approach should not be used simultaneously. Otherwise it may result into unknown behavior.
 // Previous approach continues to work as before but will not report newly define metrics such
 // as gauges.
 func (e *Exporter) StartMetricsExporter() error {
