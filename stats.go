@@ -26,13 +26,12 @@ import (
 	"sync"
 	"time"
 
-	opencensus "go.opencensus.io"
 	"go.opencensus.io/stats"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/tag"
 	"go.opencensus.io/trace"
 
-	monitoring "cloud.google.com/go/monitoring/apiv3"
+	monitoring "cloud.google.com/go/monitoring/apiv3/v2"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"go.opencensus.io/metric/metricdata"
 	"go.opencensus.io/metric/metricexport"
@@ -40,8 +39,6 @@ import (
 	"google.golang.org/api/support/bundler"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
-	"google.golang.org/genproto/googleapis/api/metric"
-	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	metricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
@@ -52,10 +49,8 @@ const (
 	opencensusTaskKey         = "opencensus_task"
 	opencensusTaskDescription = "Opencensus task identifier"
 	defaultDisplayNamePrefix  = "OpenCensus"
-	version                   = "0.10.0"
+	version                   = "0.13.3"
 )
-
-var userAgent = fmt.Sprintf("opencensus-go %s; stackdriver-exporter %s", opencensus.Version(), version)
 
 // statsExporter exports stats to the Stackdriver Monitoring.
 type statsExporter struct {
@@ -89,7 +84,7 @@ func newStatsExporter(o Options) (*statsExporter, error) {
 		return nil, errBlankProjectID
 	}
 
-	opts := append(o.MonitoringClientOptions, option.WithUserAgent(userAgent))
+	opts := append(o.MonitoringClientOptions, option.WithUserAgent(o.UserAgent))
 	ctx := o.Context
 	if ctx == nil {
 		ctx = context.Background()
@@ -150,6 +145,7 @@ func (e *statsExporter) startMetricsReader() error {
 func (e *statsExporter) stopMetricsReader() {
 	if e.ir != nil {
 		e.ir.Stop()
+		e.ir.Flush()
 	}
 }
 
@@ -365,6 +361,10 @@ func (e *statsExporter) createMetricDescriptorFromView(ctx context.Context, v *v
 }
 
 func (e *statsExporter) displayName(suffix string) string {
+	if hasDomain(suffix) {
+		// If the display name suffix is already prefixed with domain, skip adding extra prefix
+		return suffix
+	}
 	return path.Join(defaultDisplayNamePrefix, suffix)
 }
 
@@ -432,7 +432,7 @@ func (e *statsExporter) combineTimeSeriesToCreateTimeSeriesRequest(ts []*monitor
 // metricSignature creates a unique signature consisting of a
 // metric's type and its lexicographically sorted label values
 // See https://github.com/census-ecosystem/opencensus-go-exporter-stackdriver/issues/120
-func metricSignature(metric *googlemetricpb.Metric) string {
+func metricSignature(metric *metricpb.Metric) string {
 	labels := metric.GetLabels()
 	labelValues := make([]string, 0, len(labels))
 
@@ -536,7 +536,7 @@ func newTypedValue(vd *view.View, r *view.Row) *monitoringpb.TypedValue {
 }
 
 func shouldInsertZeroBound(bounds ...float64) bool {
-	if len(bounds) > 0 && bounds[0] != 0.0 {
+	if len(bounds) > 0 && bounds[0] > 0.0 {
 		return true
 	}
 	return false
@@ -592,7 +592,7 @@ func newLabelDescriptors(defaults map[string]labelValue, keys []tag.Key) []*labe
 	return labelDescriptors
 }
 
-func (e *statsExporter) createMetricDescriptor(ctx context.Context, md *metric.MetricDescriptor) error {
+func (e *statsExporter) createMetricDescriptor(ctx context.Context, md *metricpb.MetricDescriptor) error {
 	ctx, cancel := newContextWithTimeout(ctx, e.o.Timeout)
 	defer cancel()
 	cmrdesc := &monitoringpb.CreateMetricDescriptorRequest{
@@ -603,7 +603,7 @@ func (e *statsExporter) createMetricDescriptor(ctx context.Context, md *metric.M
 	return err
 }
 
-var createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
+var createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metricpb.MetricDescriptor, error) {
 	return c.CreateMetricDescriptor(ctx, mdr)
 }
 

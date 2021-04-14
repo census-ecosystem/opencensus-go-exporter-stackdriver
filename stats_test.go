@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	monitoring "cloud.google.com/go/monitoring/apiv3"
+	monitoring "cloud.google.com/go/monitoring/apiv3/v2"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -30,11 +30,11 @@ import (
 	"go.opencensus.io/tag"
 	"google.golang.org/api/option"
 	"google.golang.org/genproto/googleapis/api/distribution"
-	"google.golang.org/genproto/googleapis/api/metric"
 	metricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/testing/protocmp"
 )
 
 var authOptions = []option.ClientOption{option.WithGRPCConn(&grpc.ClientConn{})}
@@ -487,7 +487,7 @@ func TestExporter_makeReq(t *testing.T) {
 			if len(tt.want) == 0 {
 				return
 			}
-			if diff := cmp.Diff(resps, tt.want); diff != "" {
+			if diff := cmp.Diff(resps, tt.want, protocmp.Transform()); diff != "" {
 				t.Errorf("Values differ -got +want: %s", diff)
 			}
 		})
@@ -622,7 +622,7 @@ func TestExporter_createMetricDescriptorFromView(t *testing.T) {
 			}
 
 			var createCalls int
-			createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
+			createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metricpb.MetricDescriptor, error) {
 				createCalls++
 				if got, want := mdr.MetricDescriptor.Name, "projects/test_project/metricDescriptors/custom.googleapis.com/opencensus/test_view_sum"; got != want {
 					t.Errorf("MetricDescriptor.Name = %q; want %q", got, want)
@@ -645,7 +645,7 @@ func TestExporter_createMetricDescriptorFromView(t *testing.T) {
 				if got, want := mdr.MetricDescriptor.Unit, stats.UnitMilliseconds; got != want {
 					t.Errorf("MetricDescriptor.Unit = %q; want %q", got, want)
 				}
-				return &metric.MetricDescriptor{
+				return &metricpb.MetricDescriptor{
 					DisplayName: "OpenCensus/test_view_sum",
 					Description: "view_description",
 					Unit:        stats.UnitMilliseconds,
@@ -699,7 +699,7 @@ func TestExporter_createMetricDescriptorFromView_CountAggregation(t *testing.T) 
 		o:                 Options{ProjectID: "test_project"},
 	}
 
-	createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
+	createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metricpb.MetricDescriptor, error) {
 		if got, want := mdr.MetricDescriptor.Name, "projects/test_project/metricDescriptors/custom.googleapis.com/opencensus/test_view_count"; got != want {
 			t.Errorf("MetricDescriptor.Name = %q; want %q", got, want)
 		}
@@ -721,7 +721,7 @@ func TestExporter_createMetricDescriptorFromView_CountAggregation(t *testing.T) 
 		if got, want := mdr.MetricDescriptor.Unit, stats.UnitDimensionless; got != want {
 			t.Errorf("MetricDescriptor.Unit = %q; want %q", got, want)
 		}
-		return &metric.MetricDescriptor{
+		return &metricpb.MetricDescriptor{
 			DisplayName: "OpenCensus/test_view_sum",
 			Description: "view_description",
 			Unit:        stats.UnitDimensionless,
@@ -1079,7 +1079,7 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 			if len(tt.want) == 0 {
 				return
 			}
-			if diff := cmp.Diff(resps, tt.want); diff != "" {
+			if diff := cmp.Diff(resps, tt.want, protocmp.Transform()); diff != "" {
 				t.Errorf("Requests differ, -got +want: %s", diff)
 			}
 		})
@@ -1096,14 +1096,14 @@ func TestExporter_customContext(t *testing.T) {
 	}()
 
 	var timedOut = 0
-	createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metric.MetricDescriptor, error) {
+	createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metricpb.MetricDescriptor, error) {
 		select {
 		case <-time.After(1 * time.Second):
 			fmt.Println("createMetricDescriptor did not time out")
 		case <-ctx.Done():
 			timedOut++
 		}
-		return &metric.MetricDescriptor{}, nil
+		return &metricpb.MetricDescriptor{}, nil
 	}
 	createTimeSeries = func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
 		select {

@@ -62,6 +62,10 @@ func (s *testServer) Multiple(stream Foo_MultipleServer) error {
 	}
 }
 
+// mustEmbedUnimplementedFooServer is a dummy method added to satisfy
+// FooServer interface
+func (*testServer) mustEmbedUnimplementedFooServer() {}
+
 // NewTestClient is used for internal testing only. It creates a
 // grpc server and client. It returns client and cleanup function
 // to close the connection and gracefully stop the server.

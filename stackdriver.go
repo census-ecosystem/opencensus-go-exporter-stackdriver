@@ -60,12 +60,14 @@ import (
 	metadataapi "cloud.google.com/go/compute/metadata"
 	traceapi "cloud.google.com/go/trace/apiv2"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
+	opencensus "go.opencensus.io"
 	"go.opencensus.io/resource"
 	"go.opencensus.io/resource/resourcekeys"
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
+	metricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
@@ -183,7 +185,7 @@ type Options struct {
 
 	// MapResource converts a OpenCensus resource to a Stackdriver monitored resource.
 	//
-	// If this field is unset, defaultMapResource will be used which encodes a set of default
+	// If this field is unset, DefaultMapResource will be used which encodes a set of default
 	// conversions from auto-detected resources to well-known Stackdriver monitored resources.
 	MapResource func(*resource.Resource) *monitoredrespb.MonitoredResource
 
@@ -279,11 +281,17 @@ type Options struct {
 	// time-series then it will result into an error for the entire CreateTimeSeries request
 	// which may contain more than one time-series.
 	ResourceByDescriptor func(*metricdata.Descriptor, map[string]string) (map[string]string, monitoredresource.Interface)
+
+	// Override the user agent value supplied to Monitoring APIs and included as an
+	// attribute in trace data.
+	UserAgent string
 }
 
 const defaultTimeout = 5 * time.Second
 
 var defaultDomain = path.Join("custom.googleapis.com", "opencensus")
+
+var defaultUserAgent = fmt.Sprintf("opencensus-go %s; stackdriver-exporter %s", opencensus.Version(), version)
 
 // Exporter is a stats and trace exporter that uploads data to Stackdriver.
 //
@@ -333,7 +341,7 @@ func NewExporter(o Options) (*Exporter, error) {
 		o.Resource = convertMonitoredResourceToPB(o.MonitoredResource)
 	}
 	if o.MapResource == nil {
-		o.MapResource = defaultMapResource
+		o.MapResource = DefaultMapResource
 	}
 	if o.ResourceDetector != nil {
 		// For backwards-compatibility we still respect the deprecated resource field.
@@ -346,6 +354,9 @@ func NewExporter(o Options) (*Exporter, error) {
 		}
 		// Populate internal resource labels for defaulting project_id, location, and
 		// generic resource labels of applicable monitored resources.
+		if res.Labels == nil {
+			res.Labels = make(map[string]string)
+		}
 		res.Labels[stackdriverProjectID] = o.ProjectID
 		res.Labels[resourcekeys.CloudKeyZone] = o.Location
 		res.Labels[stackdriverGenericTaskNamespace] = "default"
@@ -358,6 +369,9 @@ func NewExporter(o Options) (*Exporter, error) {
 	}
 	if o.MetricPrefix != "" && !strings.HasSuffix(o.MetricPrefix, "/") {
 		o.MetricPrefix = o.MetricPrefix + "/"
+	}
+	if o.UserAgent == "" {
+		o.UserAgent = defaultUserAgent
 	}
 
 	se, err := newStatsExporter(o)
@@ -454,6 +468,15 @@ func (e *Exporter) sdWithDefaultTraceAttributes(sd *trace.SpanData) *trace.SpanD
 func (e *Exporter) Flush() {
 	e.statsExporter.Flush()
 	e.traceExporter.Flush()
+}
+
+// ViewToMetricDescriptor converts an OpenCensus view to a MetricDescriptor.
+//
+// This is useful for cases when you want to use your Go code as source of
+// truth of metric descriptors. You can extract or define views in a central
+// place, then call this method to generate MetricDescriptors.
+func (e *Exporter) ViewToMetricDescriptor(ctx context.Context, v *view.View) (*metricpb.MetricDescriptor, error) {
+	return e.statsExporter.viewToMetricDescriptor(ctx, v)
 }
 
 func (o Options) handleError(err error) {

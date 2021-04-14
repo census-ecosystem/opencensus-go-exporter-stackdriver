@@ -22,10 +22,10 @@ import (
 	"time"
 
 	tracingclient "cloud.google.com/go/trace/apiv2"
-	"github.com/golang/protobuf/proto"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/support/bundler"
 	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
+	"google.golang.org/protobuf/proto"
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
@@ -98,7 +98,7 @@ func newTraceExporterWithClient(o Options, c *tracingclient.Client) *traceExport
 
 // ExportSpan exports a SpanData to Stackdriver Trace.
 func (e *traceExporter) ExportSpan(s *trace.SpanData) {
-	protoSpan := protoFromSpanData(s, e.projectID, e.o.Resource)
+	protoSpan := protoFromSpanData(s, e.projectID, e.o.Resource, e.o.UserAgent)
 	protoSize := proto.Size(protoSpan)
 	err := e.bundler.Add(protoSpan, protoSize)
 	switch err {
@@ -137,7 +137,7 @@ func (e *traceExporter) pushTraceSpans(ctx context.Context, node *commonpb.Node,
 	}
 
 	for _, span := range spans {
-		protoSpans = append(protoSpans, protoFromSpanData(span, e.projectID, res))
+		protoSpans = append(protoSpans, protoFromSpanData(span, e.projectID, res, e.o.UserAgent))
 	}
 
 	req := tracepb.BatchWriteSpansRequest{

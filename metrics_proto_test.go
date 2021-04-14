@@ -29,6 +29,7 @@ import (
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/testing/protocmp"
 
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	"github.com/golang/protobuf/ptypes/wrappers"
@@ -54,7 +55,7 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 
 		// Set empty labels to avoid the opencensus-task
 		DefaultMonitoringLabels: &Labels{},
-		MapResource:             defaultMapResource,
+		MapResource:             DefaultMapResource,
 	}
 	se, err := newStatsExporter(exporterOptions)
 	if err != nil {
@@ -260,7 +261,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 				},
 			},
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+				o: Options{ProjectID: "foo", MapResource: DefaultMapResource},
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
@@ -331,7 +332,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 				},
 			},
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+				o: Options{ProjectID: "foo", MapResource: DefaultMapResource},
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
@@ -446,7 +447,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 				},
 			},
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+				o: Options{ProjectID: "foo", MapResource: DefaultMapResource},
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
@@ -518,7 +519,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 				},
 			},
 			statsExporter: &statsExporter{
-				o: Options{ProjectID: "foo", MapResource: defaultMapResource},
+				o: Options{ProjectID: "foo", MapResource: DefaultMapResource},
 			},
 			want: []*monitoringpb.CreateTimeSeriesRequest{
 				{
@@ -618,6 +619,26 @@ func TestProtoToMonitoringMetricDescriptor(t *testing.T) {
 				Labels:      []*labelpb.LabelDescriptor{},
 				DisplayName: "OpenCensus/with_metric_descriptor",
 				Description: "This is with metric descriptor",
+				Unit:        "By",
+			},
+		},
+		{
+			in: &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "external.googleapis.com/user/with_domain",
+					Description: "With metric descriptor and domain prefix",
+					Unit:        "By",
+				},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "test"},
+			},
+			want: &googlemetricpb.MetricDescriptor{
+				Name:        "projects/test/metricDescriptors/external.googleapis.com/user/with_domain",
+				Type:        "external.googleapis.com/user/with_domain",
+				Labels:      []*labelpb.LabelDescriptor{},
+				DisplayName: "external.googleapis.com/user/with_domain",
+				Description: "With metric descriptor and domain prefix",
 				Unit:        "By",
 			},
 		},
@@ -975,7 +996,7 @@ func TestConvertSummaryMetrics(t *testing.T) {
 			se = new(statsExporter)
 		}
 		got := se.convertSummaryMetrics(tt.in)
-		if !cmp.Equal(got, tt.want) {
+		if !cmp.Equal(got, tt.want, protocmp.Transform()) {
 			t.Fatalf("conversion failed:\n  got=%v\n want=%v\n", got, tt.want)
 		}
 	}
