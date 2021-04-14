@@ -253,7 +253,7 @@ type Options struct {
 	// or the unit is not important.
 	SkipCMD bool
 
-	// Timeout for all API calls. If not set, defaults to 5 seconds.
+	// Timeout for all API calls. If not set, defaults to 12 seconds.
 	Timeout time.Duration
 
 	// ReportingInterval sets the interval between reporting metrics.
@@ -287,7 +287,7 @@ type Options struct {
 	UserAgent string
 }
 
-const defaultTimeout = 5 * time.Second
+const defaultTimeout = 12 * time.Second
 
 var defaultDomain = path.Join("custom.googleapis.com", "opencensus")
 
