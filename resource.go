@@ -205,12 +205,15 @@ func transformResource(match, input map[string]string) (map[string]string, bool)
 
 // DefaultMapResource implements default resource mapping for well-known resource types
 func DefaultMapResource(res *resource.Resource) *monitoredrespb.MonitoredResource {
+	if res == nil || res.Labels == nil {
+		return &monitoredrespb.MonitoredResource{
+			Type: "global",
+		}
+	}
+
 	match := genericResourceMap
 	result := &monitoredrespb.MonitoredResource{
-		Type: "global",
-	}
-	if res == nil || res.Labels == nil {
-		return result
+		Type: "generic_task",
 	}
 
 	switch {
