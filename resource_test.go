@@ -276,7 +276,7 @@ func TestDefaultMapResource(t *testing.T) {
 				},
 			},
 			want: &monitoredrespb.MonitoredResource{
-				Type: "global",
+				Type: "generic_task",
 				Labels: map[string]string{
 					"project_id": "proj1",
 					"location":   "zone1",
