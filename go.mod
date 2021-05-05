@@ -1,6 +1,6 @@
 module contrib.go.opencensus.io/exporter/stackdriver
 
-go 1.12
+go 1.15
 
 require (
 	cloud.google.com/go v0.75.0
