@@ -452,19 +452,29 @@ func newPoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.P
 	}
 }
 
+func toValidTimeIntervalpb(start, end time.Time) *monitoringpb.TimeInterval {
+	// The end time of a new interval must be at least a millisecond after the end time of the
+	// previous interval, for all non-gauge types.
+	// https://cloud.google.com/monitoring/api/ref_v3/rpc/google.monitoring.v3#timeinterval
+	if end.Sub(start).Milliseconds() <= 1 {
+		end = start.Add(time.Millisecond)
+	}
+	return &monitoringpb.TimeInterval{
+		StartTime: &timestamp.Timestamp{
+			Seconds: start.Unix(),
+			Nanos:   int32(start.Nanosecond()),
+		},
+		EndTime: &timestamp.Timestamp{
+			Seconds: end.Unix(),
+			Nanos:   int32(end.Nanosecond()),
+		},
+	}
+}
+
 func newCumulativePoint(v *view.View, row *view.Row, start, end time.Time) *monitoringpb.Point {
 	return &monitoringpb.Point{
-		Interval: &monitoringpb.TimeInterval{
-			StartTime: &timestamp.Timestamp{
-				Seconds: start.Unix(),
-				Nanos:   int32(start.Nanosecond()),
-			},
-			EndTime: &timestamp.Timestamp{
-				Seconds: end.Unix(),
-				Nanos:   int32(end.Nanosecond()),
-			},
-		},
-		Value: newTypedValue(v, row),
+		Interval: toValidTimeIntervalpb(start, end),
+		Value:    newTypedValue(v, row),
 	}
 }
 
