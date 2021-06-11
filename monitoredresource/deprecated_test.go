@@ -29,7 +29,7 @@ const (
 	GKEClusterNameStr   = "cluster"
 )
 
-func TestGKEContainerMonitoredResources(t *testing.T) {
+func TestGKEContainerMonitoredResourcesV2(t *testing.T) {
 	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
 	autoDetected := GKEContainer{
 		InstanceID:    GCPInstanceIDStr,
@@ -39,32 +39,6 @@ func TestGKEContainerMonitoredResources(t *testing.T) {
 		ContainerName: GKEContainerNameStr,
 		NamespaceID:   GKENamespaceStr,
 		PodID:         GKEPodIDStr,
-	}
-
-	resType, labels := autoDetected.MonitoredResource()
-	if resType != "gke_container" ||
-		labels["instance_id"] != GCPInstanceIDStr ||
-		labels["project_id"] != GCPProjectIDStr ||
-		labels["cluster_name"] != GKEClusterNameStr ||
-		labels["container_name"] != GKEContainerNameStr ||
-		labels["zone"] != GCPZoneStr ||
-		labels["namespace_id"] != GKENamespaceStr ||
-		labels["pod_id"] != GKEPodIDStr {
-		t.Errorf("GKEContainerMonitoredResource Failed: %v", autoDetected)
-	}
-}
-
-func TestGKEContainerMonitoredResourcesV2(t *testing.T) {
-	os.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
-	autoDetected := GKEContainer{
-		InstanceID:                 GCPInstanceIDStr,
-		ProjectID:                  GCPProjectIDStr,
-		Zone:                       GCPZoneStr,
-		ClusterName:                GKEClusterNameStr,
-		ContainerName:              GKEContainerNameStr,
-		NamespaceID:                GKENamespaceStr,
-		PodID:                      GKEPodIDStr,
-		LoggingMonitoringV2Enabled: true,
 	}
 
 	resType, labels := autoDetected.MonitoredResource()
