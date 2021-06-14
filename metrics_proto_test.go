@@ -68,7 +68,7 @@ func TestExportTimeSeriesWithDifferentLabels(t *testing.T) {
 	}
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
-		Nanos:   100000997,
+		Nanos:   101000090,
 	}
 
 	// Generate the proto Metrics.
@@ -213,7 +213,7 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 	}
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
-		Nanos:   100000997,
+		Nanos:   101000090,
 	}
 
 	tests := []struct {
@@ -403,7 +403,7 @@ func TestProtoMetricWithDifferentResource(t *testing.T) {
 	}
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
-		Nanos:   100000997,
+		Nanos:   101000090,
 	}
 
 	seenResources := make(map[*resourcepb.Resource]*monitoredrespb.MonitoredResource)
@@ -677,7 +677,7 @@ func TestProtoMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 	}
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
-		Nanos:   100000997,
+		Nanos:   101000090,
 	}
 
 	tests := []struct {
@@ -890,7 +890,7 @@ func TestConvertSummaryMetrics(t *testing.T) {
 	}
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
-		Nanos:   100000997,
+		Nanos:   101000090,
 	}
 
 	res := &resourcepb.Resource{

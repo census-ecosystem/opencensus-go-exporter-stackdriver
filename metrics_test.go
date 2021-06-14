@@ -94,7 +94,7 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 	startTime, _ := ptypes.Timestamp(startTimestamp)
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
-		Nanos:   100000997,
+		Nanos:   101000090,
 	}
 	endTime, _ := ptypes.Timestamp(endTimestamp)
 
@@ -435,7 +435,7 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 	startTime, _ := ptypes.Timestamp(startTimestamp)
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
-		Nanos:   100000997,
+		Nanos:   101000090,
 	}
 	endTime, _ := ptypes.Timestamp(endTimestamp)
 
@@ -569,7 +569,7 @@ func TestResourceByDescriptor(t *testing.T) {
 	startTime, _ := ptypes.Timestamp(startTimestamp)
 	endTimestamp := &timestamp.Timestamp{
 		Seconds: 1543160298,
-		Nanos:   100000997,
+		Nanos:   101000090,
 	}
 	endTime, _ := ptypes.Timestamp(endTimestamp)
 
