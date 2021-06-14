@@ -25,7 +25,7 @@ timeseries: <
   points: <
     timestamp: <
       seconds: 1543160298
-      nanos: 100000997
+      nanos: 101000090
     >
     int64_value: 1
   >

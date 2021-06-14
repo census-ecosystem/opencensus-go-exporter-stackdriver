@@ -20,7 +20,7 @@ time_series: <
     interval: <
       end_time: <
         seconds: 1543160298
-        nanos: 100000997
+        nanos: 101000090
       >
       start_time: <
         seconds: 1543160298
@@ -53,7 +53,7 @@ time_series: <
     interval: <
       end_time: <
         seconds: 1543160298
-        nanos: 100000997
+        nanos: 101000090
       >
       start_time: <
         seconds: 1543160298
@@ -86,7 +86,7 @@ time_series: <
     interval: <
       end_time: <
         seconds: 1543160298
-        nanos: 100000997
+        nanos: 101000090
       >
       start_time: <
         seconds: 1543160298

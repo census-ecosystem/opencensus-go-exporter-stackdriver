@@ -443,12 +443,18 @@ func fromProtoPoint(startTime *timestamppb.Timestamp, pt *metricspb.Point) (*mon
 		return nil, err
 	}
 
+	endTime := pt.Timestamp
+	interval := &monitoringpb.TimeInterval{
+		StartTime: startTime,
+		EndTime:   endTime,
+	}
+	if startTime != nil && endTime != nil {
+		interval = toValidTimeIntervalpb(startTime.AsTime(), endTime.AsTime())
+	}
+
 	return &monitoringpb.Point{
-		Value: mptv,
-		Interval: &monitoringpb.TimeInterval{
-			StartTime: startTime,
-			EndTime:   pt.Timestamp,
-		},
+		Value:    mptv,
+		Interval: interval,
 	}, nil
 }
 
