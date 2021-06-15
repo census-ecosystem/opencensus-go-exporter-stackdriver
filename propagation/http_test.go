@@ -15,6 +15,7 @@
 package propagation
 
 import (
+	"encoding/hex"
 	"net/http"
 	"reflect"
 	"testing"
@@ -24,15 +25,20 @@ import (
 
 func TestHTTPFormat(t *testing.T) {
 	format := &HTTPFormat{}
-	traceID := [16]byte{16, 84, 69, 170, 120, 67, 188, 139, 242, 6, 177, 32, 0, 16, 0, 0}
-	spanID1 := [8]byte{255, 0, 0, 0, 0, 0, 0, 123}
-	spanID2 := [8]byte{0, 0, 0, 0, 0, 0, 0, 123}
+	var traceID [16]byte
+	var spanID1, spanID2 [8]byte
+	traceBuf, _ := hex.DecodeString("105445aa7843bc8bf206b12000100000")
+	spanBuf1, _ := hex.DecodeString("1234567890abcdef")
+	spanBuf2, _ := hex.DecodeString("1234567812345678")
+	copy(traceID[:], traceBuf)
+	copy(spanID1[:], spanBuf1)
+	copy(spanID2[:], spanBuf2)
 	tests := []struct {
 		incoming        string
 		wantSpanContext trace.SpanContext
 	}{
 		{
-			incoming: "105445aa7843bc8bf206b12000100000/18374686479671623803;o=1",
+			incoming: "105445aa7843bc8bf206b12000100000/1234567890abcdef;o=1",
 			wantSpanContext: trace.SpanContext{
 				TraceID:      traceID,
 				SpanID:       spanID1,
@@ -40,7 +46,7 @@ func TestHTTPFormat(t *testing.T) {
 			},
 		},
 		{
-			incoming: "105445aa7843bc8bf206b12000100000/123;o=0",
+			incoming: "105445aa7843bc8bf206b12000100000/1234567812345678;o=0",
 			wantSpanContext: trace.SpanContext{
 				TraceID:      traceID,
 				SpanID:       spanID2,
