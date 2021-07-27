@@ -402,7 +402,7 @@ func (e *Exporter) ExportMetricsProto(ctx context.Context, node *commonpb.Node, 
 	return err
 }
 
-// PushMetricsProto simliar with ExportMetricsProto but returns the number of dropped timeseries.
+// PushMetricsProto similar with ExportMetricsProto but returns the number of dropped timeseries.
 func (e *Exporter) PushMetricsProto(ctx context.Context, node *commonpb.Node, rsc *resourcepb.Resource, metrics []*metricspb.Metric) (int, error) {
 	return e.statsExporter.PushMetricsProto(ctx, node, rsc, metrics)
 }
