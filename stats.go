@@ -42,6 +42,7 @@ import (
 	metricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -619,6 +620,58 @@ var createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClien
 
 var createTimeSeries = func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
 	return c.CreateTimeSeries(ctx, ts)
+}
+
+var createServiceTimeSeries = func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+	return c.CreateServiceTimeSeries(ctx, ts)
+}
+
+// splitCreateTimeSeriesRequest splits a *monitoringpb.CreateTimeSeriesRequest object into two new objects:
+//   * The first object only contains service time series.
+//   * The second object only contains non-service time series.
+// A returned object may be nil if no time series is found in the original request that satisfies the rules
+// above.
+// All other properties of the original CreateTimeSeriesRequest object are kept in the returned objects.
+func splitCreateTimeSeriesRequest(req *monitoringpb.CreateTimeSeriesRequest) (*monitoringpb.CreateTimeSeriesRequest, *monitoringpb.CreateTimeSeriesRequest) {
+	var serviceReq, nonServiceReq *monitoringpb.CreateTimeSeriesRequest
+	serviceTs, nonServiceTs := splitTimeSeries(req.TimeSeries)
+	if len(serviceTs) > 0 {
+		serviceReq = proto.Clone(req).(*monitoringpb.CreateTimeSeriesRequest)
+		serviceReq.TimeSeries = serviceTs
+	}
+	if len(nonServiceTs) > 0 {
+		nonServiceReq = proto.Clone(req).(*monitoringpb.CreateTimeSeriesRequest)
+		nonServiceReq.TimeSeries = nonServiceTs
+	}
+	return serviceReq, nonServiceReq
+}
+
+// splitTimeSeries splits a []*monitoringpb.TimeSeries slice into two:
+//   * The first slice only contains service time series
+//   * The second slice only contains non-service time series
+func splitTimeSeries(timeSeries []*monitoringpb.TimeSeries) ([]*monitoringpb.TimeSeries, []*monitoringpb.TimeSeries) {
+	var serviceTs, nonServiceTs []*monitoringpb.TimeSeries
+	for _, ts := range timeSeries {
+		if serviceMetric(ts.Metric.Type) {
+			serviceTs = append(serviceTs, ts)
+		} else {
+			nonServiceTs = append(nonServiceTs, ts)
+		}
+	}
+	return serviceTs, nonServiceTs
+}
+
+var knownServiceMetricPrefixes = []string{
+	"kubernetes.io/",
+}
+
+func serviceMetric(metricType string) bool {
+	for _, knownServiceMetricPrefix := range knownServiceMetricPrefixes {
+		if strings.HasPrefix(metricType, knownServiceMetricPrefix) {
+			return true
+		}
+	}
+	return false
 }
 
 var knownExternalMetricPrefixes = []string{

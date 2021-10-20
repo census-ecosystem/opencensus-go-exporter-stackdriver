@@ -44,10 +44,7 @@ func TestWorkers(t *testing.T) {
 	}
 	m2 := newMetricsBatcher(ctx, "test", 2, c2, defaultTimeout) // batcher with 2 workers
 
-	tss := make([]*monitoringpb.TimeSeries, 0, 500) // make 500 time series, should be split to 3 reqs
-	for i := 0; i < 500; i++ {
-		tss = append(tss, makeTs(i))
-	}
+	tss := makeTs(500, false) // make 500 time series, should be split to 3 reqs
 
 	for _, ts := range tss {
 		m1.addTimeSeries(ts)
@@ -89,69 +86,97 @@ func makeClient(addr string) (*monitoring.MetricClient, error) {
 	return monitoring.NewMetricClient(context.Background(), option.WithGRPCConn(conn))
 }
 
-func makeTs(i int) *monitoringpb.TimeSeries {
-	return &monitoringpb.TimeSeries{
-		Metric: &googlemetricpb.Metric{
-			Type: fmt.Sprintf("custom.googleapis.com/opencensus/test/metric/%v", i),
-			Labels: map[string]string{
-				"key": fmt.Sprintf("test_%v", i),
+// makeTs returns a list of n *monitoringpb.TimeSeries. The metric type (service/non-service)
+// is determined by serviceMetric
+func makeTs(n int, serviceMetric bool) []*monitoringpb.TimeSeries {
+	var tsl []*monitoringpb.TimeSeries
+	for i := 0; i < n; i++ {
+		metricType := fmt.Sprintf("custom.googleapis.com/opencensus/test/metric/%v", i)
+		if serviceMetric {
+			metricType = fmt.Sprintf("kubernetes.io/opencensus/test/metric/%v", i)
+		}
+		tsl = append(tsl, &monitoringpb.TimeSeries{
+			Metric: &googlemetricpb.Metric{
+				Type: metricType,
+				Labels: map[string]string{
+					"key": fmt.Sprintf("test_%v", i),
+				},
 			},
-		},
-		MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
-		ValueType:  googlemetricpb.MetricDescriptor_INT64,
-		Points: []*monitoringpb.Point{
-			{
-				Value: &monitoringpb.TypedValue{
-					Value: &monitoringpb.TypedValue_Int64Value{
-						Int64Value: int64(i),
+			MetricKind: googlemetricpb.MetricDescriptor_CUMULATIVE,
+			ValueType:  googlemetricpb.MetricDescriptor_INT64,
+			Points: []*monitoringpb.Point{
+				{
+					Value: &monitoringpb.TypedValue{
+						Value: &monitoringpb.TypedValue_Int64Value{
+							Int64Value: int64(i),
+						},
 					},
 				},
 			},
-		},
+		})
 	}
+	return tsl
 }
 
 func TestSendReqAndParseDropped(t *testing.T) {
 	type testCase struct {
-		name                 string
-		timeseriesCount      int
-		createTimeSeriesFunc func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error
-		expectedErr          bool
-		expectedDropped      int
+		name                        string
+		nonServiceTimeSeriesCount   int
+		serviceTimeSeriesCount      int
+		createTimeSeriesFunc        func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error
+		createServiceTimeSeriesFunc func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error
+		expectedErr                 bool
+		expectedDropped             int
 	}
 
 	testCases := []testCase{
 		{
-			name:            "No error",
-			timeseriesCount: 75,
+			name:                      "No error",
+			serviceTimeSeriesCount:    75,
+			nonServiceTimeSeriesCount: 75,
 			createTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+				return nil
+			},
+			createServiceTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
 				return nil
 			},
 			expectedErr:     false,
 			expectedDropped: 0,
 		},
 		{
-			name:            "Partial error",
-			timeseriesCount: 75,
+			name:                      "Partial error",
+			serviceTimeSeriesCount:    75,
+			nonServiceTimeSeriesCount: 75,
 			createTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
 				return errors.New("One or more TimeSeries could not be written: Internal error encountered. Please retry after a few seconds. If internal errors persist, contact support at https://cloud.google.com/support/docs.: timeSeries[0-16,25-44,46-74]; Unknown metric: agent.googleapis.com/system.swap.page_faults: timeSeries[45]")
 			},
+			createServiceTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+				return errors.New("One or more TimeSeries could not be written: Internal error encountered. Please retry after a few seconds. If internal errors persist, contact support at https://cloud.google.com/support/docs.: timeSeries[0-16,25-44,46-74]; Unknown metric: agent.googleapis.com/system.swap.page_faults: timeSeries[45]")
+			},
 			expectedErr:     true,
-			expectedDropped: 67,
+			expectedDropped: 67 * 2,
 		},
 		{
-			name:            "Incorrectly formatted error",
-			timeseriesCount: 75,
+			name:                      "Incorrectly formatted error",
+			nonServiceTimeSeriesCount: 75,
+			serviceTimeSeriesCount:    75,
 			createTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
 				return errors.New("One or more TimeSeries could not be written: Internal error encountered. Please retry after a few seconds. If internal errors persist, contact support at https://cloud.google.com/support/docs.: timeSeries[0-16,25-44,,46-74]; Unknown metric: agent.googleapis.com/system.swap.page_faults: timeSeries[45x]")
+			},
+			createServiceTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+				return nil
 			},
 			expectedErr:     true,
 			expectedDropped: 75,
 		},
 		{
-			name:            "Unexpected error format",
-			timeseriesCount: 75,
+			name:                      "Unexpected error format",
+			nonServiceTimeSeriesCount: 75,
+			serviceTimeSeriesCount:    75,
 			createTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
+				return nil
+			},
+			createServiceTimeSeriesFunc: func(ctx context.Context, c *monitoring.MetricClient, ts *monitoringpb.CreateTimeSeriesRequest) error {
 				return errors.New("err1")
 			},
 			expectedErr:     true,
@@ -162,21 +187,28 @@ func TestSendReqAndParseDropped(t *testing.T) {
 	for _, test := range testCases {
 		t.Run(test.name, func(t *testing.T) {
 			persistedCreateTimeSeries := createTimeSeries
+			persistedCreateServiceTimeSeries := createServiceTimeSeries
 			createTimeSeries = test.createTimeSeriesFunc
+			createServiceTimeSeries = test.createServiceTimeSeriesFunc
+			defer func() {
+				createTimeSeries = persistedCreateTimeSeries
+				createServiceTimeSeries = persistedCreateServiceTimeSeries
+			}()
 
 			mc, _ := monitoring.NewMetricClient(context.Background())
-			d, err := sendReq(context.Background(), mc, &monitoringpb.CreateTimeSeriesRequest{TimeSeries: make([]*monitoringpb.TimeSeries, test.timeseriesCount)})
-			if !test.expectedErr && err != nil {
-				t.Fatal("Expected no err")
+			var tsl []*monitoringpb.TimeSeries
+			tsl = append(tsl, makeTs(test.serviceTimeSeriesCount, true)...)
+			tsl = append(tsl, makeTs(test.nonServiceTimeSeriesCount, false)...)
+			d, errors := sendReq(context.Background(), mc, &monitoringpb.CreateTimeSeriesRequest{TimeSeries: tsl})
+			if !test.expectedErr && len(errors) > 0 {
+				t.Fatalf("Expected no errors, got %v", errors)
 			}
-			if test.expectedErr && err == nil {
-				t.Fatal("Expected noerr")
+			if test.expectedErr && len(errors) == 0 {
+				t.Fatalf("Expected errors, got %v", errors)
 			}
 			if d != test.expectedDropped {
 				t.Fatalf("Want %v dropped, got %v", test.expectedDropped, d)
 			}
-
-			createTimeSeries = persistedCreateTimeSeries
 		})
 	}
 }

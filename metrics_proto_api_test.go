@@ -397,7 +397,9 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 	server.forEachStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
 		gotTimeSeries = append(gotTimeSeries, sdt)
 	})
-
+	server.forEachServiceStackdriverTimeSeries(func(sdt *monitoringpb.CreateTimeSeriesRequest) {
+		gotTimeSeries = append(gotTimeSeries, sdt)
+	})
 	if diff, idx := requireTimeSeriesRequestEqual(t, gotTimeSeries, tc.outTSR); diff != "" {
 		t.Errorf("Name[%s], TimeSeries[%d], Error: -got +want %s\n", tc.name, idx, diff)
 	}
@@ -412,6 +414,7 @@ func executeTestCase(t *testing.T, tc *testCases, se *sd.Exporter, server *fakeM
 	}
 	server.resetStackdriverMetricDescriptors()
 	server.resetStackdriverTimeSeries()
+	server.resetStackdriverServiceTimeSeries()
 }
 
 func readTestCaseFromFiles(t *testing.T, filename string) *testCases {
@@ -513,6 +516,7 @@ type fakeMetricsServer struct {
 	monitoringpb.MetricServiceServer
 	mu                           sync.RWMutex
 	stackdriverTimeSeries        []*monitoringpb.CreateTimeSeriesRequest
+	stackdriverServiceTimeSeries []*monitoringpb.CreateTimeSeriesRequest
 	stackdriverMetricDescriptors []*monitoringpb.CreateMetricDescriptorRequest
 }
 
@@ -547,6 +551,15 @@ func (server *fakeMetricsServer) forEachStackdriverTimeSeries(fn func(sdt *monit
 	}
 }
 
+func (server *fakeMetricsServer) forEachServiceStackdriverTimeSeries(fn func(sdt *monitoringpb.CreateTimeSeriesRequest)) {
+	server.mu.RLock()
+	defer server.mu.RUnlock()
+
+	for _, sdt := range server.stackdriverServiceTimeSeries {
+		fn(sdt)
+	}
+}
+
 func (server *fakeMetricsServer) forEachStackdriverMetricDescriptor(fn func(sdmd *monitoringpb.CreateMetricDescriptorRequest)) {
 	server.mu.RLock()
 	defer server.mu.RUnlock()
@@ -559,6 +572,12 @@ func (server *fakeMetricsServer) forEachStackdriverMetricDescriptor(fn func(sdmd
 func (server *fakeMetricsServer) resetStackdriverTimeSeries() {
 	server.mu.Lock()
 	server.stackdriverTimeSeries = server.stackdriverTimeSeries[:0]
+	server.mu.Unlock()
+}
+
+func (server *fakeMetricsServer) resetStackdriverServiceTimeSeries() {
+	server.mu.Lock()
+	server.stackdriverServiceTimeSeries = server.stackdriverServiceTimeSeries[:0]
 	server.mu.Unlock()
 }
 
@@ -578,6 +597,13 @@ func (server *fakeMetricsServer) CreateMetricDescriptor(ctx context.Context, req
 func (server *fakeMetricsServer) CreateTimeSeries(ctx context.Context, req *monitoringpb.CreateTimeSeriesRequest) (*empty.Empty, error) {
 	server.mu.Lock()
 	server.stackdriverTimeSeries = append(server.stackdriverTimeSeries, req)
+	server.mu.Unlock()
+	return new(empty.Empty), nil
+}
+
+func (server *fakeMetricsServer) CreateServiceTimeSeries(ctx context.Context, req *monitoringpb.CreateTimeSeriesRequest) (*empty.Empty, error) {
+	server.mu.Lock()
+	server.stackdriverServiceTimeSeries = append(server.stackdriverServiceTimeSeries, req)
 	server.mu.Unlock()
 	return new(empty.Empty), nil
 }

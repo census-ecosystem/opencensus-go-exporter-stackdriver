@@ -1107,6 +1107,235 @@ func TestExporter_makeReq_withCustomMonitoredResource(t *testing.T) {
 	}
 }
 
+func TestSplitCreateTimeSeriesRequest(t *testing.T) {
+	tests := []struct {
+		name              string
+		req               *monitoringpb.CreateTimeSeriesRequest
+		wantServiceReq    *monitoringpb.CreateTimeSeriesRequest
+		wantNonServiceReq *monitoringpb.CreateTimeSeriesRequest
+	}{
+		{
+			name: "no service metrics",
+			req: &monitoringpb.CreateTimeSeriesRequest{
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/example.com/testmetric-1",
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/example.com/testmetric-2",
+						},
+					},
+				},
+			},
+			wantNonServiceReq: &monitoringpb.CreateTimeSeriesRequest{
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/example.com/testmetric-1",
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/example.com/testmetric-2",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "custom and service metrics",
+			req: &monitoringpb.CreateTimeSeriesRequest{
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "kubernetes.io/opencensus/example.com/testmetric-1",
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/example.com/testmetric-2",
+						},
+					},
+				},
+			},
+			wantNonServiceReq: &monitoringpb.CreateTimeSeriesRequest{
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "custom.googleapis.com/opencensus/example.com/testmetric-2",
+						},
+					},
+				},
+			},
+			wantServiceReq: &monitoringpb.CreateTimeSeriesRequest{
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "kubernetes.io/opencensus/example.com/testmetric-1",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "only service metrics",
+			req: &monitoringpb.CreateTimeSeriesRequest{
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "kubernetes.io/opencensus/example.com/testmetric-1",
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "kubernetes.io/opencensus/example.com/testmetric-2",
+						},
+					},
+				},
+			},
+			wantServiceReq: &monitoringpb.CreateTimeSeriesRequest{
+				Name: fmt.Sprintf("projects/%s", "proj-id"),
+				TimeSeries: []*monitoringpb.TimeSeries{
+					{
+						Metric: &metricpb.Metric{
+							Type: "kubernetes.io/opencensus/example.com/testmetric-1",
+						},
+					},
+					{
+						Metric: &metricpb.Metric{
+							Type: "kubernetes.io/opencensus/example.com/testmetric-2",
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotServiceReq, gotNonServiceReq := splitCreateTimeSeriesRequest(tc.req)
+			if diff := cmp.Diff(tc.wantServiceReq, gotServiceReq, protocmp.Transform()); diff != "" {
+				t.Errorf("splitCreateTimeSeriesRequest(%v) returned diff (-want +got):\n%s", tc.req, diff)
+			}
+			if diff := cmp.Diff(tc.wantNonServiceReq, gotNonServiceReq, protocmp.Transform()); diff != "" {
+				t.Errorf("splitCreateTimeSeriesRequest(%v) returned diff (-want +got):\n%s", tc.req, diff)
+			}
+		})
+	}
+}
+
+func TestSplitTimeSeries(t *testing.T) {
+	tests := []struct {
+		name             string
+		timeSeries       []*monitoringpb.TimeSeries
+		wantServiceTs    []*monitoringpb.TimeSeries
+		wantNonServiceTs []*monitoringpb.TimeSeries
+	}{
+		{
+			name: "no service metrics",
+			timeSeries: []*monitoringpb.TimeSeries{
+				{
+					Metric: &metricpb.Metric{
+						Type: "custom.googleapis.com/opencensus/example.com/testmetric-1",
+					},
+				},
+				{
+					Metric: &metricpb.Metric{
+						Type: "custom.googleapis.com/opencensus/example.com/testmetric-2",
+					},
+				},
+			},
+			wantNonServiceTs: []*monitoringpb.TimeSeries{
+				{
+					Metric: &metricpb.Metric{
+						Type: "custom.googleapis.com/opencensus/example.com/testmetric-1",
+					},
+				},
+				{
+					Metric: &metricpb.Metric{
+						Type: "custom.googleapis.com/opencensus/example.com/testmetric-2",
+					},
+				},
+			},
+		},
+		{
+			name: "custom and service metrics",
+			timeSeries: []*monitoringpb.TimeSeries{
+				{
+					Metric: &metricpb.Metric{
+						Type: "kubernetes.io/opencensus/example.com/testmetric-1",
+					},
+				},
+				{
+					Metric: &metricpb.Metric{
+						Type: "custom.googleapis.com/opencensus/example.com/testmetric-2",
+					},
+				},
+			},
+			wantServiceTs: []*monitoringpb.TimeSeries{
+				{
+					Metric: &metricpb.Metric{
+						Type: "kubernetes.io/opencensus/example.com/testmetric-1",
+					},
+				},
+			},
+			wantNonServiceTs: []*monitoringpb.TimeSeries{
+				{
+					Metric: &metricpb.Metric{
+						Type: "custom.googleapis.com/opencensus/example.com/testmetric-2",
+					},
+				},
+			},
+		},
+		{
+			name: "only service metrics",
+			timeSeries: []*monitoringpb.TimeSeries{
+				{
+					Metric: &metricpb.Metric{
+						Type: "kubernetes.io/opencensus/example.com/testmetric-1",
+					},
+				},
+				{
+					Metric: &metricpb.Metric{
+						Type: "kubernetes.io/opencensus/example.com/testmetric-2",
+					},
+				},
+			},
+			wantServiceTs: []*monitoringpb.TimeSeries{
+				{
+					Metric: &metricpb.Metric{
+						Type: "kubernetes.io/opencensus/example.com/testmetric-1",
+					},
+				},
+				{
+					Metric: &metricpb.Metric{
+						Type: "kubernetes.io/opencensus/example.com/testmetric-2",
+					},
+				},
+			},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gotServiceTs, gotNonServiceTs := splitTimeSeries(tc.timeSeries)
+			if diff := cmp.Diff(tc.wantServiceTs, gotServiceTs, protocmp.Transform()); diff != "" {
+				t.Errorf("splitTimeSeries(%v) returned diff for service time series (-want +got):\n%s", tc.timeSeries, diff)
+			}
+			if diff := cmp.Diff(tc.wantNonServiceTs, gotNonServiceTs, protocmp.Transform()); diff != "" {
+				t.Errorf("splitTimeSeries(%v) returned diff for non-service time series (-want +got):\n%s", tc.timeSeries, diff)
+			}
+		})
+	}
+}
+
 func TestExporter_customContext(t *testing.T) {
 	oldCreateMetricDescriptor := createMetricDescriptor
 	oldCreateTimeSeries := createTimeSeries

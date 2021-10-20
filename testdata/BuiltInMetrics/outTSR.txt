@@ -34,7 +34,7 @@ time_series: <
 >
 time_series: <
   metric: <
-    type: "kubernetes.io/latency"
+    type: "istio.io/latency"
     labels: <
       key: "empty_key"
       value: ""
@@ -65,9 +65,11 @@ time_series: <
     >
   >
 >
+---
+name: "projects/metrics_proto_test"
 time_series: <
   metric: <
-    type: "istio.io/latency"
+    type: "kubernetes.io/latency"
     labels: <
       key: "empty_key"
       value: ""

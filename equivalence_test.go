@@ -372,6 +372,7 @@ type fakeMetricsServer struct {
 	monitoringpb.MetricServiceServer
 	mu                           sync.RWMutex
 	stackdriverTimeSeries        []*monitoringpb.CreateTimeSeriesRequest
+	stackdriverServiceTimeSeries []*monitoringpb.CreateTimeSeriesRequest
 	stackdriverMetricDescriptors []*monitoringpb.CreateMetricDescriptorRequest
 }
 
@@ -434,6 +435,13 @@ func (server *fakeMetricsServer) CreateMetricDescriptor(ctx context.Context, req
 func (server *fakeMetricsServer) CreateTimeSeries(ctx context.Context, req *monitoringpb.CreateTimeSeriesRequest) (*empty.Empty, error) {
 	server.mu.Lock()
 	server.stackdriverTimeSeries = append(server.stackdriverTimeSeries, req)
+	server.mu.Unlock()
+	return new(empty.Empty), nil
+}
+
+func (server *fakeMetricsServer) CreateServiceTimeSeries(ctx context.Context, req *monitoringpb.CreateTimeSeriesRequest) (*empty.Empty, error) {
+	server.mu.Lock()
+	server.stackdriverServiceTimeSeries = append(server.stackdriverServiceTimeSeries, req)
 	server.mu.Unlock()
 	return new(empty.Empty), nil
 }
