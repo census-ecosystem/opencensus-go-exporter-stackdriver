@@ -149,6 +149,10 @@ func (e *statsExporter) stopMetricsReader() {
 	}
 }
 
+func (e *statsExporter) close() error {
+	return e.c.Close()
+}
+
 func (e *statsExporter) getMonitoredResource(v *view.View, tags []tag.Tag) ([]tag.Tag, *monitoredrespb.MonitoredResource) {
 	resource := e.o.Resource
 	if resource == nil {

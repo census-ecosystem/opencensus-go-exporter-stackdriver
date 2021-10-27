@@ -435,6 +435,16 @@ func (e *Exporter) StopMetricsExporter() {
 	e.statsExporter.stopMetricsReader()
 }
 
+// Close closes client connections.
+func (e *Exporter) Close() error {
+	tErr := e.traceExporter.close()
+	mErr := e.statsExporter.close()
+	if mErr != nil || tErr != nil {
+		return fmt.Errorf("Error(s) closing trace client (%v), or metrics client (%v)", tErr, mErr)
+	}
+	return nil
+}
+
 // ExportSpan exports a SpanData to Stackdriver Trace.
 func (e *Exporter) ExportSpan(sd *trace.SpanData) {
 	if len(e.traceExporter.o.DefaultTraceAttributes) > 0 {
