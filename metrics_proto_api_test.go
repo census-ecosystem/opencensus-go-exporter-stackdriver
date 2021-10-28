@@ -27,6 +27,7 @@ import (
 	"github.com/golang/protobuf/ptypes/empty"
 	"google.golang.org/api/option"
 	"google.golang.org/protobuf/encoding/prototext"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/testing/protocmp"
 
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
@@ -286,12 +287,12 @@ func TestExportMaxTSPerRequest(t *testing.T) {
 		v := fmt.Sprintf("value_%d", i)
 		lv := &metricspb.LabelValue{Value: v, HasValue: true}
 
-		ts := *tcFromFile.inMetric[0].Timeseries[0]
+		ts := proto.Clone(tcFromFile.inMetric[0].Timeseries[0]).(*metricspb.TimeSeries)
 		ts.LabelValues = []*metricspb.LabelValue{inEmptyValue, lv}
-		tcFromFile.inMetric[0].Timeseries = append(tcFromFile.inMetric[0].Timeseries, &ts)
+		tcFromFile.inMetric[0].Timeseries = append(tcFromFile.inMetric[0].Timeseries, ts)
 
 		j := i / 200
-		outTS := *(tcFromFile.outTSR[0].TimeSeries[0])
+		outTS := proto.Clone(tcFromFile.outTSR[0].TimeSeries[0]).(*monitoringpb.TimeSeries)
 		outTS.Metric = &googlemetricpb.Metric{
 			Type: tcFromFile.outMDR[0].MetricDescriptor.Type,
 			Labels: map[string]string{
@@ -305,7 +306,7 @@ func TestExportMaxTSPerRequest(t *testing.T) {
 			}
 			tcFromFile.outTSR = append(tcFromFile.outTSR, newOutTSR)
 		}
-		tcFromFile.outTSR[j].TimeSeries = append(tcFromFile.outTSR[j].TimeSeries, &outTS)
+		tcFromFile.outTSR[j].TimeSeries = append(tcFromFile.outTSR[j].TimeSeries, outTS)
 	}
 	executeTestCase(t, tcFromFile, se, server, nil)
 }
@@ -326,10 +327,10 @@ func TestExportMaxTSPerRequestAcrossTwoMetrics(t *testing.T) {
 	for k := 0; k < 2; k++ {
 		for i := 1; i < 250; i++ {
 			v := fmt.Sprintf("value_%d", i+k*250)
-			ts := *tcFromFile.inMetric[k].Timeseries[0]
+			ts := proto.Clone(tcFromFile.inMetric[k].Timeseries[0]).(*metricspb.TimeSeries)
 			lv := &metricspb.LabelValue{Value: v, HasValue: true}
 			ts.LabelValues = []*metricspb.LabelValue{inEmptyValue, lv}
-			tcFromFile.inMetric[k].Timeseries = append(tcFromFile.inMetric[k].Timeseries, &ts)
+			tcFromFile.inMetric[k].Timeseries = append(tcFromFile.inMetric[k].Timeseries, ts)
 		}
 	}
 
