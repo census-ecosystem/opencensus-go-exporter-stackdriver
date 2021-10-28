@@ -351,7 +351,7 @@ func TestExportMaxTSPerRequestAcrossTwoMetrics(t *testing.T) {
 
 			// pick metric-1 for first 250 time-series and metric-2 for next 250 time-series.
 			mt := tcFromFile.outMDR[k].MetricDescriptor.Type
-			outTS := *(tcFromFile.outTSR[0].TimeSeries[0])
+			outTS := proto.Clone(tcFromFile.outTSR[0].TimeSeries[0]).(*monitoringpb.TimeSeries)
 			outTS.Metric = &googlemetricpb.Metric{
 				Type: mt,
 				Labels: map[string]string{
@@ -365,7 +365,7 @@ func TestExportMaxTSPerRequestAcrossTwoMetrics(t *testing.T) {
 				}
 				tcFromFile.outTSR = append(tcFromFile.outTSR, newOutTSR)
 			}
-			tcFromFile.outTSR[j].TimeSeries = append(tcFromFile.outTSR[j].TimeSeries, &outTS)
+			tcFromFile.outTSR[j].TimeSeries = append(tcFromFile.outTSR[j].TimeSeries, outTS)
 		}
 	}
 	executeTestCase(t, tcFromFile, se, server, nil)
