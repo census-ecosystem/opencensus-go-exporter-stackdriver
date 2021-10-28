@@ -120,6 +120,10 @@ func (e *traceExporter) Flush() {
 	e.bundler.Flush()
 }
 
+func (e *traceExporter) close() error {
+	return e.client.Close()
+}
+
 func (e *traceExporter) pushTraceSpans(ctx context.Context, node *commonpb.Node, r *resourcepb.Resource, spans []*trace.SpanData) (int, error) {
 	ctx, span := trace.StartSpan(
 		ctx,

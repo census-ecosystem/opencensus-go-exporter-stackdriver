@@ -43,7 +43,7 @@ test-386:
 .PHONY: test-with-coverage
 test-with-coverage:
 	@echo pre-compiling tests
-	@time go test -i $(ALL_PKGS)
+	@go test -i $(ALL_PKGS)
 	$(GOTEST) $(GOTEST_OPT_WITH_COVERAGE) $(ALL_PKGS)
 	go tool cover -html=coverage.txt -o coverage.html
 
@@ -52,7 +52,7 @@ test-with-cover:
 	@echo Verifying that all packages have test files to count in coverage
 	@scripts/check-test-files.sh $(subst contrib.go.opencensus.io/exporter/stackdriver,./,$(ALL_PKGS))
 	@echo pre-compiling tests
-	@time go test -i $(ALL_PKGS)
+	@go test -i $(ALL_PKGS)
 	$(GOTEST) $(GOTEST_OPT_WITH_COVERAGE) $(ALL_PKGS)
 	go tool cover -html=coverage.txt -o coverage.html
 
