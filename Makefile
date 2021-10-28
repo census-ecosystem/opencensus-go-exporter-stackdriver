@@ -121,5 +121,5 @@ install-tools:
 	GO111MODULE=on go install \
 		golang.org/x/lint/golint \
 		golang.org/x/tools/cmd/goimports \
-		github.com/rakyll/embedmd@master \
+		github.com/rakyll/embedmd \
 		honnef.co/go/tools/cmd/staticcheck
