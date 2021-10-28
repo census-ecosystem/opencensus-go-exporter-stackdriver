@@ -23,8 +23,8 @@ README_FILES := $(shell find . -name '*README.md' | sort | tr '\n' ' ')
 defaul-goal: fmt lint vet embedmd goimports staticcheck test
 
 # TODO: enable test-with-cover when find out why "scripts/check-test-files.sh: 4: set: Illegal option -o pipefail"
-.PHONY: travis-ci
-travis-ci: fmt lint vet embedmd goimports staticcheck test test-386 test-with-coverage
+.PHONY: ci
+ci: fmt lint vet embedmd goimports staticcheck test test-386 test-with-coverage
 
 all-pkgs:
 	@echo $(ALL_PKGS) | tr ' ' '\n' | sort
