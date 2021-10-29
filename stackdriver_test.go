@@ -29,6 +29,8 @@ import (
 	"go.opencensus.io/stats/view"
 	"go.opencensus.io/trace"
 	"golang.org/x/net/context/ctxhttp"
+	"google.golang.org/api/option"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -145,5 +147,33 @@ func TestUserAgent(t *testing.T) {
 
 	if want, got := "OpenCensus Service", e.statsExporter.o.UserAgent; want != got {
 		t.Fatalf("UserAgent = %q; want %q", got, want)
+	}
+}
+
+func TestClose(t *testing.T) {
+	projectID, ok := os.LookupEnv("STACKDRIVER_TEST_PROJECT_ID")
+	if !ok {
+		t.Skip("STACKDRIVER_TEST_PROJECT_ID not set")
+	}
+
+	conn, err := grpc.Dial("monitoring.googleapis.com:443", grpc.WithInsecure())
+	if err != nil {
+		t.Fatalf("cannot configure grpc conn: %v", err)
+	}
+	copts := []option.ClientOption{option.WithGRPCConn(conn)}
+
+	// option.WithGRPCConn option takes precedent over all other supplied options so the
+	// following user agent will be used by both exporters
+	exporter, err := NewExporter(Options{
+		ProjectID:               projectID,
+		MonitoringClientOptions: copts,
+		TraceClientOptions:      copts,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = exporter.Close()
+	if err != nil {
+		t.Fatal(err)
 	}
 }
