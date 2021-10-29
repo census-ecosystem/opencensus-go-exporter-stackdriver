@@ -69,6 +69,8 @@ import (
 	"google.golang.org/api/option"
 	metricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
@@ -439,6 +441,12 @@ func (e *Exporter) StopMetricsExporter() {
 func (e *Exporter) Close() error {
 	tErr := e.traceExporter.close()
 	mErr := e.statsExporter.close()
+	// If the trace and stats exporter share client connections,
+	// closing the stats exporter will return an error indicating
+	// it is already closed.  Ignore this error.
+	if status.Code(mErr) == codes.Canceled {
+		mErr = nil
+	}
 	if mErr != nil || tErr != nil {
 		return fmt.Errorf("error(s) closing trace client (%v), or metrics client (%v)", tErr, mErr)
 	}
