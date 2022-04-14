@@ -484,7 +484,7 @@ func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
 
 	case *metricspb.Point_Int64Value:
 		// drop handle stale NaNs that were cast to integers
-		if v.Int64Value == int64(math.Float64frombits(promvalue.StaleNaN)) {
+		if isStaleInt64(v.Int64Value) {
 			return nil, nil
 		}
 		return &monitoringpb.TypedValue{
@@ -507,6 +507,9 @@ func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
 		dv := v.DistributionValue
 		var mv *monitoringpb.TypedValue_DistributionValue
 		if dv != nil {
+			if isStaleInt64(dv.Count) || promvalue.IsStaleNaN(dv.Sum) {
+				return nil, nil
+			}
 			var mean float64
 			if dv.Count > 0 {
 				mean = float64(dv.Sum) / float64(dv.Count)
@@ -541,6 +544,10 @@ func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
 		}
 		return &monitoringpb.TypedValue{Value: mv}, nil
 	}
+}
+
+func isStaleInt64(v int64) bool {
+	return v == int64(math.Float64frombits(promvalue.StaleNaN))
 }
 
 func bucketCounts(buckets []*metricspb.DistributionValue_Bucket) []int64 {
