@@ -23,6 +23,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"path"
 	"strings"
 
@@ -482,6 +483,10 @@ func protoToMetricPoint(value interface{}) (*monitoringpb.TypedValue, error) {
 		return nil, fmt.Errorf("protoToMetricPoint: unknown Data type: %T", value)
 
 	case *metricspb.Point_Int64Value:
+		// drop handle stale NaNs that were cast to integers
+		if v.Int64Value == int64(math.Float64frombits(promvalue.StaleNaN)) {
+			return nil, nil
+		}
 		return &monitoringpb.TypedValue{
 			Value: &monitoringpb.TypedValue_Int64Value{
 				Int64Value: v.Int64Value,
