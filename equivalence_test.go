@@ -25,6 +25,7 @@ import (
 	"go.opencensus.io/metric/metricdata"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
@@ -133,7 +134,7 @@ func TestEquivalenceStatsVsMetricsUploads(t *testing.T) {
 	defer doneFn()
 
 	// Now create a gRPC connection to the fake Stackdriver server.
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		t.Fatalf("Failed to make a gRPC connection to the server: %v", err)
 	}

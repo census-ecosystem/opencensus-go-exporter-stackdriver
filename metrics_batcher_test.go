@@ -25,6 +25,7 @@ import (
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func TestWorkers(t *testing.T) {
@@ -79,7 +80,7 @@ func TestWorkers(t *testing.T) {
 }
 
 func makeClient(addr string) (*monitoring.MetricClient, error) {
-	conn, err := grpc.Dial(addr, grpc.WithInsecure())
+	conn, err := grpc.Dial(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		return nil, err
 	}
