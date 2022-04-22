@@ -12,6 +12,7 @@ require (
 	github.com/google/go-cmp v0.5.7
 	github.com/jstemmer/go-junit-report v0.9.1
 	github.com/prometheus/prometheus v0.35.0
+	github.com/rakyll/embedmd v0.0.0-20171029212350-c8060a0752a2
 	go.opencensus.io v0.23.0
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 	golang.org/x/net v0.0.0-20220325170049-de3da57026de
@@ -29,6 +30,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/googleapis/gax-go/v2 v2.2.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
+	github.com/pmezard/go-difflib v1.0.0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220106191415-9b9b3d81d5e3 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	golang.org/x/sys v0.0.0-20220328115105-d36c6a25d886 // indirect
