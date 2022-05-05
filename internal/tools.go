@@ -25,6 +25,7 @@ package internal
 
 import (
 	_ "github.com/jstemmer/go-junit-report"
+	_ "github.com/rakyll/embedmd"
 	_ "golang.org/x/lint/golint"
 	_ "golang.org/x/tools/cmd/goimports"
 	_ "honnef.co/go/tools/cmd/staticcheck"

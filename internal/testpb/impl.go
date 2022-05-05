@@ -25,6 +25,7 @@ import (
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 type testServer struct{}
@@ -82,7 +83,7 @@ func NewTestClient(l *testing.T) (client FooClient, cleanup func()) {
 	// Initialize client.
 	clientConn, err := grpc.Dial(
 		listener.Addr().String(),
-		grpc.WithInsecure(),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithStatsHandler(&ocgrpc.ClientHandler{}),
 		grpc.WithBlock())
 
