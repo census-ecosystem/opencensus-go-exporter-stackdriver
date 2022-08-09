@@ -257,6 +257,10 @@ func (se *statsExporter) protoMetricToTimeSeries(ctx context.Context, mappedRsc 
 			mb.recordDroppedTimeseries(1, err)
 			continue
 		}
+		if len(sdPoints) == 0 {
+			// Sending TimeSeries with no points is not allowed, so skip this one
+			continue
+		}
 
 		// Each TimeSeries has labelValues which MUST be correlated
 		// with that from the MetricDescriptor
@@ -355,6 +359,11 @@ func (se *statsExporter) protoTimeSeriesToMonitoringPoints(ts *metricspb.TimeSer
 		if err != nil {
 			return nil, err
 		}
+		if spt == nil {
+			// Skip any points that don't result in a correct value
+			// For example if they are Prometheus staleness markers
+			continue
+		}
 		sptl = append(sptl, spt)
 	}
 	return sptl, nil
@@ -443,6 +452,11 @@ func fromProtoPoint(startTime *timestamppb.Timestamp, pt *metricspb.Point) (*mon
 	mptv, err := protoToMetricPoint(pt.Value)
 	if err != nil {
 		return nil, err
+	}
+	// We don't want to send points with no value as those are invalid
+	// Pass the nil upwards instead to skip this point
+	if mptv == nil {
+		return nil, nil
 	}
 
 	endTime := pt.Timestamp

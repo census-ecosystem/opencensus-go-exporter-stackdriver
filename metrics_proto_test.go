@@ -17,11 +17,13 @@ package stackdriver
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"testing"
 
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
 	"github.com/golang/protobuf/ptypes/timestamp"
+	promvalue "github.com/prometheus/prometheus/model/value"
 	"google.golang.org/api/option"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
@@ -366,6 +368,35 @@ func TestProtoMetricToCreateTimeSeriesRequest(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			name: "Test staleness marker is skipped",
+			in: &metricspb.Metric{
+				MetricDescriptor: &metricspb.MetricDescriptor{
+					Name:        "with_metric_descriptor_2",
+					Description: "This is a test",
+					Unit:        "By",
+					LabelKeys:   []*metricspb.LabelKey{{Key: "key1"}, {Key: "key2"}, {Key: "key3"}},
+				},
+				Timeseries: []*metricspb.TimeSeries{
+					{
+						StartTimestamp: startTimestamp,
+						LabelValues:    []*metricspb.LabelValue{{}, {}, {HasValue: true, Value: "val3"}},
+						Points: []*metricspb.Point{
+							{
+								Timestamp: endTimestamp,
+								Value: &metricspb.Point_DoubleValue{
+									DoubleValue: math.Float64frombits(promvalue.StaleNaN),
+								},
+							},
+						},
+					},
+				},
+			},
+			statsExporter: &statsExporter{
+				o: Options{ProjectID: "foo", MapResource: DefaultMapResource},
+			},
+			want: nil,
 		},
 	}
 
@@ -761,6 +792,20 @@ func TestProtoMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 					Value: &monitoringpb.TypedValue_Int64Value{Int64Value: 17},
 				},
 			},
+		},
+		{
+			in: &metricspb.Point{
+				Timestamp: endTimestamp,
+				Value:     &metricspb.Point_Int64Value{Int64Value: int64(math.Float64frombits(promvalue.StaleNaN))},
+			},
+			want: nil,
+		},
+		{
+			in: &metricspb.Point{
+				Timestamp: endTimestamp,
+				Value:     &metricspb.Point_DoubleValue{DoubleValue: math.Float64frombits(promvalue.StaleNaN)},
+			},
+			want: nil,
 		},
 	}
 
