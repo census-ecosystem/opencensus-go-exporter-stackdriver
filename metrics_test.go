@@ -328,17 +328,6 @@ func TestMetricDescriptorToMonitoringMetricDescriptor(t *testing.T) {
 				ValueType:   googlemetricpb.MetricDescriptor_INT64,
 			},
 		},
-		{
-			in: &metricdata.Metric{
-				Descriptor: metricdata.Descriptor{
-					Name:        "with_summary_descriptor",
-					Description: "This is with summary descriptor",
-					Unit:        metricdata.UnitBytes,
-					Type:        metricdata.TypeSummary,
-				},
-			},
-			want: nil,
-		},
 	}
 
 	for i, tt := range tests {
