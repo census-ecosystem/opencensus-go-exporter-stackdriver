@@ -261,6 +261,11 @@ func (se *statsExporter) createMetricDescriptorFromMetric(ctx context.Context, m
 		return err
 	}
 
+	// ignore
+	if inMD.MetricKind == googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED {
+		return nil
+	}
+
 	if err = se.createMetricDescriptor(ctx, inMD); err != nil {
 		return err
 	}
