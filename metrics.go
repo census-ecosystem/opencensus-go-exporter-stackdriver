@@ -261,6 +261,10 @@ func (se *statsExporter) createMetricDescriptorFromMetric(ctx context.Context, m
 		return err
 	}
 
+	if inMD == nil {
+		return nil
+	}
+
 	if err = se.createMetricDescriptor(ctx, inMD); err != nil {
 		return err
 	}
@@ -278,6 +282,10 @@ func (se *statsExporter) metricToMpbMetricDescriptor(metric *metricdata.Metric) 
 	metricType := se.metricTypeFromProto(metric.Descriptor.Name)
 	displayName := se.displayName(metric.Descriptor.Name)
 	metricKind, valueType := metricDescriptorTypeToMetricKind(metric)
+	// ignore
+	if metricKind == googlemetricpb.MetricDescriptor_METRIC_KIND_UNSPECIFIED {
+		return nil, nil
+	}
 
 	sdm := &googlemetricpb.MetricDescriptor{
 		Name:        fmt.Sprintf("projects/%s/metricDescriptors/%s", se.o.ProjectID, metricType),
