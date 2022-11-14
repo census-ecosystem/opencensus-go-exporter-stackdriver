@@ -127,7 +127,9 @@ func TestMetricToCreateTimeSeriesRequest(t *testing.T) {
 											Count:    1,
 											Exemplar: &metricdata.Exemplar{Value: 11.9, Timestamp: startTime, Attachments: map[string]interface{}{"key": "value"}},
 										},
-										{}, {}, {},
+										{},
+										{},
+										{},
 									},
 									BucketOptions: &metricdata.BucketOptions{
 										Bounds: []float64{10, 20, 30, 40},
@@ -326,6 +328,17 @@ func TestMetricDescriptorToMonitoringMetricDescriptor(t *testing.T) {
 				ValueType:   googlemetricpb.MetricDescriptor_INT64,
 			},
 		},
+		{
+			in: &metricdata.Metric{
+				Descriptor: metricdata.Descriptor{
+					Name:        "with_summary_descriptor",
+					Description: "This is with summary descriptor",
+					Unit:        metricdata.UnitBytes,
+					Type:        metricdata.TypeSummary,
+				},
+			},
+			want: nil,
+		},
 	}
 
 	for i, tt := range tests {
@@ -463,7 +476,8 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 						{},
 						{
 							Count:    1,
-							Exemplar: &metricdata.Exemplar{Value: 11.9, Timestamp: startTime, Attachments: map[string]interface{}{"SpanContext": spanCtx}}},
+							Exemplar: &metricdata.Exemplar{Value: 11.9, Timestamp: startTime, Attachments: map[string]interface{}{"SpanContext": spanCtx}},
+						},
 						{},
 						{},
 						{},
@@ -945,7 +959,7 @@ func TestResourceByDescriptor(t *testing.T) {
 		},
 	}
 
-	var se = &statsExporter{
+	se := &statsExporter{
 		o: Options{
 			ProjectID:            "foo",
 			ResourceByDescriptor: getResourceByDescriptor,
