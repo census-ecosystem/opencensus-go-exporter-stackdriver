@@ -22,9 +22,9 @@ import (
 	"time"
 
 	tracingclient "cloud.google.com/go/trace/apiv2"
+	"cloud.google.com/go/trace/apiv2/tracepb"
 	"go.opencensus.io/trace"
 	"google.golang.org/api/support/bundler"
-	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
 	"google.golang.org/protobuf/proto"
 
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"

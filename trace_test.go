@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/trace/apiv2/tracepb"
 	"go.opencensus.io/trace"
-	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
 )
 
 func TestBundling(t *testing.T) {
