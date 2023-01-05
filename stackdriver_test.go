@@ -16,7 +16,7 @@ package stackdriver
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -34,11 +34,9 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var (
-	dummyAutodetect = func() gcp.Interface {
-		return nil
-	}
-)
+var dummyAutodetect = func() gcp.Interface {
+	return nil
+}
 
 func init() {
 	// monitoredresource.Autodetect() takes a few seconds to return when
@@ -98,7 +96,7 @@ func TestExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		t.Fatal(err)
 	}
