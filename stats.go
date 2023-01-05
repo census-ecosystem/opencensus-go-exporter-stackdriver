@@ -631,8 +631,9 @@ var createServiceTimeSeries = func(ctx context.Context, c *monitoring.MetricClie
 }
 
 // splitCreateTimeSeriesRequest splits a *monitoringpb.CreateTimeSeriesRequest object into two new objects:
-//   * The first object only contains service time series.
-//   * The second object only contains non-service time series.
+//   - The first object only contains service time series.
+//   - The second object only contains non-service time series.
+//
 // A returned object may be nil if no time series is found in the original request that satisfies the rules
 // above.
 // All other properties of the original CreateTimeSeriesRequest object are kept in the returned objects.
@@ -653,8 +654,8 @@ func splitCreateTimeSeriesRequest(req *monitoringpb.CreateTimeSeriesRequest) (*m
 }
 
 // splitTimeSeries splits a []*monitoringpb.TimeSeries slice into two:
-//   * The first slice only contains service time series
-//   * The second slice only contains non-service time series
+//   - The first slice only contains service time series
+//   - The second slice only contains non-service time series
 func splitTimeSeries(timeSeries []*monitoringpb.TimeSeries) ([]*monitoringpb.TimeSeries, []*monitoringpb.TimeSeries) {
 	var serviceTs, nonServiceTs []*monitoringpb.TimeSeries
 	for _, ts := range timeSeries {
