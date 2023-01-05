@@ -24,7 +24,7 @@
 // Alternatively, pass the authentication options in both the MonitoringClientOptions
 // and the TraceClientOptions fields of Options.
 //
-// Stackdriver Monitoring
+// # Stackdriver Monitoring
 //
 // This exporter support exporting OpenCensus views to Stackdriver Monitoring.
 // Each registered view becomes a metric in Stackdriver Monitoring, with the
@@ -35,13 +35,13 @@
 //
 // In order to be able to push your stats to Stackdriver Monitoring, you must:
 //
-//   1. Create a Cloud project: https://support.google.com/cloud/answer/6251787?hl=en
-//   2. Enable billing: https://support.google.com/cloud/answer/6288653#new-billing
-//   3. Enable the Stackdriver Monitoring API: https://console.cloud.google.com/apis/dashboard
+//  1. Create a Cloud project: https://support.google.com/cloud/answer/6251787?hl=en
+//  2. Enable billing: https://support.google.com/cloud/answer/6288653#new-billing
+//  3. Enable the Stackdriver Monitoring API: https://console.cloud.google.com/apis/dashboard
 //
 // These steps enable the API but don't require that your app is hosted on Google Cloud Platform.
 //
-// Stackdriver Trace
+// # Stackdriver Trace
 //
 // This exporter supports exporting Trace Spans to Stackdriver Trace. It also
 // supports the Google "Cloud Trace" propagation format header.
@@ -418,12 +418,15 @@ func (e *Exporter) ExportMetrics(ctx context.Context, metrics []*metricdata.Metr
 // from all registered producers at set interval and exports them.
 // Use StopMetricsExporter to stop exporting metrics.
 // Previously, it required registering exporter to export stats collected by opencensus.
-//    exporter := stackdriver.NewExporter(stackdriver.Option{})
-//    view.RegisterExporter(exporter)
+//
+//	exporter := stackdriver.NewExporter(stackdriver.Option{})
+//	view.RegisterExporter(exporter)
+//
 // Now, it requires to call StartMetricsExporter() to export stats and metrics collected by opencensus.
-//    exporter := stackdriver.NewExporter(stackdriver.Option{})
-//    exporter.StartMetricsExporter()
-//    defer exporter.StopMetricsExporter()
+//
+//	exporter := stackdriver.NewExporter(stackdriver.Option{})
+//	exporter.StartMetricsExporter()
+//	defer exporter.StopMetricsExporter()
 //
 // Both approach should not be used simultaneously. Otherwise it may result into unknown behavior.
 // Previous approach continues to work as before but will not report newly define metrics such
