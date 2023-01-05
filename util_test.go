@@ -15,10 +15,10 @@
 package stackdriver_test
 
 import (
-	"io/ioutil"
+	"os"
 )
 
 // readFile is a wrapper to read a file. It is meant for internal use for testing.
 func readFile(filename string) ([]byte, error) {
-	return ioutil.ReadFile(filename)
+	return os.ReadFile(filename)
 }
