@@ -250,7 +250,8 @@ func attributeValue(v interface{}) *tracepb.AttributeValue {
 		return &tracepb.AttributeValue{
 			Value: &tracepb.AttributeValue_StringValue{
 				StringValue: trunc(strconv.FormatFloat(value, 'f', -1, 64),
-					maxAttributeStringValue)},
+					maxAttributeStringValue),
+			},
 		}
 	case string:
 		return &tracepb.AttributeValue{

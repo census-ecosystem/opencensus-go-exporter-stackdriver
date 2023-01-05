@@ -63,7 +63,6 @@ func Example_defaults() {
 }
 
 func Example_gKE() {
-
 	// This example shows how to set up a Stackdriver exporter suitable for
 	// monitoring a GKE container.
 

@@ -78,7 +78,7 @@ func generateSpan() {
 			span2.AddAttributes(
 				trace.Int64Attribute("key1", 100),
 				// TODO [rghetia]: uncomment the test case after go.opencensus.io/trace@v0.20.0 is released.
-				//trace.Float64Attribute("key3", 100.001),
+				// trace.Float64Attribute("key3", 100.001),
 			)
 			span2.End()
 		}
@@ -271,7 +271,6 @@ func createExpectedSpans() spans {
 }
 
 func TestExportTrace(t *testing.T) {
-
 	var te testExporter
 	trace.RegisterExporter(&te)
 	defer trace.UnregisterExporter(&te)
@@ -326,14 +325,14 @@ func TestExportTrace(t *testing.T) {
 		for _, s := range spbs {
 			bytes, err := prototext.Marshal(s)
 			if err != nil {
-				t.Fatalf("Error marshalling span: %s", err)
+				t.Fatalf("Error marshaling span: %s", err)
 			}
 			got = append(got, string(bytes))
 		}
 		for _, s := range expectedSpans {
 			bytes, err := prototext.Marshal(s)
 			if err != nil {
-				t.Fatalf("Error marshalling span: %s", err)
+				t.Fatalf("Error marshaling span: %s", err)
 			}
 			want = append(want, string(bytes))
 		}
@@ -349,7 +348,6 @@ func checkExepectedMonitoredResourceKV(k string, v string, spb *tracepb.Span, t 
 }
 
 func createAWSEC2MonitoredResource() *monitoredrespb.MonitoredResource {
-
 	mr := &monitoredrespb.MonitoredResource{
 		Type: "aws_ec2_instance",
 		Labels: map[string]string{
@@ -362,7 +360,6 @@ func createAWSEC2MonitoredResource() *monitoredrespb.MonitoredResource {
 }
 
 func createGCEInstanceMonitoredResource() *monitoredrespb.MonitoredResource {
-
 	mr := &monitoredrespb.MonitoredResource{
 		Type: "gce_instance",
 		Labels: map[string]string{
@@ -375,7 +372,6 @@ func createGCEInstanceMonitoredResource() *monitoredrespb.MonitoredResource {
 }
 
 func createGKEContainerMonitoredResource() *monitoredrespb.MonitoredResource {
-
 	mr := &monitoredrespb.MonitoredResource{
 		Type: "gke_container",
 		Labels: map[string]string{
@@ -392,7 +388,6 @@ func createGKEContainerMonitoredResource() *monitoredrespb.MonitoredResource {
 }
 
 func TestExportTraceWithMonitoredResource(t *testing.T) {
-
 	var te testExporter
 	trace.RegisterExporter(&te)
 	defer trace.UnregisterExporter(&te)
@@ -443,7 +438,6 @@ func TestExportTraceWithMonitoredResource(t *testing.T) {
 		checkExepectedMonitoredResourceKV("g.co/r/aws_ec2_instance/instance_id", "i-092676e3abbde2959", span, t)
 		checkExepectedMonitoredResourceKV("g.co/r/aws_ec2_instance/region", "aws:us-west-2", span, t)
 	}
-
 }
 
 func TestEnums(t *testing.T) {

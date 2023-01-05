@@ -152,7 +152,6 @@ func (e *traceExporter) pushTraceSpans(ctx context.Context, node *commonpb.Node,
 	defer cancel()
 
 	err := e.client.BatchWriteSpans(ctx, &req)
-
 	if err != nil {
 		return len(spans), err
 	}
