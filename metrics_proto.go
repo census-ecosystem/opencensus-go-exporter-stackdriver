@@ -41,13 +41,18 @@ import (
 	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 )
 
-var errNilMetricOrMetricDescriptor = errors.New("non-nil metric or metric descriptor")
-var percentileLabelKey = &metricspb.LabelKey{
-	Key:         "percentile",
-	Description: "the value at a given percentile of a distribution",
-}
-var globalResource = &resource.Resource{Type: "global"}
-var domains = []string{"googleapis.com", "kubernetes.io", "istio.io", "knative.dev"}
+var (
+	errNilMetricOrMetricDescriptor = errors.New("non-nil metric or metric descriptor")
+	percentileLabelKey             = &metricspb.LabelKey{
+		Key:         "percentile",
+		Description: "the value at a given percentile of a distribution",
+	}
+)
+
+var (
+	globalResource = &resource.Resource{Type: "global"}
+	domains        = []string{"googleapis.com", "kubernetes.io", "istio.io", "knative.dev"}
+)
 
 // PushMetricsProto exports OpenCensus Metrics Proto to Stackdriver Monitoring synchronously,
 // without de-duping or adding proto metrics to the bundler.
@@ -204,7 +209,7 @@ func (se *statsExporter) convertSummaryMetrics(summary *metricspb.Metric) []*met
 }
 
 func (se *statsExporter) getResource(rsc *resourcepb.Resource, metric *metricspb.Metric, seenRscs map[*resourcepb.Resource]*monitoredrespb.MonitoredResource) *monitoredrespb.MonitoredResource {
-	var resource = rsc
+	resource := rsc
 	if metric.Resource != nil {
 		resource = metric.Resource
 	}

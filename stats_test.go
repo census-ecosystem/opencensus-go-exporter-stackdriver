@@ -414,8 +414,12 @@ func TestExporter_makeReq(t *testing.T) {
 										BucketOptions: &distribution.Distribution_BucketOptions{
 											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
 												ExplicitBuckets: &distribution.Distribution_BucketOptions_Explicit{
-													Bounds: []float64{0.0, 2.0, 4.0, 7.0}}}},
-										BucketCounts: []int64{0, 2, 2, 1}},
+													Bounds: []float64{0.0, 2.0, 4.0, 7.0},
+												},
+											},
+										},
+										BucketCounts: []int64{0, 2, 2, 1},
+									},
 								}},
 							},
 						},
@@ -460,8 +464,12 @@ func TestExporter_makeReq(t *testing.T) {
 										BucketOptions: &distribution.Distribution_BucketOptions{
 											Options: &distribution.Distribution_BucketOptions_ExplicitBuckets{
 												ExplicitBuckets: &distribution.Distribution_BucketOptions_Explicit{
-													Bounds: []float64{0.0, 2.0, 4.0, 7.0}}}},
-										BucketCounts: []int64{0, 2, 2, 1}},
+													Bounds: []float64{0.0, 2.0, 4.0, 7.0},
+												},
+											},
+										},
+										BucketCounts: []int64{0, 2, 2, 1},
+									},
 								}},
 							},
 						},
@@ -1344,7 +1352,7 @@ func TestExporter_customContext(t *testing.T) {
 		createTimeSeries = oldCreateTimeSeries
 	}()
 
-	var timedOut = 0
+	timedOut := 0
 	createMetricDescriptor = func(ctx context.Context, c *monitoring.MetricClient, mdr *monitoringpb.CreateMetricDescriptorRequest) (*metricpb.MetricDescriptor, error) {
 		select {
 		case <-time.After(1 * time.Second):

@@ -73,9 +73,7 @@ type statsExporter struct {
 	initReaderOnce sync.Once
 }
 
-var (
-	errBlankProjectID = errors.New("expecting a non-blank ProjectID")
-)
+var errBlankProjectID = errors.New("expecting a non-blank ProjectID")
 
 // newStatsExporter returns an exporter that uploads stats data to Stackdriver Monitoring.
 // Only one Stackdriver exporter should be created per ProjectID per process, any subsequent

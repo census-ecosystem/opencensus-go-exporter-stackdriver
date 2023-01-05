@@ -1050,7 +1050,8 @@ func TestMetricPrefix(t *testing.T) {
 					ProjectID: "foo",
 					GetMetricPrefix: func(name string) string {
 						return "prefix"
-					}},
+					},
+				},
 			},
 			want: "custom.googleapis.com/opencensus/prefix/my_metric",
 		},
@@ -1062,7 +1063,8 @@ func TestMetricPrefix(t *testing.T) {
 					ProjectID: "foo",
 					GetMetricPrefix: func(name string) string {
 						return "knative.dev/serving"
-					}},
+					},
+				},
 			},
 			want: "knative.dev/serving/my_metric",
 		},
@@ -1075,7 +1077,8 @@ func TestMetricPrefix(t *testing.T) {
 					MetricPrefix: "appengine.googleapis.com/",
 					GetMetricPrefix: func(name string) string {
 						return "knative.dev/serving"
-					}},
+					},
+				},
 			},
 			want: "knative.dev/serving/my_metric",
 		},
