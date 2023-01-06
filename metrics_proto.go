@@ -29,6 +29,7 @@ import (
 
 	"go.opencensus.io/resource"
 
+	"cloud.google.com/go/monitoring/apiv3/v2/monitoringpb"
 	commonpb "github.com/census-instrumentation/opencensus-proto/gen-go/agent/common/v1"
 	metricspb "github.com/census-instrumentation/opencensus-proto/gen-go/metrics/v1"
 	resourcepb "github.com/census-instrumentation/opencensus-proto/gen-go/resource/v1"
@@ -38,7 +39,6 @@ import (
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
-	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 )
 
 var (

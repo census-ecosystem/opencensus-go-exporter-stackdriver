@@ -23,6 +23,7 @@ import (
 	monitoring "cloud.google.com/go/monitoring/apiv3/v2"
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 
+	"cloud.google.com/go/monitoring/apiv3/v2/monitoringpb"
 	"github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/google/go-cmp/cmp"
 	"go.opencensus.io/stats"
@@ -32,7 +33,6 @@ import (
 	"google.golang.org/genproto/googleapis/api/distribution"
 	metricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
-	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/testing/protocmp"
 )

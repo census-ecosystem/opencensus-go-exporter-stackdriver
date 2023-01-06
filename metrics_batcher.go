@@ -24,7 +24,7 @@ import (
 	"time"
 
 	monitoring "cloud.google.com/go/monitoring/apiv3/v2"
-	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
+	"cloud.google.com/go/monitoring/apiv3/v2/monitoringpb"
 )
 
 const (
@@ -209,7 +209,8 @@ func newWorker(
 	reqsChan chan *monitoringpb.CreateTimeSeriesRequest,
 	respsChan chan *response,
 	wg *sync.WaitGroup,
-	timeout time.Duration) *worker {
+	timeout time.Duration,
+) *worker {
 	return &worker{
 		ctx:       ctx,
 		mc:        mc,

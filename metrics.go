@@ -29,11 +29,11 @@ import (
 	"go.opencensus.io/trace"
 	"google.golang.org/protobuf/proto"
 
+	"cloud.google.com/go/monitoring/apiv3/v2/monitoringpb"
 	distributionpb "google.golang.org/genproto/googleapis/api/distribution"
 	labelpb "google.golang.org/genproto/googleapis/api/label"
 	googlemetricpb "google.golang.org/genproto/googleapis/api/metric"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
-	monitoringpb "google.golang.org/genproto/googleapis/monitoring/v3"
 
 	"contrib.go.opencensus.io/exporter/stackdriver/monitoredresource"
 	"go.opencensus.io/metric/metricdata"

@@ -24,11 +24,11 @@ import (
 	"testing"
 	"time"
 
+	"cloud.google.com/go/trace/apiv2/tracepb"
 	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	wrapperspb "github.com/golang/protobuf/ptypes/wrappers"
 	"go.opencensus.io/trace"
 	monitoredrespb "google.golang.org/genproto/googleapis/api/monitoredres"
-	tracepb "google.golang.org/genproto/googleapis/devtools/cloudtrace/v2"
 	codepb "google.golang.org/genproto/googleapis/rpc/code"
 	statuspb "google.golang.org/genproto/googleapis/rpc/status"
 	"google.golang.org/protobuf/encoding/prototext"
