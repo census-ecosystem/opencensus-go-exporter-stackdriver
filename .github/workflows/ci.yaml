@@ -7,19 +7,6 @@ on:
     branches:
       - master
 jobs:
-  staticcheck:
-    name: "Staticcheck"
-    runs-on: ubuntu-22.04
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3
-    - name: Setup Golang Environment
-      uses: actions/setup-go@v3
-      with:
-        go-version-file: go.mod
-        cache: true
-    - name: Run Staticcheck
-      uses: dominikh/staticcheck-action@v1.2.0
   lint:
     name: "Lint"
     runs-on: ubuntu-22.04
