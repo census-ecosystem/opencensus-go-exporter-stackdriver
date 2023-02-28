@@ -15,8 +15,10 @@
 package aws
 
 import (
-	"github.com/aws/aws-sdk-go/aws/ec2metadata"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"context"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/feature/ec2/imds"
 )
 
 // awsIdentityDocument is used to store parsed AWS Identity Document.
@@ -37,15 +39,13 @@ type awsIdentityDocument struct {
 // This is only done once.
 func retrieveAWSIdentityDocument() *awsIdentityDocument {
 	awsIdentityDoc := awsIdentityDocument{}
-	sesion, err := session.NewSession()
+	ctx := context.TODO()
+	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
 		return nil
 	}
-	c := ec2metadata.New(sesion)
-	if !c.Available() {
-		return nil
-	}
-	ec2InstanceIdentifyDocument, err := c.GetInstanceIdentityDocument()
+	c := imds.NewFromConfig(cfg)
+	ec2InstanceIdentifyDocument, err := c.GetInstanceIdentityDocument(ctx, nil)
 	if err != nil {
 		return nil
 	}
