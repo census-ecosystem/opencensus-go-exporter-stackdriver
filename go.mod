@@ -12,7 +12,6 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.9
 	github.com/jstemmer/go-junit-report v0.9.1
-	github.com/prometheus/prometheus v0.35.0
 	go.opencensus.io v0.24.0
 	golang.org/x/net v0.7.0
 	golang.org/x/oauth2 v0.4.0
