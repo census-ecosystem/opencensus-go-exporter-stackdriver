@@ -1,6 +1,6 @@
 
 #!/bin/bash
-echo "[!] "
+echo "[!] Executing"
 set -euo pipefail
 
 COLOR_FIXME=$(printf "\033[31mFIXME\033[0m")
