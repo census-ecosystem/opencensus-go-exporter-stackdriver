@@ -561,7 +561,7 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 	}
 
 	for i, tt := range tests {
-		mpt, err := metricPointToMpbPoint(&startTime, tt.in, "foo")
+		mpt, err := metricPointToMpbPoint(startTimestamp, tt.in, "foo")
 		if tt.wantErr != "" {
 			continue
 		}
