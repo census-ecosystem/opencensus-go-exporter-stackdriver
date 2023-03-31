@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/timestamp"
@@ -542,10 +543,25 @@ func TestMetricsToMonitoringMetrics_fromProtoPoint(t *testing.T) {
 				},
 			},
 		},
+		{
+			in: &metricdata.Point{
+				Time:  startTime.Add(5 * time.Nanosecond),
+				Value: int64(17),
+			},
+			want: &monitoringpb.Point{
+				Interval: &monitoringpb.TimeInterval{
+					StartTime: startTimestamp,
+					EndTime:   timestampProto(startTime.Add(time.Millisecond)),
+				},
+				Value: &monitoringpb.TypedValue{
+					Value: &monitoringpb.TypedValue_Int64Value{Int64Value: 17},
+				},
+			},
+		},
 	}
 
 	for i, tt := range tests {
-		mpt, err := metricPointToMpbPoint(startTimestamp, tt.in, "foo")
+		mpt, err := metricPointToMpbPoint(&startTime, tt.in, "foo")
 		if tt.wantErr != "" {
 			continue
 		}
