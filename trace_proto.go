@@ -53,12 +53,6 @@ func protoFromSpanData(s *trace.SpanData, projectID string, mr *monitoredrespb.M
 	spanIDString := s.SpanContext.SpanID.String()
 
 	name := s.Name
-	switch s.SpanKind {
-	case trace.SpanKindClient:
-		name = "Sent." + name
-	case trace.SpanKindServer:
-		name = "Recv." + name
-	}
 
 	sp := &tracepb.Span{
 		Name:                    "projects/" + projectID + "/traces/" + traceIDString + "/spans/" + spanIDString,
