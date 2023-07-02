@@ -411,12 +411,16 @@ func metricPointToMpbPoint(startTime *timestamp.Timestamp, pt *metricdata.Point,
 		return nil, err
 	}
 
+	interval := &monitoringpb.TimeInterval{
+		StartTime: startTime,
+		EndTime:   timestampProto(pt.Time),
+	}
+	if startTime != nil {
+		interval = toValidTimeIntervalpb(startTime.AsTime(), pt.Time)
+	}
 	mpt := &monitoringpb.Point{
-		Value: mptv,
-		Interval: &monitoringpb.TimeInterval{
-			StartTime: startTime,
-			EndTime:   timestampProto(pt.Time),
-		},
+		Value:    mptv,
+		Interval: interval,
 	}
 	return mpt, nil
 }
